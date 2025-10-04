@@ -1,0 +1,8 @@
+{
+  "version": "1.0.1",
+  "settings": {
+    "debug": true,
+    "log_level": "debug"
+  },
+  "new_feature": "enabled"
+}
