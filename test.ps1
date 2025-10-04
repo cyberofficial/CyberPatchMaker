@@ -115,7 +115,8 @@ Test-Step "Dry-run patch application" {
 # Test 6: Copy test version and apply patch
 Test-Step "Apply patch to clean installation" {
     Write-Host "  Copying version 1.0.0 to test directory..." -ForegroundColor Gray
-    Copy-Item -Path "testdata/versions/1.0.0" -Destination "testdata/test-output/test-app" -Recurse -Force
+    New-Item -Path "testdata/test-output/test-app" -ItemType Directory -Force | Out-Null
+    Get-ChildItem -Path "testdata/versions/1.0.0" | Copy-Item -Destination "testdata/test-output/test-app" -Recurse -Force
     
     Write-Host "  Applying patch..." -ForegroundColor Gray
     $output = .\applier.exe --patch .\testdata\test-output\patches\1.0.0-to-1.0.1.patch --current-dir .\testdata\test-output\test-app --verify 2>&1
@@ -173,7 +174,7 @@ Test-Step "Verify patch rejection for modified installation" {
     Write-Host "  Creating modified installation..." -ForegroundColor Gray
     # Copy 1.0.0 contents to modified-app
     New-Item -Path "testdata/test-output/modified-app" -ItemType Directory -Force | Out-Null
-    Copy-Item -Path "testdata/versions/1.0.0/*" -Destination "testdata/test-output/modified-app" -Recurse -Force
+    Get-ChildItem -Path "testdata/versions/1.0.0" | Copy-Item -Destination "testdata/test-output/modified-app" -Recurse -Force
     
     Write-Host "  Modifying key file..." -ForegroundColor Gray
     Add-Content -Path "testdata/test-output/modified-app/program.exe" -Value "CORRUPTED"
@@ -189,7 +190,7 @@ Test-Step "Verify patch rejection for modified installation" {
     if ($outputStr -notmatch "checksum mismatch") {
         throw "Checksum mismatch error not found in output"
     }
-    if ($outputStr -notmatch "Restoring from backup") {
+    if ($outputStr -notmatch "Backup restored successfully") {
         throw "Backup restoration message not found in output"
     }
     
@@ -205,17 +206,18 @@ Test-Step "Verify patch rejection for modified installation" {
 # Test 9: Test with different compression
 Test-Step "Generate patch with gzip compression" {
     Write-Host "  Generating patch with gzip..." -ForegroundColor Gray
-    $output = .\generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\test-output\patches\gzip-test.patch --compression gzip 2>&1
+    New-Item -Path "testdata/test-output/patches-gzip" -ItemType Directory -Force | Out-Null
+    $output = .\generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\test-output\patches-gzip --compression gzip 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         throw "Generator failed with exit code $LASTEXITCODE"
     }
     
-    if (-not (Test-Path "testdata/test-output/patches/gzip-test.patch")) {
+    if (-not (Test-Path "testdata/test-output/patches-gzip/1.0.0-to-1.0.1.patch")) {
         throw "Gzip patch file not created"
     }
     
-    $patchSize = (Get-Item "testdata/test-output/patches/gzip-test.patch").Length
+    $patchSize = (Get-Item "testdata/test-output/patches-gzip/1.0.0-to-1.0.1.patch").Length
     Write-Host "  Gzip patch generated: $patchSize bytes" -ForegroundColor Gray
 }
 
@@ -227,10 +229,10 @@ Test-Step "Apply gzip-compressed patch" {
     }
     # Copy 1.0.0 contents to gzip-app
     New-Item -Path "testdata/test-output/gzip-app" -ItemType Directory -Force | Out-Null
-    Copy-Item -Path "testdata/versions/1.0.0/*" -Destination "testdata/test-output/gzip-app" -Recurse -Force
+    Get-ChildItem -Path "testdata/versions/1.0.0" | Copy-Item -Destination "testdata/test-output/gzip-app" -Recurse -Force
     
     Write-Host "  Applying gzip patch..." -ForegroundColor Gray
-    $output = .\applier.exe --patch .\testdata\test-output\patches\gzip-test.patch --current-dir .\testdata\test-output\gzip-app --verify 2>&1
+    $output = .\applier.exe --patch .\testdata\test-output\patches-gzip\1.0.0-to-1.0.1.patch --current-dir .\testdata\test-output\gzip-app --verify 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         throw "Gzip patch application failed with exit code $LASTEXITCODE"

@@ -146,7 +146,7 @@ test_step "Verify patch rejection for modified installation" '
     [ $? -ne 0 ] || { echo "Patch should have been rejected but succeeded"; exit 1; }
     
     echo "$output" | grep -q "checksum mismatch" || { echo "Checksum mismatch error not found"; exit 1; }
-    echo "$output" | grep -q "Restoring from backup" || { echo "Backup restoration message not found"; exit 1; }
+    echo "$output" | grep -q "Backup restored successfully" || { echo "Backup restoration message not found"; exit 1; }
     
     # Verify file was restored
     diff testdata/test-output/modified-app/program.exe testdata/versions/1.0.0/program.exe > /dev/null || { echo "Modified file was not restored from backup"; exit 1; }
@@ -157,11 +157,12 @@ test_step "Verify patch rejection for modified installation" '
 # Test 9: Test with different compression
 test_step "Generate patch with gzip compression" '
     echo -e "  ${GRAY}Generating patch with gzip...${NC}"
-    ./generator --versions-dir ./testdata/versions --from 1.0.0 --to 1.0.1 --output ./testdata/test-output/patches/gzip-test.patch --compression gzip > /dev/null 2>&1 || { echo "Generator failed"; exit 1; }
+    mkdir -p testdata/test-output/patches-gzip
+    ./generator --versions-dir ./testdata/versions --from 1.0.0 --to 1.0.1 --output ./testdata/test-output/patches-gzip --compression gzip > /dev/null 2>&1 || { echo "Generator failed"; exit 1; }
     
-    [ -f "testdata/test-output/patches/gzip-test.patch" ] || { echo "Gzip patch file not created"; exit 1; }
+    [ -f "testdata/test-output/patches-gzip/1.0.0-to-1.0.1.patch" ] || { echo "Gzip patch file not created"; exit 1; }
     
-    patch_size=$(stat -f%z "testdata/test-output/patches/gzip-test.patch" 2>/dev/null || stat -c%s "testdata/test-output/patches/gzip-test.patch" 2>/dev/null)
+    patch_size=$(stat -f%z "testdata/test-output/patches-gzip/1.0.0-to-1.0.1.patch" 2>/dev/null || stat -c%s "testdata/test-output/patches-gzip/1.0.0-to-1.0.1.patch" 2>/dev/null)
     echo -e "  ${GRAY}Gzip patch generated: $patch_size bytes${NC}"
 '
 
@@ -173,7 +174,7 @@ test_step "Apply gzip-compressed patch" '
     cp -r testdata/versions/1.0.0/. testdata/test-output/gzip-app/
     
     echo -e "  ${GRAY}Applying gzip patch...${NC}"
-    ./applier --patch ./testdata/test-output/patches/gzip-test.patch --current-dir ./testdata/test-output/gzip-app --verify > /dev/null 2>&1 || { echo "Gzip patch application failed"; exit 1; }
+    ./applier --patch ./testdata/test-output/patches-gzip/1.0.0-to-1.0.1.patch --current-dir ./testdata/test-output/gzip-app --verify > /dev/null 2>&1 || { echo "Gzip patch application failed"; exit 1; }
     
     # Verify result matches expected version
     diff testdata/test-output/gzip-app/program.exe testdata/versions/1.0.1/program.exe > /dev/null || { echo "Gzip patched files do not match expected version"; exit 1; }
