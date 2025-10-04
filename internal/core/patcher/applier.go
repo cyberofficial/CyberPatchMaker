@@ -22,7 +22,7 @@ func NewApplier() *Applier {
 }
 
 // ApplyPatch applies a patch to a target directory
-func (a *Applier) ApplyPatch(patch *utils.Patch, targetDir string, verifyBefore, verifyAfter bool) error {
+func (a *Applier) ApplyPatch(patch *utils.Patch, targetDir string, verifyBefore, verifyAfter bool, createBackup bool) error {
 	fmt.Printf("Applying patch from %s to %s...\n", patch.FromVersion, patch.ToVersion)
 
 	// Verify target directory exists
@@ -41,6 +41,16 @@ func (a *Applier) ApplyPatch(patch *utils.Patch, targetDir string, verifyBefore,
 			return fmt.Errorf("required files verification failed: %w", err)
 		}
 		fmt.Println("Pre-patch verification successful")
+	}
+
+	// Create backup AFTER verification passes but BEFORE applying operations
+	if createBackup {
+		fmt.Println("\nCreating backup...")
+		backupDir := targetDir + ".backup"
+		if err := a.createBackup(targetDir, backupDir); err != nil {
+			return fmt.Errorf("failed to create backup: %w", err)
+		}
+		fmt.Printf("Backup created at: %s\n", backupDir)
 	}
 
 	// Apply operations
@@ -62,6 +72,15 @@ func (a *Applier) ApplyPatch(patch *utils.Patch, targetDir string, verifyBefore,
 			return fmt.Errorf("post-patch verification failed: %w", err)
 		}
 		fmt.Println("Post-patch verification successful")
+	}
+
+	// Clean up backup if successful
+	if createBackup {
+		fmt.Println("Removing backup...")
+		backupDir := targetDir + ".backup"
+		if err := os.RemoveAll(backupDir); err != nil {
+			fmt.Printf("Warning: failed to remove backup: %v\n", err)
+		}
 	}
 
 	fmt.Println("Patch applied successfully")
@@ -282,6 +301,52 @@ func (a *Applier) verifyPatchedFiles(targetDir string, operations []utils.PatchO
 
 	if len(mismatches) > 0 {
 		return fmt.Errorf("found %d mismatches:\n%v", len(mismatches), mismatches)
+	}
+
+	return nil
+}
+
+// createBackup creates a backup of the target directory
+func (a *Applier) createBackup(srcDir, backupDir string) error {
+	// Remove existing backup if it exists
+	if utils.FileExists(backupDir) {
+		if err := os.RemoveAll(backupDir); err != nil {
+			return fmt.Errorf("failed to remove existing backup: %w", err)
+		}
+	}
+
+	// Create backup directory
+	if err := utils.EnsureDir(backupDir); err != nil {
+		return fmt.Errorf("failed to create backup directory: %w", err)
+	}
+
+	// Copy all files
+	return a.copyDir(srcDir, backupDir)
+}
+
+// copyDir recursively copies a directory
+func (a *Applier) copyDir(src, dst string) error {
+	entries, err := os.ReadDir(src)
+	if err != nil {
+		return err
+	}
+
+	for _, entry := range entries {
+		srcPath := filepath.Join(src, entry.Name())
+		dstPath := filepath.Join(dst, entry.Name())
+
+		if entry.IsDir() {
+			if err := utils.EnsureDir(dstPath); err != nil {
+				return err
+			}
+			if err := a.copyDir(srcPath, dstPath); err != nil {
+				return err
+			}
+		} else {
+			if err := utils.CopyFile(srcPath, dstPath); err != nil {
+				return err
+			}
+		}
 	}
 
 	return nil

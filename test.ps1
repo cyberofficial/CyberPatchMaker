@@ -190,17 +190,14 @@ Test-Step "Verify patch rejection for modified installation" {
     if ($outputStr -notmatch "checksum mismatch") {
         throw "Checksum mismatch error not found in output"
     }
-    if ($outputStr -notmatch "Backup restored successfully") {
-        throw "Backup restoration message not found in output"
-    }
     
-    # Verify file was restored
+    # Verify file remains in corrupted state (no backup was created since verification failed early)
     $diff = Compare-Object (Get-Content "testdata/test-output/modified-app/program.exe") (Get-Content "testdata/versions/1.0.0/program.exe")
-    if ($diff) {
-        throw "Modified file was not restored from backup"
+    if (-not $diff) {
+        throw "File should still be corrupted, but matches original"
     }
     
-    Write-Host "  Patch correctly rejected and backup restored" -ForegroundColor Gray
+    Write-Host "  Patch correctly rejected before any modifications" -ForegroundColor Gray
 }
 
 # Test 9: Test with different compression

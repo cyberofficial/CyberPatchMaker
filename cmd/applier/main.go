@@ -62,28 +62,21 @@ func main() {
 		return
 	}
 
-	// Create backup if requested
-	if *backup {
-		fmt.Println("\nCreating backup...")
-		backupDir := *currentDir + ".backup"
-		if err := createBackup(*currentDir, backupDir); err != nil {
-			fmt.Printf("Error: failed to create backup: %v\n", err)
-			os.Exit(1)
-		}
-		fmt.Printf("Backup created at: %s\n", backupDir)
-	}
-
-	// Apply patch
+	// Apply patch (backup will be created internally after verification)
 	fmt.Println("\nApplying patch...")
 	applier := patcher.NewApplier()
-	if err := applier.ApplyPatch(patch, *currentDir, *verify, *verify); err != nil {
+	if err := applier.ApplyPatch(patch, *currentDir, *verify, *verify, *backup); err != nil {
 		fmt.Printf("Error: patch application failed: %v\n", err)
 		if *backup {
-			fmt.Println("Restoring from backup...")
-			if restoreErr := restoreBackup(*currentDir+".backup", *currentDir); restoreErr != nil {
-				fmt.Printf("Error: failed to restore backup: %v\n", restoreErr)
-			} else {
-				fmt.Println("Backup restored successfully")
+			// Restore from backup if it exists
+			backupDir := *currentDir + ".backup"
+			if utils.FileExists(backupDir) {
+				fmt.Println("Restoring from backup...")
+				if restoreErr := restoreBackup(backupDir, *currentDir); restoreErr != nil {
+					fmt.Printf("Error: failed to restore backup: %v\n", restoreErr)
+				} else {
+					fmt.Println("Backup restored successfully")
+				}
 			}
 		}
 		os.Exit(1)
@@ -91,14 +84,6 @@ func main() {
 
 	fmt.Println("\n=== Patch Applied Successfully ===")
 	fmt.Printf("Version updated from %s to %s\n", patch.FromVersion, patch.ToVersion)
-
-	// Clean up backup if successful
-	if *backup {
-		fmt.Println("Removing backup...")
-		if err := os.RemoveAll(*currentDir + ".backup"); err != nil {
-			fmt.Printf("Warning: failed to remove backup: %v\n", err)
-		}
-	}
 }
 
 func loadPatch(filename string) (*utils.Patch, error) {
