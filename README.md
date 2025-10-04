@@ -23,6 +23,7 @@ Perfect for:
 
 ✅ **Safe & Reliable** - Automatic verification and rollback if anything goes wrong  
 ✅ **Efficient** - Smart compression reduces patch sizes by ~60%  
+✅ **Bidirectional** - Generate both upgrade and downgrade patches for version flexibility  
 ✅ **Cross-Platform** - Works on Windows, macOS, and Linux  
 ✅ **Developer-Friendly** - Simple command-line tools  
 ✅ **Production-Ready** - Built-in backup and recovery systems
@@ -74,6 +75,23 @@ The `--verify` flag ensures everything is checked before and after patching, wit
 - [Applier Guide](docs/applier-guide.md) - All patch application options
 - [CLI Reference](docs/cli-reference.md) - Complete command reference
 - [CLI Examples](docs/CLI-EXAMPLES.md) - Common usage patterns
+- [Downgrade Guide](docs/downgrade-guide.md) - Rollback to previous versions
+
+### Downgrade Patches (Rolling Back)
+
+Need to rollback to a previous version? CyberPatchMaker supports bidirectional patches:
+
+```bash
+# Generate downgrade patch
+generator --from 1.0.3 --to 1.0.2 --versions-dir ./versions --output ./patches/downgrade
+
+# Apply downgrade to rollback
+applier --patch ./patches/downgrade/1.0.3-to-1.0.2.patch --current-dir ./app --verify
+```
+
+This allows users to safely revert to an earlier version if needed.
+
+📖 **Complete downgrade documentation:** [Downgrade Guide](docs/downgrade-guide.md)
 
 ## How It Works (Simple Version)
 

@@ -10,6 +10,7 @@ Welcome to the CyberPatchMaker documentation wiki. This comprehensive guide cove
 ### User Guides
 - [Generator Tool Guide](generator-guide.md) - Complete guide to patch generation
 - [Applier Tool Guide](applier-guide.md) - Complete guide to patch application
+- [Downgrade Guide](downgrade-guide.md) - Rollback to previous versions
 - [CLI Reference](cli-reference.md) - Quick command-line reference
 - [Version Management](version-management.md) - Managing multiple versions
 - [Compression Options](compression-guide.md) - Choosing the right compression

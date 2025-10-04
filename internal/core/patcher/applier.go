@@ -205,10 +205,10 @@ func (a *Applier) applyAddDir(targetPath string) error {
 	return nil
 }
 
-// applyDeleteDir removes an empty directory
+// applyDeleteDir removes a directory and all its contents
 func (a *Applier) applyDeleteDir(targetPath string) error {
 	if utils.FileExists(targetPath) {
-		if err := os.Remove(targetPath); err != nil {
+		if err := os.RemoveAll(targetPath); err != nil {
 			return fmt.Errorf("failed to delete directory: %w", err)
 		}
 
@@ -277,7 +277,7 @@ func (a *Applier) verifyPatchedFiles(targetDir string, operations []utils.PatchO
 	mismatches := make([]string, 0)
 
 	for _, op := range operations {
-		if op.Type == utils.OpDelete || op.Type == utils.OpDeleteDir {
+		if op.Type == utils.OpDelete || op.Type == utils.OpDeleteDir || op.Type == utils.OpAddDir {
 			continue
 		}
 

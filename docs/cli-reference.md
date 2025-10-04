@@ -135,6 +135,49 @@ applier --patch ./patches/1.0.2-to-1.0.3.patch \
         --verify
 ```
 
+### Downgrade Patches (Rollback to Previous Version)
+
+**Generate downgrade patch:**
+```bash
+# Generate patch to downgrade from 1.0.3 back to 1.0.2
+generator --from 1.0.3 \
+          --to 1.0.2 \
+          --versions-dir ./versions \
+          --output ./patches/downgrade \
+          --verify
+```
+
+**Apply downgrade patch:**
+```bash
+# Test rollback
+applier --patch ./patches/downgrade/1.0.3-to-1.0.2.patch \
+        --current-dir ./test-app \
+        --dry-run
+
+# Apply rollback to production
+applier --patch ./patches/downgrade/1.0.3-to-1.0.2.patch \
+        --current-dir C:\Production\MyApp \
+        --verify
+```
+
+**Generate all downgrade paths from current version:**
+```bash
+# From 1.0.3 to all previous versions
+generator --from 1.0.3 --to 1.0.2 --versions-dir ./versions --output ./patches/downgrade
+generator --from 1.0.3 --to 1.0.1 --versions-dir ./versions --output ./patches/downgrade
+generator --from 1.0.3 --to 1.0.0 --versions-dir ./versions --output ./patches/downgrade
+```
+
+**Result:**
+```
+patches/downgrade/
+├── 1.0.3-to-1.0.2.patch
+├── 1.0.3-to-1.0.1.patch
+└── 1.0.3-to-1.0.0.patch
+```
+
+> **Note:** For complete downgrade documentation, see [Downgrade Guide](downgrade-guide.md)
+
 ### Custom Patch with Maximum Compression
 
 ```bash
