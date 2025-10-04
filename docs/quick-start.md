@@ -161,17 +161,11 @@ See [Troubleshooting](troubleshooting.md) for more help.
 
 ## Testing
 
-Want to verify everything works? Run the test suite:
+Want to verify everything works? Run the comprehensive test suite:
 
 **Windows:**
 ```powershell
-.\test.ps1
+.\advanced-test.ps1
 ```
 
-**Linux/macOS:**
-```bash
-chmod +x test.sh
-./test.sh
-```
-
-This runs 10 automated tests to validate the entire system.
+This runs 20 automated tests to validate the entire system. Test data is automatically generated on first run, so there's no setup required!

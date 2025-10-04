@@ -274,28 +274,24 @@ go build -gcflags="all=-N -l" ./cmd/generator
 
 **Windows (PowerShell):**
 ```powershell
-./test.ps1
+.\advanced-test.ps1
 ```
 
-**Linux/macOS:**
-```bash
-./test.sh
-```
+Test data is automatically generated on first run.
 
-**Expected output:**
+**Expected output (first run):**
 ```
+Checking for test versions...
+Version 1.0.0 not found, creating...
+Version 1.0.0 created (3 files, 2 directories)
+Version 1.0.1 not found, creating...
+Version 1.0.1 created (4 files, 2 directories)
+Version 1.0.2 not found, creating...
+Version 1.0.2 created (11 files, 6 directories, 3 levels deep)
+Created 3 test version(s)
+
 === Test Results ===
-Tests passed: 10/10
-- patch_same_version
-- patch_forward_one
-- patch_forward_two
-- patch_skip_version
-- patch_backward_one
-- backup_verify
-- backup_restore
-- modified_source
-- missing_file
-- corrupted_patch
+All 20 tests passed!
 ```
 
 ---
@@ -417,8 +413,7 @@ CyberPatchMaker/
 │
 ├── go.mod                # Go module definition
 ├── go.sum                # Dependency checksums
-├── test.ps1              # Windows test script
-├── test.sh               # Linux/macOS test script
+├── advanced-test.ps1     # Comprehensive test suite (20 tests)
 ├── LICENSE               # Apache 2.0 license
 └── README.md             # Project README
 ```
@@ -1038,9 +1033,9 @@ benchcmp before.txt after.txt
 ```
 
 6. **Verify correctness:**
-```bash
+```powershell
 go test ./...
-./test.ps1  # or ./test.sh
+.\advanced-test.ps1
 ```
 
 ---

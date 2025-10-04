@@ -15,11 +15,10 @@ go build ./cmd/generator
 go build ./cmd/applier
 
 # Run tests
-./test.ps1          # Windows
-./test.sh           # Linux/macOS
+.\advanced-test.ps1  # Windows only
 ```
 
-If tests pass (10/10), your setup is correct!
+If all 20 tests pass, your setup is correct! Test data is auto-generated on first run.
 
 ---
 
@@ -677,7 +676,7 @@ net use Z: \\server\share
 **Solutions:**
 ```bash
 # Make tools executable
-chmod +x generator applier test.sh
+chmod +x generator applier
 
 # Verify
 ls -la generator applier
@@ -707,11 +706,11 @@ ls -la generator applier
 
 When reporting issues, include:
 
-1. **Platform**: Windows, Linux, macOS
+1. **Platform**: Windows (Linux/macOS not currently supported)
 2. **Go version**: `go version`
 3. **Command used**: Full command with all flags
 4. **Error message**: Complete error output
-5. **Test results**: `./test.ps1` or `./test.sh` output
+5. **Test results**: `.\advanced-test.ps1` output
 6. **File sizes**: Size of versions and patches
 7. **Disk space**: Available space on relevant drives
 
@@ -721,7 +720,7 @@ Platform: Windows 11
 Go version: go1.21.3 windows/amd64
 Command: .\applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir .\myapp --verify
 Error: Pre-verification failed: key file checksum mismatch
-Test results: 10/10 passing
+Test results: 20/20 passing
 Sizes: Version 1.0.0 = 5.2GB, Version 1.0.1 = 5.3GB, Patch = 50MB
 Disk space: 100GB free on C: drive
 ```

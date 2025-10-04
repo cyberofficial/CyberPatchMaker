@@ -1,254 +1,148 @@
 # Testing Guide
 
-Guide to running and understanding CyberPatchMaker's test suite.
+Guide to running and understanding CyberPatchMaker's comprehensive test suite.
 
 ## Overview
 
-CyberPatchMaker includes comprehensive test suites for both Windows (PowerShell) and Linux/macOS (Bash). These tests validate all core functionality including generation, application, verification, and error handling.
+CyberPatchMaker includes a comprehensive test suite with 20 tests that validate all core functionality including generation, application, verification, error handling, and advanced scenarios like multi-hop patching, compression formats, and automatic rollback.
 
-## Test Suites
+**Key Feature:** Test data is automatically generated on first run - no bloat files committed to the repository!
 
-### Windows Test Suite
+## Test Suite
 
-**File:** `test.ps1`
+### Advanced Test Suite
+
+**File:** `advanced-test.ps1`
 **Shell:** PowerShell 5.1 or later
-**Platform:** Windows only
-
-### Linux/macOS Test Suite
-
-**File:** `test.sh`
-**Shell:** Bash 4.0 or later
-**Platform:** Linux, macOS, WSL
+**Platform:** Windows (PowerShell)
+**Tests:** 20 comprehensive tests
+**Test Data:** Auto-generated on first run (1.0.0, 1.0.1, 1.0.2)
 
 ## Running Tests
 
 ### Windows (PowerShell)
 
 ```powershell
-# Run all tests
-.\test.ps1
+# Run the comprehensive test suite
+.\advanced-test.ps1
 
-# Output:
-Running CyberPatchMaker Test Suite...
-==================================================
-Test 1: Build tools... ✓ PASS
-Test 2: Directory structure... ✓ PASS
-Test 3: Generate patches (batch mode)... ✓ PASS
-Test 4: Patch file existence... ✓ PASS
-Test 5: Apply patch with verification... ✓ PASS
-Test 6: Version verification... ✓ PASS
-Test 7: Dry-run mode... ✓ PASS
-Test 8: Pre-verification failure... ✓ PASS
-Test 9: Compression options... ✓ PASS
-Test 10: Cleanup... ✓ PASS
-==================================================
-All tests passed! (10/10)
+# First run output (auto-generates test data):
+Checking for test versions...
+Version 1.0.0 not found, creating...
+  Creating version 1.0.0...
+  Version 1.0.0 created (3 files, 2 directories)
+Version 1.0.1 not found, creating...
+  Creating version 1.0.1...
+  Version 1.0.1 created (4 files, 2 directories)
+Version 1.0.2 not found, creating...
+  Creating version 1.0.2...
+  Version 1.0.2 created (11 files, 6 directories, 3 levels deep)
+
+Created 3 test version(s)
+
+# Then runs all tests:
+Running CyberPatchMaker Advanced Test Suite
+========================================
+Test 1: Build generator tool... ✓ PASS
+Test 2: Build applier tool... ✓ PASS
+...
+Test 20: Cleanup test files... ✓ PASS
+========================================
+Advanced Test Results
+========================================
+Passed: 20
+Failed: 0
+
+✓ All advanced tests passed!
 ```
 
----
-
-### Linux/macOS (Bash)
-
-```bash
-# Make script executable (first time only)
-chmod +x test.sh
-
-# Run all tests
-./test.sh
-
-# Output:
-Running CyberPatchMaker Test Suite...
-==================================================
-Test 1: Build tools... ✓ PASS
-Test 2: Directory structure... ✓ PASS
-Test 3: Generate patches (batch mode)... ✓ PASS
-Test 4: Patch file existence... ✓ PASS
-Test 5: Apply patch with verification... ✓ PASS
-Test 6: Version verification... ✓ PASS
-Test 7: Dry-run mode... ✓ PASS
-Test 8: Pre-verification failure... ✓ PASS
-Test 9: Compression options... ✓ PASS
-Test 10: Cleanup... ✓ PASS
-==================================================
-All tests passed! (10/10)
-```
+**Note:** The test script automatically generates test versions on first run. Subsequent runs will use the existing test data unless you delete the `testdata/versions/` directory
 
 ---
 
-## Test Descriptions
+## Test Suite Overview
 
-### Test 1: Build Tools
+The advanced test suite includes 20 comprehensive tests organized into several categories:
 
-**Purpose:** Verify tools can be built from source
+### Core Functionality Tests (Tests 1-6)
+1. **Build Generator Tool** - Verifies generator.exe compiles correctly
+2. **Build Applier Tool** - Verifies applier.exe compiles correctly
+3. **Auto-Generate Test Versions** - Creates test data (1.0.0, 1.0.1, 1.0.2) if missing
+4. **Generate Patches (Batch)** - Tests batch patch generation from all versions to 1.0.2
+5. **Patch File Verification** - Confirms all expected patch files were created
+6. **Apply Simple Patch** - Tests basic patch application (1.0.0 → 1.0.1)
 
-**What it does:**
-1. Runs `go build` for generator tool
-2. Runs `go build` for applier tool
-3. Verifies executables were created
+### Verification Tests (Tests 7-9)
+7. **Verify Patch Results** - Confirms all files match expected checksums after patching
+8. **Pre-Verification Test** - Ensures system detects source version before patching
+9. **Wrong Version Detection** - Verifies system rejects patches for wrong versions
 
-**Expected result:** Both tools build successfully
+### Compression Tests (Tests 10-12)
+10. **Zstd Compression** - Tests high-performance zstd compression
+11. **Gzip Compression** - Tests universal gzip compression
+12. **No Compression** - Tests uncompressed patches
 
-**Why it matters:** Ensures code compiles and is syntactically correct
+### Advanced Scenario Tests (Tests 13-17)
+13. **Complex Directory Structure** - Tests 3-level nested directories (1.0.1 → 1.0.2)
+14. **Multi-Hop Patching** - Tests sequential patching (1.0.0 → 1.0.1 → 1.0.2)
+15. **File Corruption Detection** - Verifies system detects corrupted files before patching
+16. **Dry-Run Mode** - Tests preview mode without making changes
+17. **Backup System** - Verifies automatic backup creation and restoration
 
----
+### Performance & Cleanup Tests (Tests 18-20)
+18. **Performance Benchmark** - Measures patch generation speed
+19. **Verify All Operations** - Final comprehensive check of all test versions
+20. **Cleanup Test Files** - Removes temporary test artifacts
 
-### Test 2: Directory Structure
+### Test Data Structure
 
-**Purpose:** Verify test data structure exists
+**Auto-generated test versions:**
 
-**What it does:**
-1. Checks `testdata/` directory exists
-2. Checks version folders exist (1.0.0, 1.0.1, 1.0.2)
+**Version 1.0.0** (Baseline - 3 files, 2 directories):
 3. Checks test file exists in each version
 
 **Expected result:** All directories and files present
 
-**Why it matters:** Test data is properly set up for subsequent tests
-
-**Test data structure:**
 ```
-testdata/
-├── 1.0.0/
-│   └── test-app.txt (contains: "Version 1.0.0")
-├── 1.0.1/
-│   └── test-app.txt (contains: "Version 1.0.1")
-└── 1.0.2/
-    └── test-app.txt (contains: "Version 1.0.2")
+testdata/versions/1.0.0/
+├── program.exe         # "Test Program v1.0.0\n"
+├── data/
+│   └── config.json     # JSON config file
+└── libs/
+    └── core.dll        # "Core Library v1.0.0\n"
 ```
 
----
+**Version 1.0.1** (Simple update - 4 files, 2 directories):
+```
+testdata/versions/1.0.1/
+├── program.exe         # Modified: "Test Program v1.0.1\n"
+├── data/
+│   └── config.json     # Modified: updated features
+└── libs/
+    ├── core.dll        # Modified: "Core Library v1.5.0\n"
+    └── newfeature.dll  # NEW: "New Feature v1.0.0\n"
+```
 
-### Test 3: Generate Patches (Batch Mode)
-
-**Purpose:** Test patch generation in batch mode
-
-**What it does:**
-1. Creates test version directories (1.0.0, 1.0.1, 1.0.2)
-2. Runs generator in batch mode: all versions → 1.0.2
-3. Verifies command exits successfully
-
-**Expected result:** Generator succeeds, exit code 0
-
-**Why it matters:** Core patch generation functionality works
-
-**Generated patches:**
-- `1.0.0-to-1.0.2.patch`
-- `1.0.1-to-1.0.2.patch`
-
----
-
-### Test 4: Patch File Existence
-
-**Purpose:** Verify patch files were created
-
-**What it does:**
-1. Checks `testdata/patches/1.0.0-to-1.0.2.patch` exists
-2. Checks `testdata/patches/1.0.1-to-1.0.2.patch` exists
-
-**Expected result:** Both patch files exist
-
-**Why it matters:** Generator actually creates output files
-
----
-
-### Test 5: Apply Patch with Verification
-
-**Purpose:** Test patch application with full verification
-
-**What it does:**
-1. Creates test application directory from 1.0.0
-2. Applies patch with `--verify` flag
-3. Verifies command exits successfully
-
-**Expected result:** Patch applies successfully, exit code 0
-
-**Why it matters:** Core patch application functionality works
-
----
-
-### Test 6: Version Verification
-
-**Purpose:** Verify patch updated the version correctly
-
-**What it does:**
-1. Reads content of `test-app/test-app.txt`
-2. Verifies it contains "Version 1.0.2"
-
-**Expected result:** File contains expected version string
-
-**Why it matters:** Patch actually modified files correctly
-
----
-
-### Test 7: Dry-Run Mode
-
-**Purpose:** Test dry-run preview functionality
-
-**What it does:**
-1. Creates fresh test application directory from 1.0.1
-2. Runs applier with `--dry-run` flag
-3. Verifies command exits successfully
-4. Verifies version was NOT changed (still 1.0.1)
-
-**Expected result:** 
-- Command succeeds
-- Version remains unchanged (1.0.1)
-
-**Why it matters:** Dry-run doesn't modify files (preview only)
-
----
-
-### Test 8: Pre-Verification Failure
-
-**Purpose:** Test detection of modified installations
-
-**What it does:**
-1. Creates test application directory from 1.0.1
-2. **Corrupts the test file** (modifies content)
-3. Attempts to apply patch with verification
-4. Verifies command FAILS (exit code ≠ 0)
-5. Verifies corruption remains (file still modified)
-
-**Expected result:**
-- Command fails (corrupted installation detected)
-- Backup is NOT created
-- No changes made (file remains corrupted)
-
-**Why it matters:** System properly rejects patches on corrupted installations
-
-**This is the critical backup timing test!**
-
----
-
-### Test 9: Compression Options
-
-**Purpose:** Test different compression algorithms
-
-**What it does:**
-1. Generates patch with gzip compression
-2. Verifies command exits successfully
-3. Verifies patch file was created
-
-**Expected result:** 
-- Generator succeeds with gzip
-- Patch file exists
-
-**Why it matters:** Alternative compression algorithms work
-
----
-
-### Test 10: Cleanup
-
-**Purpose:** Clean up test artifacts
-
-**What it does:**
-1. Removes test application directory
-2. Removes generated patches
-3. Removes executables
-
-**Expected result:** All test artifacts removed
-
-**Why it matters:** Clean environment for next test run
+**Version 1.0.2** (Complex structure - 11 files, 6 directories, 3 levels deep):
+```
+testdata/versions/1.0.2/
+├── program.exe                   # Modified: v1.0.2
+├── data/
+│   ├── config.json               # Modified: added features
+│   ├── assets/images/            # NEW: 3 levels deep
+│   │   ├── logo.png              # NEW: binary PNG file
+│   │   └── icon.png              # NEW: binary PNG file
+│   └── locale/                   # NEW: directory
+│       └── en-US.json            # NEW: localization file
+├── libs/
+│   ├── core.dll                  # Modified: v2.5.0
+│   ├── newfeature.dll            # Modified: v1.5.0
+│   └── plugins/                  # NEW: directory
+│       └── api.dll               # NEW: plugin file
+└── plugins/                      # NEW: root-level directory
+    ├── sample.plugin             # NEW: plugin file
+    └── sample.json               # NEW: plugin config
+```
 
 ---
 
@@ -393,22 +287,12 @@ jobs:
       - uses: actions/setup-go@v4
         with:
           go-version: '1.21'
-      - name: Run tests
-        run: .\test.ps1
+      - name: Run advanced test suite
+        run: .\advanced-test.ps1
         shell: pwsh
-
-  test-linux:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
-        with:
-          go-version: '1.21'
-      - name: Run tests
-        run: |
-          chmod +x test.sh
-          ./test.sh
 ```
+
+**Note:** Test data is auto-generated on first run, so no additional setup is required
 
 ---
 
@@ -514,37 +398,36 @@ rm generator applier
 
 ---
 
-## Writing New Tests
+## Adding New Tests
 
-### Test Template
+To add new tests to the advanced test suite:
 
-```bash
-# Test N: Description
-echo -n "Test N: Description... "
-
-# Setup
-# ... prepare test environment ...
-
-# Execute
-# ... run command ...
-EXIT_CODE=$?
-
-# Verify
-if [ $EXIT_CODE -eq 0 ]; then
-    # Additional checks
-    if [ -f expected_file ]; then
-        echo "✓ PASS"
-    else
-        echo "✗ FAIL"
-        echo "  Expected file not found"
-        exit 1
-    fi
-else
-    echo "✗ FAIL"
-    echo "  Command failed with exit code $EXIT_CODE"
-    exit 1
-fi
-```
+1. **Edit advanced-test.ps1**
+2. **Add new test function** following the pattern:
+   ```powershell
+   function Test-NewFeature {
+       Write-Host "Test N: New feature description... " -NoNewline
+       
+       # Setup
+       # ... prepare test environment ...
+       
+       # Execute
+       $result = # ... run command ...
+       
+       # Verify
+       if ($result) {
+           Write-Host "✓ PASS" -ForegroundColor Green
+           return $true
+       } else {
+           Write-Host "✗ FAIL" -ForegroundColor Red
+           Write-Host "  Error description"
+           return $false
+       }
+   }
+   ```
+3. **Add test to main execution block**
+4. **Update test count** in summary section
+5. **Test thoroughly** before committing
 
 ---
 

@@ -457,24 +457,26 @@ Output: Success/Error Message
 ## Testing Architecture
 
 ### Test Suite Location
-- `test.ps1` (Windows PowerShell)
-- `test.sh` (Linux/macOS Bash)
+- `advanced-test.ps1` (Windows PowerShell)
 
 ### Test Data
-- `testdata/versions/` - Sample versions
+- Auto-generated on first run (not committed to repository)
+- `testdata/versions/` - Generated test versions (1.0.0, 1.0.1, 1.0.2)
 - `testdata/test-output/` - Test execution workspace
 
-### Test Coverage
-1. Build validation
-2. Environment setup
-3. Test data verification
-4. Patch generation (zstd)
-5. Dry-run mode
-6. Patch application
-7. File verification
-8. Error handling (rejection)
-9. Compression alternatives (gzip)
-10. End-to-end validation
+### Test Coverage (20 Comprehensive Tests)
+1. Build validation (generator and applier)
+2. Test data auto-generation
+3. Basic patch generation (zstd compression)
+4. Basic patch application
+5. Dry-run mode validation
+6. Pre-verification (key file + all required files)
+7. Post-verification (all modified files)
+8. Patch rejection (wrong version)
+9. Patch rejection (missing files)
+10-12. Compression alternatives (zstd, gzip, none)
+13-17. Advanced scenarios (multi-hop patching, performance benchmarks)
+18-20. Cleanup and validation
 
 See [Testing Guide](testing-guide.md) for details.
 
