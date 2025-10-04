@@ -107,6 +107,16 @@ function Create-Version-1.0.2 {
 
 # Function to ensure all test versions exist
 function Ensure-Test-Versions {
+    # Check if testdata was kept from previous run
+    $cleanupStatePath = "testdata/.cleanup-deferred"
+    if (Test-Path $cleanupStatePath) {
+        Write-Host "Previous test data detected (cleanup was deferred)..." -ForegroundColor Yellow
+        Write-Host "Removing old test data..." -ForegroundColor Yellow
+        Remove-Item "testdata" -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "✓ Old test data removed" -ForegroundColor Green
+        Write-Host ""
+    }
+    
     Write-Host "Checking for test versions..." -ForegroundColor Cyan
     
     $versionsCreated = 0
@@ -661,8 +671,67 @@ if ($failed -eq 0) {
     Write-Host "  • Deep file path operations" -ForegroundColor Gray
     Write-Host ""
     Write-Host "CyberPatchMaker advanced functionality verified!" -ForegroundColor Green
+    
+    # Cleanup prompt
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host "Test Data Cleanup" -ForegroundColor Cyan
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Test data is located in: .\testdata\" -ForegroundColor Gray
+    Write-Host ""
+    
+    $response = Read-Host "Would you like to clean up test data now? (Y/N)"
+    
+    if ($response -match '^[Yy]') {
+        Write-Host ""
+        Write-Host "Cleaning up test data..." -ForegroundColor Yellow
+        Remove-Item "testdata" -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "✓ Test data removed" -ForegroundColor Green
+        Write-Host ""
+    } else {
+        Write-Host ""
+        Write-Host "Test data kept for inspection." -ForegroundColor Cyan
+        Write-Host "Note: On next run, test data will be automatically removed and recreated." -ForegroundColor Yellow
+        Write-Host ""
+        
+        # Create state file to track deferred cleanup
+        New-Item -ItemType Directory -Force -Path "testdata" -ErrorAction SilentlyContinue | Out-Null
+        Set-Content -Path "testdata/.cleanup-deferred" -Value "cleanup deferred from previous run"
+    }
+    
     exit 0
 } else {
     Write-Host "✗ Some advanced tests failed. Please check the output above." -ForegroundColor Red
+    
+    # Cleanup prompt even on failure
+    Write-Host ""
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host "Test Data Cleanup" -ForegroundColor Cyan
+    Write-Host "========================================" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Test data is located in: .\testdata\" -ForegroundColor Gray
+    Write-Host "You may want to keep it to inspect the failure." -ForegroundColor Yellow
+    Write-Host ""
+    
+    $response = Read-Host "Would you like to clean up test data now? (Y/N)"
+    
+    if ($response -match '^[Yy]') {
+        Write-Host ""
+        Write-Host "Cleaning up test data..." -ForegroundColor Yellow
+        Remove-Item "testdata" -Recurse -Force -ErrorAction SilentlyContinue
+        Write-Host "✓ Test data removed" -ForegroundColor Green
+        Write-Host ""
+    } else {
+        Write-Host ""
+        Write-Host "Test data kept for inspection." -ForegroundColor Cyan
+        Write-Host "Note: On next run, test data will be automatically removed and recreated." -ForegroundColor Yellow
+        Write-Host ""
+        
+        # Create state file to track deferred cleanup
+        New-Item -ItemType Directory -Force -Path "testdata" -ErrorAction SilentlyContinue | Out-Null
+        Set-Content -Path "testdata/.cleanup-deferred" -Value "cleanup deferred from previous run"
+    }
+    
     exit 1
 }

@@ -305,9 +305,9 @@ go test ./...
 
 **Run specific package:**
 ```bash
-go test ./pkg/patcher
-go test ./pkg/manifest
-go test ./pkg/backup
+go test ./internal/core/patcher
+go test ./internal/core/manifest
+go test ./internal/core/scanner
 ```
 
 **Verbose output:**
@@ -317,8 +317,8 @@ go test -v ./...
 
 **Run specific test:**
 ```bash
-go test -run TestApplyPatch ./pkg/patcher
-go test -run TestGenerateManifest ./pkg/manifest
+go test -run TestApplyPatch ./internal/core/patcher
+go test -run TestGenerateManifest ./internal/core/manifest
 ```
 
 ---
@@ -353,7 +353,7 @@ go test -bench=. ./...
 
 **Benchmark specific function:**
 ```bash
-go test -bench=BenchmarkDiff ./pkg/differ
+go test -bench=BenchmarkDiff ./internal/core/differ
 ```
 
 **Benchmark with memory stats:**
@@ -375,29 +375,33 @@ CyberPatchMaker/
 │   └── applier/          # Applier CLI tool
 │       └── main.go       # Entry point
 │
+├── internal/
+│   └── core/             # Core business logic
+│       ├── patcher/      # Core patching logic
+│       │   ├── applier.go    # Apply patches
+│       │   └── generator.go  # Generate patches
+│       │
+│       ├── manifest/     # Manifest handling
+│       │   └── manager.go    # Manifest operations
+│       │
+│       ├── differ/       # Binary diff algorithms
+│       │   └── differ.go     # Diff implementation
+│       │
+│       ├── scanner/      # Directory scanning
+│       │   └── scanner.go    # Recursive scanning & hashing
+│       │
+│       ├── version/      # Version management
+│       │   └── manager.go    # Version operations
+│       │
+│       └── config/       # Configuration management
+│           └── config.go     # App configuration
+│
 ├── pkg/
-│   ├── patcher/          # Core patching logic
-│   │   ├── applier.go    # Apply patches
-│   │   ├── generator.go  # Generate patches
-│   │   └── operations.go # Patch operations
-│   │
-│   ├── manifest/         # Manifest handling
-│   │   ├── manifest.go   # Manifest structure
-│   │   ├── generator.go  # Generate manifests
-│   │   └── loader.go     # Load manifests
-│   │
-│   ├── diff/             # Binary diff algorithms
-│   │   ├── bsdiff.go     # bsdiff implementation
-│   │   └── differ.go     # Diff interface
-│   │
-│   ├── backup/           # Backup system
-│   │   ├── backup.go     # Create backups
-│   │   ├── restore.go    # Restore from backup
-│   │   └── lifecycle.go  # Backup lifecycle
-│   │
-│   └── verify/           # Verification logic
-│       ├── hash.go       # SHA-256 hashing
-│       └── verify.go     # Pre/post verification
+│   └── utils/            # Shared utilities
+│       ├── types.go      # Core data structures
+│       ├── checksum.go   # SHA-256 calculation
+│       ├── fileops.go    # File operations
+│       └── compress.go   # Compression utilities
 │
 ├── testdata/             # Test version files
 │   ├── versions/         # Test versions
@@ -432,30 +436,41 @@ CyberPatchMaker/
 - Coordinate patch application workflow
 - Handle user input/output
 
-**pkg/patcher:**
+**internal/core/patcher:**
 - Core patch generation logic
 - Core patch application logic
 - Patch operations (add, modify, delete)
 
-**pkg/manifest:**
+**internal/core/manifest:**
 - Generate manifests for versions
 - Load and parse manifests
 - Manifest structure and validation
 
-**pkg/diff:**
+**internal/core/differ:**
 - Binary diff generation (bsdiff)
 - Binary patch application (bspatch)
-- Diff algorithm interface
+- Diff algorithm implementation
 
-**pkg/backup:**
-- Create backups before patching
-- Restore from backups on failure
-- Manage backup lifecycle (3-operation system)
+**internal/core/scanner:**
+- Recursively scan directory trees
+- Calculate SHA-256 checksums for all files
+- Generate complete file manifests
 
-**pkg/verify:**
-- Calculate SHA-256 checksums
-- Pre-patch verification
-- Post-patch verification
+**internal/core/version:**
+- Version management and registry
+- Version comparison and validation
+- Version metadata operations
+
+**internal/core/config:**
+- Application configuration management
+- Settings persistence
+- Configuration validation
+
+**pkg/utils:**
+- Core data structures (types.go)
+- SHA-256 checksum utilities (checksum.go)
+- File operations and helpers (fileops.go)
+- Compression utilities (compress.go)
 
 ---
 
@@ -476,28 +491,28 @@ CyberPatchMaker/
 ### Where to Add Code
 
 **Adding new compression algorithm:**
-- Add to `pkg/compress/` (new package)
-- Implement `Compressor` interface
+- Add to `pkg/utils/compress.go`
+- Implement compression/decompression functions
 - Register in `cmd/generator/main.go`
 - Update `docs/compression-guide.md`
 
 **Adding new verification method:**
-- Add to `pkg/verify/verify.go`
-- Implement `Verifier` interface
-- Call from `pkg/patcher/applier.go`
-- Write tests in `pkg/verify/verify_test.go`
+- Add to `internal/core/scanner/scanner.go`
+- Implement verification logic
+- Call from `internal/core/patcher/applier.go`
+- Write tests in `internal/core/scanner/scanner_test.go`
 
 **Adding new command-line flag:**
 - Add to `cmd/generator/main.go` or `cmd/applier/main.go`
 - Parse in `parseFlags()` function
-- Pass to relevant package
+- Pass to relevant package in `internal/core/`
 - Update help text and documentation
 
 **Adding new patch operation:**
-- Add to `pkg/patcher/operations.go`
-- Implement `Operation` interface
-- Handle in `pkg/patcher/applier.go`
-- Write tests in `pkg/patcher/operations_test.go`
+- Add to `internal/core/patcher/generator.go`
+- Implement operation logic
+- Handle in `internal/core/patcher/applier.go`
+- Write tests in `internal/core/patcher/` test files
 
 ---
 
@@ -837,7 +852,7 @@ dlv debug ./cmd/generator -- --versions-dir ./versions --new-version 1.0.1
 
 **Debug tests:**
 ```bash
-dlv test ./pkg/patcher
+dlv test ./internal/core/patcher
 ```
 
 **Set breakpoints:**
@@ -885,13 +900,13 @@ dlv test ./pkg/patcher
 
 **CPU profiling:**
 ```bash
-go test -cpuprofile=cpu.prof ./pkg/patcher
+go test -cpuprofile=cpu.prof ./internal/core/patcher
 go tool pprof cpu.prof
 ```
 
 **Memory profiling:**
 ```bash
-go test -memprofile=mem.prof ./pkg/patcher
+go test -memprofile=mem.prof ./internal/core/patcher
 go tool pprof mem.prof
 ```
 
@@ -910,25 +925,17 @@ go tool pprof mem.prof
 
 **Steps:**
 
-1. **Create package:**
-```bash
-mkdir -p pkg/compress
-touch pkg/compress/brotli.go
-```
-
-2. **Implement interface:**
+1. **Add to pkg/utils/compress.go:**
 ```go
-package compress
+// pkg/utils/compress.go
 
-type Brotli struct {
-    level int
-}
-
-func (b *Brotli) Compress(data []byte) ([]byte, error) {
+// CompressBrotli compresses data using Brotli algorithm
+func CompressBrotli(data []byte, level int) ([]byte, error) {
     // Implementation
 }
 
-func (b *Brotli) Decompress(data []byte) ([]byte, error) {
+// DecompressBrotli decompresses Brotli-compressed data
+func DecompressBrotli(data []byte) ([]byte, error) {
     // Implementation
 }
 ```
@@ -945,7 +952,7 @@ func TestBrotliCompress(t *testing.T) {
 // cmd/generator/main.go
 switch compressionType {
 case "brotli":
-    compressor = &compress.Brotli{Level: level}
+    compressed, err := utils.CompressBrotli(data, level)
 }
 ```
 
@@ -998,12 +1005,12 @@ flag.Usage = func() {
 
 1. **Benchmark current performance:**
 ```bash
-go test -bench=. -benchmem ./pkg/patcher > before.txt
+go test -bench=. -benchmem ./internal/core/patcher > before.txt
 ```
 
 2. **Profile the code:**
 ```bash
-go test -cpuprofile=cpu.prof ./pkg/patcher
+go test -cpuprofile=cpu.prof ./internal/core/patcher
 go tool pprof -http=:8080 cpu.prof
 ```
 
@@ -1028,7 +1035,7 @@ for i := 0; i < n; i++ {
 
 5. **Benchmark again:**
 ```bash
-go test -bench=. -benchmem ./pkg/patcher > after.txt
+go test -bench=. -benchmem ./internal/core/patcher > after.txt
 benchcmp before.txt after.txt
 ```
 

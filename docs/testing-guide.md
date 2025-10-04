@@ -54,9 +54,58 @@ Passed: 20
 Failed: 0
 
 ✓ All advanced tests passed!
+
+Would you like to clean up test data now? (Y/N): Y
+Cleaning up test data...
+✓ Test data removed successfully
 ```
 
-**Note:** The test script automatically generates test versions on first run. Subsequent runs will use the existing test data unless you delete the `testdata/versions/` directory
+**Note:** The test script automatically generates test versions on first run. Subsequent runs will use the existing test data unless you delete the `testdata/versions/` directory.
+
+### Test Data Cleanup Management
+
+The test suite includes an intelligent cleanup system to help manage test data:
+
+**Interactive Cleanup Prompt:**
+- After all tests complete, you'll be prompted to clean up test data
+- **Press Y** to immediately delete the `testdata/` directory
+- **Press N** to keep test data for inspection
+
+**Auto-Delete Behavior:**
+- If you choose to keep test data (N), a `.cleanup-deferred` state file is created
+- On the next test run, the system automatically detects deferred cleanup
+- Previous test data is automatically deleted before creating fresh test data
+- This ensures clean test runs while giving you time to inspect results
+
+**Example Workflow:**
+
+```powershell
+# First run - Choose to keep data for inspection
+.\advanced-test.ps1
+# ... tests complete ...
+# Would you like to clean up test data now? (Y/N): N
+# Test data kept in testdata/ directory (cleanup deferred to next run)
+
+# Inspect test data manually
+ls testdata/versions/
+ls testdata/patches/
+
+# Second run - Auto cleanup of old data
+.\advanced-test.ps1
+# Previous test data detected (cleanup was deferred)...
+# Removing old test data...
+# ✓ Old test data removed
+# ... tests run with fresh data ...
+# Would you like to clean up test data now? (Y/N): Y
+# Cleaning up test data...
+# ✓ Test data removed successfully
+```
+
+**State File:**
+- **Location:** `testdata/.cleanup-deferred`
+- **Purpose:** Tracks that cleanup was deferred
+- **Behavior:** Triggers auto-delete on next run
+- **Cleanup:** Automatically removed when test data is deleted
 
 ---
 
