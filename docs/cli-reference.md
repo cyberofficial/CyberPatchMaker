@@ -1,0 +1,362 @@
+# CLI Reference
+
+Quick reference for CyberPatchMaker command-line tools.
+
+## Generator Tool
+
+### Basic Syntax
+
+```bash
+generator [options]
+```
+
+### Options
+
+| Option | Required | Description |
+|--------|----------|-------------|
+| `--versions-dir <path>` | Yes (batch) | Directory containing version folders |
+| `--new-version <version>` | Yes (batch) | New version number to generate patches for |
+| `--from <version>` | Yes (single) | Source version number |
+| `--to <version>` | Yes (single) | Target version number |
+| `--output <path>` | Yes | Output directory for patches |
+| `--compression <type>` | No | Compression: `zstd` (default), `gzip`, `none` |
+| `--level <n>` | No | Compression level: 1-4 (default: 3) |
+| `--verify` | No | Verify patches after creation |
+| `--help` | No | Display help information |
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success |
+| 1 | General error |
+| 2 | Invalid arguments |
+| 3 | Version not found |
+| 4 | Key file detection failed |
+| 5 | Manifest generation failed |
+| 6 | Patch generation failed |
+| 7 | Verification failed |
+
+### Examples
+
+**Batch Mode** (generate all patches to new version):
+```bash
+generator --versions-dir ./versions --new-version 1.0.3 --output ./patches
+```
+
+**Single Patch Mode**:
+```bash
+generator --from 1.0.1 --to 1.0.3 --versions-dir ./versions --output ./patches
+```
+
+**With Compression**:
+```bash
+generator --versions-dir ./versions --new-version 1.0.3 --output ./patches --compression zstd --level 4
+```
+
+**With Verification**:
+```bash
+generator --versions-dir ./versions --new-version 1.0.3 --output ./patches --verify
+```
+
+---
+
+## Applier Tool
+
+### Basic Syntax
+
+```bash
+applier [options]
+```
+
+### Options
+
+| Option | Required | Description |
+|--------|----------|-------------|
+| `--patch <path>` | Yes | Path to patch file |
+| `--current-dir <path>` | Yes | Directory containing current installation |
+| `--verify` | No | Enable full verification (recommended!) |
+| `--dry-run` | No | Preview changes without applying |
+| `--help` | No | Display help information |
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| 0 | Success |
+| 1 | General error |
+| 2 | Invalid arguments |
+| 3 | Patch file not found |
+| 4 | Current directory not found |
+| 5 | Pre-verification failed |
+| 6 | Backup creation failed |
+| 7 | Operation failed |
+| 8 | Post-verification failed |
+| 9 | Restoration failed |
+
+### Examples
+
+**Safe Application** (with verification):
+```bash
+applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --verify
+```
+
+**Dry-Run** (preview only):
+```bash
+applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --dry-run
+```
+
+**Quick Application** (no verification - RISKY!):
+```bash
+applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp
+```
+
+---
+
+## Common Workflows
+
+### New Production Release
+
+```bash
+# 1. Generate all patches to new version
+generator --versions-dir ./versions \
+          --new-version 1.0.3 \
+          --output ./patches \
+          --verify
+
+# 2. Test with dry-run
+applier --patch ./patches/1.0.2-to-1.0.3.patch \
+        --current-dir ./test-app \
+        --dry-run
+
+# 3. Apply to production
+applier --patch ./patches/1.0.2-to-1.0.3.patch \
+        --current-dir C:\Production\MyApp \
+        --verify
+```
+
+### Custom Patch with Maximum Compression
+
+```bash
+# Generate single patch with highest compression
+generator --from 1.0.1 \
+          --to 1.0.3 \
+          --versions-dir ./versions \
+          --output ./patches \
+          --compression zstd \
+          --level 4 \
+          --verify
+```
+
+### Quick Testing
+
+```bash
+# Generate without compression (fastest)
+generator --versions-dir ./versions \
+          --new-version 1.0.3 \
+          --output ./patches \
+          --compression none
+
+# Apply without verification (fastest)
+applier --patch ./patches/1.0.0-to-1.0.3.patch \
+        --current-dir ./test-app
+```
+
+---
+
+## Environment Variables
+
+Currently, no environment variables are used. All configuration is via command-line flags.
+
+---
+
+## Configuration Files
+
+Currently, no configuration files are used. All configuration is via command-line flags.
+
+---
+
+## Output Format
+
+### Generator Output
+
+```
+Scanning versions directory: ./versions
+Found versions: 1.0.0, 1.0.1, 1.0.2
+New version: 1.0.3
+
+Generating patch 1.0.0 -> 1.0.3...
+  Loading manifests...
+  Comparing versions...
+  Generating binary diffs...
+  Creating patch file...
+  Compressing (zstd level 3)...
+  ✓ Success: patches/1.0.0-to-1.0.3.patch (2.1 MB)
+
+Generating patch 1.0.1 -> 1.0.3...
+  ...
+  ✓ Success: patches/1.0.1-to-1.0.3.patch (1.8 MB)
+
+Generating patch 1.0.2 -> 1.0.3...
+  ...
+  ✓ Success: patches/1.0.2-to-1.0.3.patch (1.2 MB)
+
+All patches generated successfully!
+Total: 3 patches, 5.1 MB
+```
+
+### Applier Output
+
+```
+Loading patch: patches/1.0.0-to-1.0.3.patch
+
+=== Patch Information ===
+From Version: 1.0.0
+To Version:   1.0.3
+Key File:     program.exe
+Created:      2025-10-04 10:30:00
+Patch Size:   2.1 MB
+Compression:  zstd
+
+Operations:
+  5 files to add
+  12 files to modify
+  3 files to delete
+
+Applying patch from 1.0.0 to 1.0.3...
+Verifying current version...
+✓ Pre-patch verification successful
+
+Creating backup...
+✓ Backup created at: ./myapp.backup
+
+Applying 20 operations...
+  Modified: program.exe
+  Modified: data/config.json
+  Added: libs/newfeature.dll
+  Deleted: libs/oldfeature.dll
+  ... (16 more operations)
+
+✓ Post-patch verification successful
+
+Removing backup...
+
+=== Patch Applied Successfully ===
+Version updated from 1.0.0 to 1.0.3
+Time elapsed: 12.3 seconds
+```
+
+---
+
+## Platform-Specific Notes
+
+### Windows
+
+**PowerShell:**
+```powershell
+.\generator.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches
+.\applier.exe --patch .\patches\1.0.0-to-1.0.3.patch --current-dir .\myapp --verify
+```
+
+**Command Prompt (cmd):**
+```batch
+generator.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches
+applier.exe --patch .\patches\1.0.0-to-1.0.3.patch --current-dir .\myapp --verify
+```
+
+**Paths:** Use backslashes `\` or forward slashes `/` (both work)
+
+---
+
+### Linux/macOS
+
+**Bash:**
+```bash
+./generator --versions-dir ./versions --new-version 1.0.3 --output ./patches
+./applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --verify
+```
+
+**Paths:** Use forward slashes `/`
+
+**Permissions:** May need to make executables:
+```bash
+chmod +x generator applier
+```
+
+---
+
+## Automation Scripts
+
+### PowerShell Script Example
+
+```powershell
+# generate-patches.ps1
+param(
+    [string]$NewVersion = "1.0.3",
+    [string]$VersionsDir = "./versions",
+    [string]$OutputDir = "./patches"
+)
+
+Write-Host "Generating patches for version $NewVersion..."
+
+& .\generator.exe `
+    --versions-dir $VersionsDir `
+    --new-version $NewVersion `
+    --output $OutputDir `
+    --verify
+
+if ($LASTEXITCODE -eq 0) {
+    Write-Host "Success! Patches generated in $OutputDir"
+} else {
+    Write-Error "Patch generation failed with exit code $LASTEXITCODE"
+    exit $LASTEXITCODE
+}
+```
+
+**Usage:**
+```powershell
+.\generate-patches.ps1 -NewVersion 1.0.4
+```
+
+---
+
+### Bash Script Example
+
+```bash
+#!/bin/bash
+# generate-patches.sh
+
+NEW_VERSION=${1:-"1.0.3"}
+VERSIONS_DIR="./versions"
+OUTPUT_DIR="./patches"
+
+echo "Generating patches for version $NEW_VERSION..."
+
+./generator \
+    --versions-dir "$VERSIONS_DIR" \
+    --new-version "$NEW_VERSION" \
+    --output "$OUTPUT_DIR" \
+    --verify
+
+if [ $? -eq 0 ]; then
+    echo "Success! Patches generated in $OUTPUT_DIR"
+else
+    echo "Patch generation failed with exit code $?"
+    exit $?
+fi
+```
+
+**Usage:**
+```bash
+chmod +x generate-patches.sh
+./generate-patches.sh 1.0.4
+```
+
+---
+
+## Related Documentation
+
+- [Generator Guide](generator-guide.md) - Detailed generator documentation
+- [Applier Guide](applier-guide.md) - Detailed applier documentation
+- [Quick Start](quick-start.md) - Getting started tutorial
+- [Troubleshooting](troubleshooting.md) - Common issues
