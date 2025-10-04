@@ -4,7 +4,7 @@ Guide to running and understanding CyberPatchMaker's comprehensive test suite.
 
 ## Overview
 
-CyberPatchMaker includes a comprehensive test suite with 20 tests that validate all core functionality including generation, application, verification, error handling, and advanced scenarios like multi-hop patching, compression formats, and automatic rollback.
+CyberPatchMaker includes a comprehensive test suite with 24 tests that validate all core functionality including generation, application, verification, error handling, and advanced scenarios like multi-hop patching, bidirectional patching, downgrade testing, compression formats, and automatic rollback.
 
 **Key Feature:** Test data is automatically generated on first run - no bloat files committed to the repository!
 
@@ -15,9 +15,10 @@ CyberPatchMaker includes a comprehensive test suite with 20 tests that validate 
 **File:** `advanced-test.ps1`
 **Shell:** PowerShell 5.1 or later
 **Platform:** Windows (PowerShell)
-**Tests:** 20 comprehensive tests
+**Tests:** 24 comprehensive tests
 **Test Data:** Auto-generated on first run (1.0.0, 1.0.1, 1.0.2)
 **Command Visibility:** Shows exact command-line for each operation (displayed in cyan)
+**Bidirectional Testing:** Includes upgrade/downgrade cycle verification
 
 ## Running Tests
 
@@ -124,7 +125,7 @@ ls testdata/patches/
 
 ## Test Suite Overview
 
-The advanced test suite includes 20 comprehensive tests organized into several categories:
+The advanced test suite includes 24 comprehensive tests organized into several categories:
 
 ### Core Functionality Tests (Tests 1-6)
 1. **Build Generator Tool** - Verifies generator.exe compiles correctly
@@ -144,17 +145,23 @@ The advanced test suite includes 20 comprehensive tests organized into several c
 11. **Gzip Compression** - Tests universal gzip compression
 12. **No Compression** - Tests uncompressed patches
 
-### Advanced Scenario Tests (Tests 13-17)
+### Advanced Scenario Tests (Tests 13-16)
 13. **Complex Directory Structure** - Tests 3-level nested directories (1.0.1 → 1.0.2)
 14. **Multi-Hop Patching** - Tests sequential patching (1.0.0 → 1.0.1 → 1.0.2)
 15. **File Corruption Detection** - Verifies system detects corrupted files before patching
 16. **Dry-Run Mode** - Tests preview mode without making changes
-17. **Backup System** - Verifies automatic backup creation and restoration
 
-### Performance & Cleanup Tests (Tests 18-20)
-18. **Performance Benchmark** - Measures patch generation speed
-19. **Verify All Operations** - Final comprehensive check of all test versions
-20. **Cleanup Test Files** - Removes temporary test artifacts
+### Bidirectional Patching Tests (Tests 17-20)
+17. **Generate Downgrade Patch** - Tests downgrade patch generation (1.0.2 → 1.0.1)
+18. **Apply Downgrade Patch** - Tests downgrade patch application and verification
+19. **Verify Downgrade Results** - Confirms downgraded version matches expected state
+20. **Bidirectional Cycle** - Tests complete upgrade/downgrade cycle (1.0.1 ↔ 1.0.2)
+
+### Error Handling & Safety Tests (Tests 21-24)
+21. **Wrong Version Detection** - Verifies patches are rejected for wrong versions
+22. **Backup System** - Verifies automatic backup creation and restoration
+23. **Performance Benchmark** - Measures patch generation speed
+24. **Verify All Operations** - Final comprehensive check of all test versions
 
 ### Test Data Structure
 
@@ -329,6 +336,67 @@ echo "Corrupted Version" > testdata/manual/corrupted/app.exe
 ls testdata/manual/corrupted.backup
 # Should show: directory not found
 ```
+
+---
+
+### Testing Downgrade Patches
+
+**Generating a downgrade patch:**
+
+```bash
+# Generate downgrade patch (1.0.1 → 1.0.0)
+./generator --versions-dir testdata/manual \
+            --from 1.0.1 \
+            --to 1.0.0 \
+            --output testdata/manual/patches
+
+# Verify downgrade patch exists
+ls testdata/manual/patches/
+# Should show: 1.0.1-to-1.0.0.patch
+```
+
+**Applying a downgrade patch:**
+
+```bash
+# Create test installation with version 1.0.1
+mkdir -p testdata/manual/test-downgrade
+cp testdata/manual/1.0.1/app.exe testdata/manual/test-downgrade/
+
+# Apply downgrade patch
+./applier --patch testdata/manual/patches/1.0.1-to-1.0.0.patch \
+          --current-dir testdata/manual/test-downgrade \
+          --verify
+
+# Verify version downgraded to 1.0.0
+cat testdata/manual/test-downgrade/app.exe
+# Should show: Version 1.0.0
+```
+
+**Testing bidirectional patching cycle:**
+
+```bash
+# Start with version 1.0.0
+mkdir -p testdata/manual/test-bidirectional
+cp testdata/manual/1.0.0/app.exe testdata/manual/test-bidirectional/
+
+# Upgrade to 1.0.1
+./applier --patch testdata/manual/patches/1.0.0-to-1.0.1.patch \
+          --current-dir testdata/manual/test-bidirectional \
+          --verify
+
+cat testdata/manual/test-bidirectional/app.exe
+# Should show: Version 1.0.1
+
+# Downgrade back to 1.0.0
+./applier --patch testdata/manual/patches/1.0.1-to-1.0.0.patch \
+          --current-dir testdata/manual/test-bidirectional \
+          --verify
+
+cat testdata/manual/test-bidirectional/app.exe
+# Should show: Version 1.0.0 (back to original)
+```
+
+> **Note:** For comprehensive downgrade documentation, see the [Downgrade Guide](downgrade-guide.md).
 
 ---
 

@@ -546,7 +546,123 @@ Test-Step "Test multi-hop patching scenario" {
     Write-Host "  Multi-hop patching successful: 1.0.0 → 1.0.1 → 1.0.2" -ForegroundColor Gray
 }
 
-# Test 17: Test wrong version detection
+# Test 17: Test downgrade patch generation (1.0.2 → 1.0.1)
+Test-Step "Generate downgrade patch (1.0.2 → 1.0.1)" {
+    Write-Host "  Generating downgrade patch from 1.0.2 to 1.0.1..." -ForegroundColor Gray
+    Write-Host "  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.2 --to 1.0.1 --output .\testdata\advanced-output\patches --compression zstd" -ForegroundColor Cyan
+    $output = .\generator.exe --versions-dir .\testdata\versions --from 1.0.2 --to 1.0.1 --output .\testdata\advanced-output\patches --compression zstd 2>&1
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Downgrade patch generation failed with exit code $LASTEXITCODE"
+    }
+    
+    if (-not (Test-Path "testdata/advanced-output/patches/1.0.2-to-1.0.1.patch")) {
+        throw "Downgrade patch file not created"
+    }
+    
+    $patchSize = (Get-Item "testdata/advanced-output/patches/1.0.2-to-1.0.1.patch").Length
+    Write-Host "  Downgrade patch generated: $patchSize bytes" -ForegroundColor Gray
+}
+
+# Test 18: Apply downgrade patch (1.0.2 → 1.0.1)
+Test-Step "Apply downgrade patch to revert version" {
+    Write-Host "  Copying version 1.0.2 to downgrade-test..." -ForegroundColor Gray
+    New-Item -Path "testdata/advanced-output/downgrade-test" -ItemType Directory -Force | Out-Null
+    Get-ChildItem -Path "testdata/versions/1.0.2" -Recurse | Copy-Item -Destination {
+        $dest = Join-Path "testdata/advanced-output/downgrade-test" $_.FullName.Substring((Resolve-Path "testdata/versions/1.0.2").Path.Length)
+        $destDir = Split-Path $dest
+        if (-not (Test-Path $destDir)) { New-Item -Path $destDir -ItemType Directory -Force | Out-Null }
+        $dest
+    } -Force
+    
+    Write-Host "  Applying downgrade patch (1.0.2 → 1.0.1)..." -ForegroundColor Gray
+    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.2-to-1.0.1.patch --current-dir .\testdata\advanced-output\downgrade-test --verify" -ForegroundColor Cyan
+    $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.2-to-1.0.1.patch --current-dir .\testdata\advanced-output\downgrade-test --verify 2>&1
+    
+    if ($LASTEXITCODE -ne 0) {
+        $outputStr = $output -join "`n"
+        throw "Downgrade patch application failed: $outputStr"
+    }
+    
+    Write-Host "  Downgrade patch applied successfully" -ForegroundColor Gray
+}
+
+# Test 19: Verify downgrade results match version 1.0.1
+Test-Step "Verify downgrade results match version 1.0.1" {
+    Write-Host "  Verifying downgraded version matches 1.0.1..." -ForegroundColor Gray
+    
+    # Compare key files
+    $diff = Compare-Object (Get-Content "testdata/advanced-output/downgrade-test/program.exe") (Get-Content "testdata/versions/1.0.1/program.exe")
+    if ($diff) {
+        throw "program.exe does not match version 1.0.1"
+    }
+    
+    # Verify new files from 1.0.2 were removed
+    if (Test-Path "testdata/advanced-output/downgrade-test/data/assets") {
+        throw "Directory data/assets should have been removed"
+    }
+    if (Test-Path "testdata/advanced-output/downgrade-test/plugins") {
+        throw "Directory plugins should have been removed"
+    }
+    
+    # Verify file count matches 1.0.1
+    $downgradedFiles = (Get-ChildItem "testdata/advanced-output/downgrade-test" -Recurse -File | Measure-Object).Count
+    $expectedFiles = (Get-ChildItem "testdata/versions/1.0.1" -Recurse -File | Measure-Object).Count
+    
+    if ($downgradedFiles -ne $expectedFiles) {
+        throw "File count mismatch: downgraded=$downgradedFiles, expected=$expectedFiles"
+    }
+    
+    Write-Host "  Downgrade successful: version 1.0.2 → 1.0.1 verified" -ForegroundColor Gray
+}
+
+# Test 20: Test bidirectional patching (upgrade then downgrade)
+Test-Step "Test bidirectional patching cycle" {
+    Write-Host "  Testing complete bidirectional patch cycle..." -ForegroundColor Gray
+    
+    # Copy 1.0.1 to bidirectional test directory
+    New-Item -Path "testdata/advanced-output/bidirectional" -ItemType Directory -Force | Out-Null
+    Get-ChildItem -Path "testdata/versions/1.0.1" -Recurse | Copy-Item -Destination {
+        $dest = Join-Path "testdata/advanced-output/bidirectional" $_.FullName.Substring((Resolve-Path "testdata/versions/1.0.1").Path.Length)
+        $destDir = Split-Path $dest
+        if (-not (Test-Path $destDir)) { New-Item -Path $destDir -ItemType Directory -Force | Out-Null }
+        $dest
+    } -Force
+    
+    # Upgrade: 1.0.1 → 1.0.2
+    Write-Host "  Step 1: Upgrade 1.0.1 → 1.0.2..." -ForegroundColor Gray
+    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\bidirectional --verify" -ForegroundColor Cyan
+    $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\bidirectional --verify 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "Upgrade failed (1.0.1 → 1.0.2)"
+    }
+    
+    # Verify upgraded to 1.0.2
+    $diff = Compare-Object (Get-Content "testdata/advanced-output/bidirectional/program.exe") (Get-Content "testdata/versions/1.0.2/program.exe")
+    if ($diff) {
+        throw "Upgrade verification failed - not version 1.0.2"
+    }
+    Write-Host "  ✓ Upgraded to 1.0.2" -ForegroundColor Green
+    
+    # Downgrade: 1.0.2 → 1.0.1
+    Write-Host "  Step 2: Downgrade 1.0.2 → 1.0.1..." -ForegroundColor Gray
+    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.2-to-1.0.1.patch --current-dir .\testdata\advanced-output\bidirectional --verify" -ForegroundColor Cyan
+    $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.2-to-1.0.1.patch --current-dir .\testdata\advanced-output\bidirectional --verify 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "Downgrade failed (1.0.2 → 1.0.1)"
+    }
+    
+    # Verify downgraded back to 1.0.1
+    $diff = Compare-Object (Get-Content "testdata/advanced-output/bidirectional/program.exe") (Get-Content "testdata/versions/1.0.1/program.exe")
+    if ($diff) {
+        throw "Downgrade verification failed - not version 1.0.1"
+    }
+    Write-Host "  ✓ Downgraded back to 1.0.1" -ForegroundColor Green
+    
+    Write-Host "  Bidirectional patching cycle successful: 1.0.1 → 1.0.2 → 1.0.1" -ForegroundColor Gray
+}
+
+# Test 21: Test wrong version detection
 Test-Step "Verify patch rejection for wrong source version" {
     Write-Host "  Testing patch rejection (applying 1.0.1→1.0.2 to 1.0.0)..." -ForegroundColor Gray
     
@@ -575,7 +691,7 @@ Test-Step "Verify patch rejection for wrong source version" {
     Write-Host "  Patch correctly rejected for wrong source version" -ForegroundColor Gray
 }
 
-# Test 18: Test file corruption detection
+# Test 22: Test file corruption detection
 Test-Step "Verify detection of corrupted files in source" {
     Write-Host "  Testing corrupted file detection..." -ForegroundColor Gray
     
@@ -608,7 +724,7 @@ Test-Step "Verify detection of corrupted files in source" {
     Write-Host "  Corrupted file correctly detected" -ForegroundColor Gray
 }
 
-# Test 19: Verify backup creation and rollback
+# Test 23: Verify backup creation and rollback
 Test-Step "Verify backup system works correctly" {
     Write-Host "  Testing backup and rollback functionality..." -ForegroundColor Gray
     
@@ -639,7 +755,7 @@ Test-Step "Verify backup system works correctly" {
     Write-Host "  Backup system verified" -ForegroundColor Gray
 }
 
-# Test 20: Performance check - verify generation speed
+# Test 24: Performance check - verify generation speed
 Test-Step "Verify patch generation performance" {
     Write-Host "  Measuring patch generation time..." -ForegroundColor Gray
     Write-Host "  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches" -ForegroundColor Cyan
@@ -678,6 +794,9 @@ if ($failed -eq 0) {
     Write-Host "  • Complex nested directory structures" -ForegroundColor Gray
     Write-Host "  • Multiple compression formats (zstd, gzip, none)" -ForegroundColor Gray
     Write-Host "  • Multi-hop patching (1.0.0 → 1.0.1 → 1.0.2)" -ForegroundColor Gray
+    Write-Host "  • Bidirectional patching (upgrade and downgrade)" -ForegroundColor Gray
+    Write-Host "  • Downgrade patches (1.0.2 → 1.0.1 rollback)" -ForegroundColor Gray
+    Write-Host "  • Complete bidirectional cycle (1.0.1 ↔ 1.0.2)" -ForegroundColor Gray
     Write-Host "  • Wrong version detection" -ForegroundColor Gray
     Write-Host "  • File corruption detection" -ForegroundColor Gray
     Write-Host "  • Backup system functionality" -ForegroundColor Gray

@@ -293,7 +293,41 @@ Note: Level 4 takes longer but creates smallest patches.
 
 ---
 
-### Example 4: Fast Generation for Testing
+### Example 4: Downgrade Patches (Rollback)
+
+**Generate downgrade patch to roll back from 1.0.3 to 1.0.2:**
+
+```bash
+generator --from 1.0.3 --to 1.0.2 --versions-dir ./versions --output ./patches/downgrade --verify
+```
+
+**Generate all downgrade paths from current version:**
+
+```bash
+# From 1.0.3 to each previous version
+generator --from 1.0.3 --to 1.0.2 --versions-dir ./versions --output ./patches/downgrade
+generator --from 1.0.3 --to 1.0.1 --versions-dir ./versions --output ./patches/downgrade
+generator --from 1.0.3 --to 1.0.0 --versions-dir ./versions --output ./patches/downgrade
+```
+
+**Result:**
+```
+patches/downgrade/
+├── 1.0.3-to-1.0.2.patch
+├── 1.0.3-to-1.0.1.patch
+└── 1.0.3-to-1.0.0.patch
+```
+
+**Key Points:**
+- Downgrade patches work exactly like upgrade patches
+- Simply swap the `--from` and `--to` parameters
+- The generator creates a patch that reverses all changes
+- Users can safely rollback to previous versions
+- See [Downgrade Guide](downgrade-guide.md) for complete documentation
+
+---
+
+### Example 5: Fast Generation for Testing
 
 Generate patches quickly without compression for local testing:
 
