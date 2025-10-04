@@ -17,6 +17,7 @@ CyberPatchMaker includes a comprehensive test suite with 20 tests that validate 
 **Platform:** Windows (PowerShell)
 **Tests:** 20 comprehensive tests
 **Test Data:** Auto-generated on first run (1.0.0, 1.0.1, 1.0.2)
+**Command Visibility:** Shows exact command-line for each operation (displayed in cyan)
 
 ## Running Tests
 
@@ -40,13 +41,25 @@ Version 1.0.2 not found, creating...
 
 Created 3 test version(s)
 
-# Then runs all tests:
+# Then runs all tests with command visibility:
 Running CyberPatchMaker Advanced Test Suite
 ========================================
-Test 1: Build generator tool... ✓ PASS
-Test 2: Build applier tool... ✓ PASS
+
+Testing: Generate complex patch (1.0.1 → 1.0.2) with zstd
+  Generating patch from 1.0.1 to 1.0.2 with zstd compression...
+  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches --compression zstd
+  Patch generated (zstd): 1627 bytes
+✓ PASSED: Generate complex patch (1.0.1 → 1.0.2) with zstd
+
+Testing: Apply zstd patch to complex directory structure
+  Copying version 1.0.1 to test-zstd...
+  Applying zstd patch...
+  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-zstd --verify
+  Zstd patch applied successfully
+✓ PASSED: Apply zstd patch to complex directory structure
+
 ...
-Test 20: Cleanup test files... ✓ PASS
+(All 20 tests with command visibility)
 ========================================
 Advanced Test Results
 ========================================

@@ -363,10 +363,6 @@ cmd/                # Command-line tools
 - **Atomic Operations**: No partial installations
 - **Automatic Rollback**: Safe recovery on failure
 
-## Contributing
-
-Contributions are welcome! Please see PLAN.MD for the development roadmap.
-
 ## License
 
 See LICENSE file for details.

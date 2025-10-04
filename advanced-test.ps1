@@ -226,6 +226,7 @@ Test-Step "Verify test versions exist" {
 # Test 4: Generate patch with default compression (zstd)
 Test-Step "Generate complex patch (1.0.1 → 1.0.2) with zstd" {
     Write-Host "  Generating patch from 1.0.1 to 1.0.2 with zstd compression..." -ForegroundColor Gray
+    Write-Host "  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches --compression zstd" -ForegroundColor Cyan
     $output = .\generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches --compression zstd 2>&1
     
     if ($LASTEXITCODE -ne 0) {
@@ -248,6 +249,7 @@ Test-Step "Generate complex patch (1.0.1 → 1.0.2) with zstd" {
 # Test 5: Generate same patch with gzip compression
 Test-Step "Generate same patch with gzip compression" {
     Write-Host "  Generating patch with gzip compression..." -ForegroundColor Gray
+    Write-Host "  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-gzip --compression gzip" -ForegroundColor Cyan
     $output = .\generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-gzip --compression gzip 2>&1
     
     if ($LASTEXITCODE -ne 0) {
@@ -265,6 +267,7 @@ Test-Step "Generate same patch with gzip compression" {
 # Test 6: Generate same patch with no compression
 Test-Step "Generate same patch with no compression" {
     Write-Host "  Generating patch with no compression..." -ForegroundColor Gray
+    Write-Host "  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-none --compression none" -ForegroundColor Cyan
     $output = .\generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-none --compression none 2>&1
     
     if ($LASTEXITCODE -ne 0) {
@@ -300,6 +303,7 @@ Test-Step "Compare compression efficiency" {
 # Test 8: Dry-run complex patch
 Test-Step "Dry-run complex patch application" {
     Write-Host "  Running applier in dry-run mode..." -ForegroundColor Gray
+    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\versions\1.0.1 --dry-run" -ForegroundColor Cyan
     $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\versions\1.0.1 --dry-run 2>&1
     
     if ($LASTEXITCODE -ne 0) {
@@ -327,6 +331,7 @@ Test-Step "Apply zstd patch to complex directory structure" {
     } -Force
     
     Write-Host "  Applying zstd patch..." -ForegroundColor Gray
+    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-zstd --verify" -ForegroundColor Cyan
     $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-zstd --verify 2>&1
     
     if ($LASTEXITCODE -ne 0) {
@@ -354,6 +359,7 @@ Test-Step "Apply gzip patch to complex directory structure" {
     } -Force
     
     Write-Host "  Applying gzip patch..." -ForegroundColor Gray
+    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches-gzip\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-gzip --verify" -ForegroundColor Cyan
     $output = .\applier.exe --patch .\testdata\advanced-output\patches-gzip\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-gzip --verify 2>&1
     
     if ($LASTEXITCODE -ne 0) {
@@ -376,6 +382,7 @@ Test-Step "Apply uncompressed patch to complex directory structure" {
     } -Force
     
     Write-Host "  Applying uncompressed patch..." -ForegroundColor Gray
+    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches-none\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-none --verify" -ForegroundColor Cyan
     $output = .\applier.exe --patch .\testdata\advanced-output\patches-none\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-none --verify 2>&1
     
     if ($LASTEXITCODE -ne 0) {
@@ -498,6 +505,7 @@ Test-Step "Test multi-hop patching scenario" {
     Write-Host "  Testing 1.0.0 → 1.0.1 → 1.0.2 patch chain..." -ForegroundColor Gray
     
     # Generate 1.0.0 → 1.0.1 patch
+    Write-Host "  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches" -ForegroundColor Cyan
     $output = .\generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to generate 1.0.0→1.0.1 patch"
@@ -515,6 +523,7 @@ Test-Step "Test multi-hop patching scenario" {
     
     # Apply first patch: 1.0.0 → 1.0.1
     Write-Host "  Applying first patch (1.0.0 → 1.0.1)..." -ForegroundColor Gray
+    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.1.patch --current-dir .\testdata\advanced-output\multi-hop --verify" -ForegroundColor Cyan
     $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.1.patch --current-dir .\testdata\advanced-output\multi-hop --verify 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to apply 1.0.0→1.0.1 patch"
@@ -522,6 +531,7 @@ Test-Step "Test multi-hop patching scenario" {
     
     # Apply second patch: 1.0.1 → 1.0.2
     Write-Host "  Applying second patch (1.0.1 → 1.0.2)..." -ForegroundColor Gray
+    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\multi-hop --verify" -ForegroundColor Cyan
     $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\multi-hop --verify 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to apply 1.0.1→1.0.2 patch"
@@ -550,6 +560,7 @@ Test-Step "Verify patch rejection for wrong source version" {
     } -Force
     
     # Try to apply 1.0.1→1.0.2 patch (should fail)
+    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\wrong-version --verify" -ForegroundColor Cyan
     $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\wrong-version --verify 2>&1
     
     if ($LASTEXITCODE -eq 0) {
@@ -582,6 +593,7 @@ Test-Step "Verify detection of corrupted files in source" {
     Add-Content -Path "testdata/advanced-output/corrupted/libs/core.dll" -Value "CORRUPTED DATA"
     
     # Try to apply patch (should fail)
+    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\corrupted --verify" -ForegroundColor Cyan
     $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\corrupted --verify 2>&1
     
     if ($LASTEXITCODE -eq 0) {
@@ -610,6 +622,7 @@ Test-Step "Verify backup system works correctly" {
     } -Force
     
     # Apply patch (should create backup)
+    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\backup-test --verify" -ForegroundColor Cyan
     $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\backup-test --verify 2>&1
     
     if ($LASTEXITCODE -ne 0) {
@@ -629,6 +642,7 @@ Test-Step "Verify backup system works correctly" {
 # Test 20: Performance check - verify generation speed
 Test-Step "Verify patch generation performance" {
     Write-Host "  Measuring patch generation time..." -ForegroundColor Gray
+    Write-Host "  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches" -ForegroundColor Cyan
     
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
     $output = .\generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches 2>&1
