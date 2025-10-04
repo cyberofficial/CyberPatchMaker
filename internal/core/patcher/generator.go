@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/cyberofficial/cyberpatchmaker/internal/core/differ"
@@ -32,7 +34,11 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 	// Compare manifests
 	added, modified, deleted := g.manifestManager.CompareManifests(fromVersion.Manifest, toVersion.Manifest)
 
-	fmt.Printf("Changes detected: %d added, %d modified, %d deleted\n", len(added), len(modified), len(deleted))
+	// Compare directories
+	addedDirs, deletedDirs := g.compareDirectories(fromVersion.Manifest.Directories, toVersion.Manifest.Directories)
+
+	fmt.Printf("Changes detected: %d added, %d modified, %d deleted files, %d added dirs, %d deleted dirs\n",
+		len(added), len(modified), len(deleted), len(addedDirs), len(deletedDirs))
 
 	// Create patch
 	patch := &utils.Patch{
@@ -54,6 +60,16 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 		})
 	}
 
+	// Process added directories first (before adding files to them)
+	for _, dir := range addedDirs {
+		patch.Operations = append(patch.Operations, utils.PatchOperation{
+			Type:     utils.OpAddDir,
+			FilePath: dir,
+			Size:     0,
+		})
+		fmt.Printf("  Add directory: %s\n", dir)
+	}
+
 	// Process deleted files
 	for _, file := range deleted {
 		patch.Operations = append(patch.Operations, utils.PatchOperation{
@@ -62,6 +78,24 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 			OldChecksum: file.Checksum,
 			Size:        0,
 		})
+	}
+
+	// Process deleted directories last (after files are deleted, so dirs are empty)
+	// Sort deleted directories by depth (deepest first) to ensure child dirs deleted before parents
+	sort.Slice(deletedDirs, func(i, j int) bool {
+		// Count path separators - more separators = deeper path
+		iDepth := strings.Count(deletedDirs[i], string(filepath.Separator))
+		jDepth := strings.Count(deletedDirs[j], string(filepath.Separator))
+		return iDepth > jDepth // Deeper paths first
+	})
+
+	for _, dir := range deletedDirs {
+		patch.Operations = append(patch.Operations, utils.PatchOperation{
+			Type:     utils.OpDeleteDir,
+			FilePath: dir,
+			Size:     0,
+		})
+		fmt.Printf("  Delete directory: %s\n", dir)
 	}
 
 	// Process added files
@@ -177,6 +211,37 @@ func (g *Generator) calculatePatchSize(patch *utils.Patch) int64 {
 	return totalSize
 }
 
+// compareDirectories compares two directory lists and returns added and deleted directories
+func (g *Generator) compareDirectories(sourceDirs, targetDirs []string) (added, deleted []string) {
+	// Create maps for efficient lookup
+	sourceMap := make(map[string]bool)
+	targetMap := make(map[string]bool)
+
+	for _, dir := range sourceDirs {
+		sourceMap[dir] = true
+	}
+
+	for _, dir := range targetDirs {
+		targetMap[dir] = true
+	}
+
+	// Find added directories
+	for _, dir := range targetDirs {
+		if !sourceMap[dir] {
+			added = append(added, dir)
+		}
+	}
+
+	// Find deleted directories
+	for _, dir := range sourceDirs {
+		if !targetMap[dir] {
+			deleted = append(deleted, dir)
+		}
+	}
+
+	return added, deleted
+}
+
 // ValidatePatch validates a patch before saving
 func (g *Generator) ValidatePatch(patch *utils.Patch) error {
 	if patch.FromVersion == "" {
@@ -197,7 +262,7 @@ func (g *Generator) ValidatePatch(patch *utils.Patch) error {
 
 	// Validate each operation
 	for i, op := range patch.Operations {
-		if op.FilePath == "" {
+		if op.FilePath == "" && op.Type != utils.OpAddDir && op.Type != utils.OpDeleteDir {
 			return fmt.Errorf("operation %d has empty file path", i)
 		}
 
@@ -222,6 +287,11 @@ func (g *Generator) ValidatePatch(patch *utils.Patch) error {
 		case utils.OpDelete:
 			if op.OldChecksum == "" {
 				return fmt.Errorf("operation %d (delete): old checksum is empty", i)
+			}
+		case utils.OpAddDir, utils.OpDeleteDir:
+			// Directory operations don't require checksums
+			if op.FilePath == "" {
+				return fmt.Errorf("operation %d (dir): directory path is empty", i)
 			}
 		default:
 			return fmt.Errorf("operation %d has invalid type: %d", i, op.Type)
