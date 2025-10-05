@@ -26,3 +26,6 @@ go.work.sum
 /.github
 PLAN.MD
 /testdata
+
+# Build output directory
+/dist
