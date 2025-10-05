@@ -497,7 +497,7 @@ func (aw *ApplierWindow) continueApplyPatch() {
 
 	err := applier.ApplyPatch(aw.loadedPatch, aw.currentDir, aw.verifyBefore, aw.verifyAfter, aw.createBackup)
 	if err != nil {
-		aw.setStatus("Error: Patch application failed")
+		aw.setStatus("Error: patch application failed")
 		aw.appendLog("ERROR: " + err.Error())
 
 		// Check if backup exists for restoration
@@ -518,7 +518,7 @@ func (aw *ApplierWindow) continueApplyPatch() {
 
 		// Show error dialog
 		if aw.window != nil {
-			dialog.ShowError(fmt.Errorf("Patch application failed: %v", err), aw.window)
+			dialog.ShowError(fmt.Errorf("patch application failed: %v", err), aw.window)
 		}
 		return
 	}

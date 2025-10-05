@@ -674,14 +674,14 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 		patchCount++
 	}
 
-	gw.appendLog(fmt.Sprintf("\n=== BATCH COMPLETE ==="))
+	gw.appendLog("\n=== BATCH COMPLETE ===")
 	gw.appendLog(fmt.Sprintf("Generated: %d patches", patchCount))
 	if failCount > 0 {
 		gw.appendLog(fmt.Sprintf("Failed: %d patches", failCount))
 	}
 
 	if patchCount > 0 {
-		gw.setStatus(fmt.Sprintf("Success! Generated %d patches", patchCount))
+		gw.setStatus(fmt.Sprintf("Generated %d patches", patchCount))
 		if gw.window != nil {
 			dialog.ShowInformation("Batch Complete",
 				fmt.Sprintf("Successfully generated %d patches\n\nOutput: %s", patchCount, gw.outputDir),

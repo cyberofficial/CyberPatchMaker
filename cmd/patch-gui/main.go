@@ -10,8 +10,8 @@ import (
 )
 
 func main() {
-	// Create new Fyne application
-	myApp := app.New()
+	// Create new Fyne application with unique ID
+	myApp := app.NewWithID("com.cyberofficial.cyberpatchmaker.generator")
 	myWindow := myApp.NewWindow("CyberPatchMaker - Patch Generator")
 
 	// Set window size
