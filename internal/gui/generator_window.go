@@ -104,33 +104,19 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		gw.versionsDirEntry,
 	)
 
-	// Create from key file selector
-	gw.fromKeyFileEntry = widget.NewEntry()
-	gw.fromKeyFileEntry.SetText(gw.fromKeyFile)
-	gw.fromKeyFileEntry.OnChanged = func(text string) {
-		gw.fromKeyFile = text
-	}
-
-	fromKeyFileContainer := container.NewBorder(
-		nil, nil,
-		widget.NewLabel("From Key File:"),
-		nil,
-		gw.fromKeyFileEntry,
-	)
-
-	// Create to key file selector
-	gw.toKeyFileEntry = widget.NewEntry()
-	gw.toKeyFileEntry.SetText(gw.toKeyFile)
-	gw.toKeyFileEntry.OnChanged = func(text string) {
-		gw.toKeyFile = text
-	}
-
-	toKeyFileContainer := container.NewBorder(
-		nil, nil,
-		widget.NewLabel("To Key File:"),
-		nil,
-		gw.toKeyFileEntry,
-	)
+	// Create batch mode checkbox
+	gw.batchModeCheck = widget.NewCheck("Batch Mode: Generate patches from ALL versions to target", func(checked bool) {
+		gw.batchMode = checked
+		if checked {
+			// In batch mode, from version is not used
+			gw.fromVersionSelect.Disable()
+			gw.fromKeyFileEntry.Disable()
+		} else {
+			gw.fromVersionSelect.Enable()
+			gw.fromKeyFileEntry.Enable()
+		}
+		gw.updateGenerateButton()
+	})
 
 	// Create from version selector
 	gw.fromVersionSelect = widget.NewSelect([]string{}, func(selected string) {
@@ -139,12 +125,12 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	})
 	gw.fromVersionSelect.PlaceHolder = "Select source version..."
 
-	fromVersionContainer := container.NewBorder(
-		nil, nil,
-		widget.NewLabel("From Version:"),
-		nil,
-		gw.fromVersionSelect,
-	)
+	// Create from key file selector
+	gw.fromKeyFileEntry = widget.NewEntry()
+	gw.fromKeyFileEntry.SetText(gw.fromKeyFile)
+	gw.fromKeyFileEntry.OnChanged = func(text string) {
+		gw.fromKeyFile = text
+	}
 
 	// Create to version selector
 	gw.toVersionSelect = widget.NewSelect([]string{}, func(selected string) {
@@ -153,11 +139,21 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	})
 	gw.toVersionSelect.PlaceHolder = "Select target version..."
 
-	toVersionContainer := container.NewBorder(
-		nil, nil,
-		widget.NewLabel("To Version:"),
-		nil,
-		gw.toVersionSelect,
+	// Create to key file selector
+	gw.toKeyFileEntry = widget.NewEntry()
+	gw.toKeyFileEntry.SetText(gw.toKeyFile)
+	gw.toKeyFileEntry.OnChanged = func(text string) {
+		gw.toKeyFile = text
+	}
+
+	// Left column: Version selection
+	leftColumn := container.NewVBox(
+		widget.NewLabel("Version Selection:"),
+		container.NewBorder(nil, nil, widget.NewLabel("From:"), nil, gw.fromVersionSelect),
+		container.NewBorder(nil, nil, widget.NewLabel("Key:"), nil, gw.fromKeyFileEntry),
+		widget.NewSeparator(),
+		container.NewBorder(nil, nil, widget.NewLabel("To:"), nil, gw.toVersionSelect),
+		container.NewBorder(nil, nil, widget.NewLabel("Key:"), nil, gw.toKeyFileEntry),
 	)
 
 	// Create output directory selector
@@ -170,7 +166,7 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 
 	outputDirContainer := container.NewBorder(
 		nil, nil,
-		widget.NewLabel("Output Directory:"),
+		widget.NewLabel("Output:"),
 		outputDirBrowse,
 		gw.outputDirEntry,
 	)
@@ -210,18 +206,17 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	gw.compressionRadio.SetSelected("zstd")
 
 	compressionContainer := container.NewVBox(
-		widget.NewLabel("Compression:"),
 		gw.compressionRadio,
 		container.NewBorder(nil, nil, widget.NewLabel("Level:"), gw.compressionLabel, gw.compressionSlider),
 	)
 
 	// Create advanced options
-	gw.verifyCheck = widget.NewCheck("Verify patches after creation", func(checked bool) {
+	gw.verifyCheck = widget.NewCheck("Verify after creation", func(checked bool) {
 		gw.verifyAfter = checked
 	})
 	gw.verifyCheck.SetChecked(true)
 
-	gw.skipIdenticalCheck = widget.NewCheck("Skip binary-identical files", func(checked bool) {
+	gw.skipIdenticalCheck = widget.NewCheck("Skip identical files", func(checked bool) {
 		gw.skipIdentical = checked
 	})
 	gw.skipIdenticalCheck.SetChecked(true)
@@ -236,33 +231,22 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		}
 	}
 
-	diffThresholdContainer := container.NewBorder(
-		nil, nil,
-		widget.NewLabel("Diff Threshold (KB):"),
-		nil,
-		gw.diffThresholdEntry,
-	)
-
-	advancedContainer := container.NewVBox(
-		widget.NewLabel("Advanced Options:"),
+	// Right column: Options
+	rightColumn := container.NewVBox(
+		widget.NewLabel("Compression:"),
+		compressionContainer,
+		widget.NewSeparator(),
+		widget.NewLabel("Options:"),
 		gw.verifyCheck,
 		gw.skipIdenticalCheck,
-		diffThresholdContainer,
+		container.NewBorder(nil, nil, widget.NewLabel("Diff Threshold (KB):"), nil, gw.diffThresholdEntry),
 	)
 
-	// Create batch mode checkbox
-	gw.batchModeCheck = widget.NewCheck("Batch Mode: Generate patches from ALL versions to target", func(checked bool) {
-		gw.batchMode = checked
-		if checked {
-			// In batch mode, from version is not used
-			gw.fromVersionSelect.Disable()
-			gw.fromKeyFileEntry.Disable()
-		} else {
-			gw.fromVersionSelect.Enable()
-			gw.fromKeyFileEntry.Enable()
-		}
-		gw.updateGenerateButton()
-	})
+	// Create two-column layout for version/options
+	twoColumnLayout := container.NewGridWithColumns(2,
+		leftColumn,
+		rightColumn,
+	)
 
 	// Create generate button
 	gw.generateBtn = widget.NewButton("Generate Patch", func() {
@@ -279,28 +263,17 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	gw.logText.Disable()
 
 	logContainer := container.NewVScroll(gw.logText)
-	logContainer.SetMinSize(fyne.NewSize(0, 200))
+	logContainer.SetMinSize(fyne.NewSize(0, 150))
 
-	// Assemble the UI
+	// Assemble the UI with compact layout
 	return container.NewVBox(
 		versionsDirContainer,
-		widget.NewSeparator(),
 		gw.batchModeCheck,
 		widget.NewSeparator(),
-		fromVersionContainer,
-		fromKeyFileContainer,
-		toVersionContainer,
-		toKeyFileContainer,
+		twoColumnLayout,
 		widget.NewSeparator(),
 		outputDirContainer,
-		compressionContainer,
-		advancedContainer,
-		widget.NewSeparator(),
-		gw.generateBtn,
-		widget.NewSeparator(),
-		widget.NewLabel("Status:"),
-		gw.statusLabel,
-		widget.NewLabel("Log:"),
+		container.NewBorder(nil, nil, nil, gw.generateBtn, gw.statusLabel),
 		logContainer,
 	)
 }

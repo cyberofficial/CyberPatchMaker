@@ -123,12 +123,12 @@ func (aw *ApplierWindow) buildUI() fyne.CanvasObject {
 
 	currentDirContainer := container.NewBorder(
 		nil, nil,
-		widget.NewLabel("Current Directory:"),
+		widget.NewLabel("Current Dir:"),
 		currentDirBrowse,
 		aw.currentDirEntry,
 	)
 
-	// Create patch information display
+	// Create patch information display labels
 	aw.fromVersionLabel = widget.NewLabel("---")
 	aw.toVersionLabel = widget.NewLabel("---")
 	aw.keyFileLabel = widget.NewLabel("---")
@@ -143,29 +143,39 @@ func (aw *ApplierWindow) buildUI() fyne.CanvasObject {
 	aw.deleteDirsLabel = widget.NewLabel("---")
 	aw.requiredLabel = widget.NewLabel("---")
 
-	aw.patchInfoBox = container.NewVBox(
-		widget.NewLabel("Patch Information:"),
-		widget.NewSeparator(),
-		container.NewBorder(nil, nil, widget.NewLabel("From Version:"), nil, aw.fromVersionLabel),
-		container.NewBorder(nil, nil, widget.NewLabel("To Version:"), nil, aw.toVersionLabel),
+	// Left column: Patch Info
+	patchInfoLeft := container.NewVBox(
+		widget.NewLabel("Version Info:"),
+		container.NewBorder(nil, nil, widget.NewLabel("From:"), nil, aw.fromVersionLabel),
+		container.NewBorder(nil, nil, widget.NewLabel("To:"), nil, aw.toVersionLabel),
 		container.NewBorder(nil, nil, widget.NewLabel("Key File:"), nil, aw.keyFileLabel),
-		container.NewBorder(nil, nil, widget.NewLabel("Required Hash:"), nil, aw.hashLabel),
-		container.NewBorder(nil, nil, widget.NewLabel("Patch Size:"), nil, aw.sizeLabel),
+		container.NewBorder(nil, nil, widget.NewLabel("Hash:"), nil, aw.hashLabel),
+		widget.NewSeparator(),
+		container.NewBorder(nil, nil, widget.NewLabel("Size:"), nil, aw.sizeLabel),
 		container.NewBorder(nil, nil, widget.NewLabel("Compression:"), nil, aw.compressionLabel),
 		container.NewBorder(nil, nil, widget.NewLabel("Created:"), nil, aw.createdLabel),
-		widget.NewSeparator(),
+	)
+
+	// Right column: Operations Info
+	patchInfoRight := container.NewVBox(
 		widget.NewLabel("Operations:"),
-		container.NewBorder(nil, nil, widget.NewLabel("Files Added:"), nil, aw.addedLabel),
-		container.NewBorder(nil, nil, widget.NewLabel("Files Modified:"), nil, aw.modifiedLabel),
-		container.NewBorder(nil, nil, widget.NewLabel("Files Deleted:"), nil, aw.deletedLabel),
-		container.NewBorder(nil, nil, widget.NewLabel("Dirs Added:"), nil, aw.addDirsLabel),
-		container.NewBorder(nil, nil, widget.NewLabel("Dirs Deleted:"), nil, aw.deleteDirsLabel),
+		container.NewBorder(nil, nil, widget.NewLabel("Added:"), nil, aw.addedLabel),
+		container.NewBorder(nil, nil, widget.NewLabel("Modified:"), nil, aw.modifiedLabel),
+		container.NewBorder(nil, nil, widget.NewLabel("Deleted:"), nil, aw.deletedLabel),
+		container.NewBorder(nil, nil, widget.NewLabel("Dirs+:"), nil, aw.addDirsLabel),
+		container.NewBorder(nil, nil, widget.NewLabel("Dirs-:"), nil, aw.deleteDirsLabel),
 		widget.NewSeparator(),
-		container.NewBorder(nil, nil, widget.NewLabel("Required Files:"), nil, aw.requiredLabel),
+		container.NewBorder(nil, nil, widget.NewLabel("Required:"), nil, aw.requiredLabel),
+	)
+
+	// Create two-column patch info layout
+	aw.patchInfoBox = container.NewGridWithColumns(2,
+		patchInfoLeft,
+		patchInfoRight,
 	)
 
 	// Create options
-	aw.dryRunCheck = widget.NewCheck("Dry Run: Simulate patch without making changes", func(checked bool) {
+	aw.dryRunCheck = widget.NewCheck("Dry Run (Simulate)", func(checked bool) {
 		aw.dryRun = checked
 		// Disable backup and verify when dry run is enabled
 		if checked {
@@ -179,33 +189,35 @@ func (aw *ApplierWindow) buildUI() fyne.CanvasObject {
 		}
 	})
 
-	aw.verifyBeforeCheck = widget.NewCheck("Verify file hashes before patching", func(checked bool) {
+	aw.verifyBeforeCheck = widget.NewCheck("Verify before", func(checked bool) {
 		aw.verifyBefore = checked
 	})
 	aw.verifyBeforeCheck.SetChecked(true)
 
-	aw.verifyAfterCheck = widget.NewCheck("Verify file hashes after patching", func(checked bool) {
+	aw.verifyAfterCheck = widget.NewCheck("Verify after", func(checked bool) {
 		aw.verifyAfter = checked
 	})
 	aw.verifyAfterCheck.SetChecked(true)
 
-	aw.backupCheck = widget.NewCheck("Create backup before patching", func(checked bool) {
+	aw.backupCheck = widget.NewCheck("Create backup", func(checked bool) {
 		aw.createBackup = checked
 	})
 	aw.backupCheck.SetChecked(true)
 
-	aw.autoDetectCheck = widget.NewCheck("Auto-detect current version from key file", func(checked bool) {
+	aw.autoDetectCheck = widget.NewCheck("Auto-detect version", func(checked bool) {
 		aw.autoDetect = checked
 	})
 	aw.autoDetectCheck.SetChecked(true)
 
+	// Options in horizontal layout to save space
+	optionsRow1 := container.NewGridWithColumns(2, aw.verifyBeforeCheck, aw.verifyAfterCheck)
+	optionsRow2 := container.NewGridWithColumns(2, aw.backupCheck, aw.autoDetectCheck)
+
 	optionsContainer := container.NewVBox(
 		widget.NewLabel("Options:"),
 		aw.dryRunCheck,
-		aw.verifyBeforeCheck,
-		aw.verifyAfterCheck,
-		aw.backupCheck,
-		aw.autoDetectCheck,
+		optionsRow1,
+		optionsRow2,
 	)
 
 	// Create apply button
@@ -223,9 +235,9 @@ func (aw *ApplierWindow) buildUI() fyne.CanvasObject {
 	aw.logText.Disable()
 
 	logContainer := container.NewVScroll(aw.logText)
-	logContainer.SetMinSize(fyne.NewSize(0, 200))
+	logContainer.SetMinSize(fyne.NewSize(0, 150))
 
-	// Assemble the UI
+	// Assemble the UI with compact layout
 	return container.NewVBox(
 		patchFileContainer,
 		currentDirContainer,
@@ -233,12 +245,7 @@ func (aw *ApplierWindow) buildUI() fyne.CanvasObject {
 		aw.patchInfoBox,
 		widget.NewSeparator(),
 		optionsContainer,
-		widget.NewSeparator(),
-		aw.applyBtn,
-		widget.NewSeparator(),
-		widget.NewLabel("Status:"),
-		aw.statusLabel,
-		widget.NewLabel("Log:"),
+		container.NewBorder(nil, nil, nil, aw.applyBtn, aw.statusLabel),
 		logContainer,
 	)
 }
