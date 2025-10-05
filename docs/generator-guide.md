@@ -463,3 +463,4 @@ If you have 10+ versions:
 - [How It Works](how-it-works.md) - Understanding the patch system
 - [Compression Guide](compression-guide.md) - Detailed compression info
 - [Version Management](version-management.md) - Managing versions
+- [Backup System](backup-system.md) - Understanding backup behavior during patching

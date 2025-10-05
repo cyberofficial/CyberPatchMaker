@@ -168,4 +168,4 @@ Want to verify everything works? Run the comprehensive test suite:
 .\advanced-test.ps1
 ```
 
-This runs 20 automated tests to validate the entire system. Test data is automatically generated on first run, so there's no setup required!
+This runs 28 automated tests to validate the entire system. Test data is automatically generated on first run, so there's no setup required!

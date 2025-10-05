@@ -46,11 +46,12 @@ func (a *Applier) ApplyPatch(patch *utils.Patch, targetDir string, verifyBefore,
 	// Create backup AFTER verification passes but BEFORE applying operations
 	if createBackup {
 		fmt.Println("\nCreating backup...")
-		backupDir := targetDir + ".backup"
-		if err := a.createBackup(targetDir, backupDir); err != nil {
+		backupDir := filepath.Join(targetDir, "backup.cyberpatcher")
+		if err := a.createMirrorBackup(targetDir, backupDir, patch.Operations); err != nil {
 			return fmt.Errorf("failed to create backup: %w", err)
 		}
 		fmt.Printf("Backup created at: %s\n", backupDir)
+		fmt.Println("Note: Backup will be preserved after patching for manual rollback")
 	}
 
 	// Apply operations
@@ -74,13 +75,11 @@ func (a *Applier) ApplyPatch(patch *utils.Patch, targetDir string, verifyBefore,
 		fmt.Println("Post-patch verification successful")
 	}
 
-	// Clean up backup if successful
+	// Keep backup after successful patching for manual rollback if needed
 	if createBackup {
-		fmt.Println("Removing backup...")
-		backupDir := targetDir + ".backup"
-		if err := os.RemoveAll(backupDir); err != nil {
-			fmt.Printf("Warning: failed to remove backup: %v\n", err)
-		}
+		backupDir := filepath.Join(targetDir, "backup.cyberpatcher")
+		fmt.Printf("\nBackup preserved at: %s\n", backupDir)
+		fmt.Println("To rollback: Copy files from backup folder to their original locations")
 	}
 
 	fmt.Println("Patch applied successfully")
@@ -306,8 +305,9 @@ func (a *Applier) verifyPatchedFiles(targetDir string, operations []utils.PatchO
 	return nil
 }
 
-// createBackup creates a backup of the target directory
-func (a *Applier) createBackup(srcDir, backupDir string) error {
+// createMirrorBackup creates a selective backup of only files that will be modified or deleted
+// The backup mirrors the directory structure for easy manual rollback
+func (a *Applier) createMirrorBackup(targetDir, backupDir string, operations []utils.PatchOperation) error {
 	// Remove existing backup if it exists
 	if utils.FileExists(backupDir) {
 		if err := os.RemoveAll(backupDir); err != nil {
@@ -315,39 +315,40 @@ func (a *Applier) createBackup(srcDir, backupDir string) error {
 		}
 	}
 
-	// Create backup directory
+	// Create root backup directory
 	if err := utils.EnsureDir(backupDir); err != nil {
 		return fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
-	// Copy all files
-	return a.copyDir(srcDir, backupDir)
-}
-
-// copyDir recursively copies a directory
-func (a *Applier) copyDir(src, dst string) error {
-	entries, err := os.ReadDir(src)
-	if err != nil {
-		return err
-	}
-
-	for _, entry := range entries {
-		srcPath := filepath.Join(src, entry.Name())
-		dstPath := filepath.Join(dst, entry.Name())
-
-		if entry.IsDir() {
-			if err := utils.EnsureDir(dstPath); err != nil {
-				return err
-			}
-			if err := a.copyDir(srcPath, dstPath); err != nil {
-				return err
-			}
-		} else {
-			if err := utils.CopyFile(srcPath, dstPath); err != nil {
-				return err
-			}
+	// Backup only files that will be modified or deleted
+	backedUpCount := 0
+	for _, op := range operations {
+		// Only backup files that will be modified or deleted
+		if op.Type != utils.OpModify && op.Type != utils.OpDelete {
+			continue
 		}
+
+		srcPath := filepath.Join(targetDir, op.FilePath)
+		dstPath := filepath.Join(backupDir, op.FilePath)
+
+		// Skip if source file doesn't exist (shouldn't happen, but be safe)
+		if !utils.FileExists(srcPath) {
+			continue
+		}
+
+		// Create parent directories in backup (mirror structure)
+		if err := utils.EnsureDir(filepath.Dir(dstPath)); err != nil {
+			return fmt.Errorf("failed to create backup subdirectory for %s: %w", op.FilePath, err)
+		}
+
+		// Copy the file to backup location
+		if err := utils.CopyFile(srcPath, dstPath); err != nil {
+			return fmt.Errorf("failed to backup file %s: %w", op.FilePath, err)
+		}
+
+		backedUpCount++
 	}
 
+	fmt.Printf("Backed up %d files\n", backedUpCount)
 	return nil
 }

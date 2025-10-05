@@ -200,7 +200,7 @@ applier --patch ./patches/downgrade/1.0.3-to-1.0.2.patch \
 **Always recommended for production:**
 
 ```bash
-# Downgrade safely with verification and backup
+# Downgrade safely with verification and selective backup
 applier --patch ./patches/downgrade/1.0.3-to-1.0.2.patch \
         --current-dir C:\Production\MyApp \
         --verify
@@ -208,10 +208,12 @@ applier --patch ./patches/downgrade/1.0.3-to-1.0.2.patch \
 
 This will:
 1. Verify current version is 1.0.3
-2. Create backup of 1.0.3
-3. Apply downgrade operations
+2. **Create selective backup** of files being changed (modified/deleted from 1.0.3) in `C:\Production\MyApp\backup.cyberpatcher`
+3. Apply downgrade operations (transform 1.0.3 → 1.0.2)
 4. Verify result is 1.0.2
-5. Remove backup on success
+5. **Preserve backup** for manual rollback to 1.0.3 if needed
+
+**Backup System Benefit:** Downgrade backup only contains changed files (minimal disk space), preserved with mirror structure for easy restoration.
 
 ---
 

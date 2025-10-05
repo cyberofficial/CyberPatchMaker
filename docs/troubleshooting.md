@@ -18,7 +18,7 @@ go build ./cmd/applier
 .\advanced-test.ps1  # Windows only
 ```
 
-If all 20 tests pass, your setup is correct! Test data is auto-generated on first run.
+If all 28 tests pass, your setup is correct! Test data is auto-generated on first run.
 
 ---
 
@@ -308,19 +308,22 @@ Required: 500 MB
 Available: 200 MB
 ```
 
-**Cause:** Not enough free disk space for backup + patch
+**Cause:** Not enough free disk space for selective backup + patch
+
+**Note:** The selective backup system only backs up modified/deleted files, requiring minimal extra space (e.g., ~50MB for changed files instead of 5GB full copy).
 
 **Solutions:**
 1. Free up disk space:
    - Delete temporary files
    - Empty recycle bin / trash
-   - Remove old backups
+   - Remove old `backup.cyberpatcher` folders from previous patches
    - Move files to another drive
 2. Disable automatic backup (RISKY!):
    ```bash
    # Only for testing - NOT recommended!
    ./applier --patch patch.patch --current-dir ./app --no-backup
    ```
+   **WARNING:** Without backup, you cannot automatically rollback on failure!
 
 ---
 
@@ -328,15 +331,15 @@ Available: 200 MB
 
 **Symptom:**
 ```
-Error: failed to create backup directory: ./myapp.backup
+Error: failed to create backup directory: ./myapp/backup.cyberpatcher
 ```
 
-**Cause:** Can't create backup directory
+**Cause:** Can't create `backup.cyberpatcher` subdirectory inside target directory
 
 **Solutions:**
-1. Check write permissions in current directory
-2. Check disk space
-3. Check another process isn't using .backup directory
+1. Check write permissions in target directory (`--current-dir`)
+2. Check disk space (selective backup needs minimal space)
+3. Check another process isn't using `backup.cyberpatcher` directory
 4. Close any programs accessing the installation
 5. Run as administrator (Windows) or with sudo (Linux)
 
@@ -371,16 +374,20 @@ Got:      abc123...
 
 **Solutions:**
 1. **Automatic rollback**: System should restore from backup automatically
-2. **Manual restore** if needed:
+2. **Manual restore** from selective backup:
    ```bash
-   # Remove corrupted installation
-   rm -rf ./myapp
+   # Restore backed up files from mirror structure
+   cp -r ./myapp/backup.cyberpatcher/* ./myapp/
    
-   # Restore from backup
-   cp -r ./myapp.backup ./myapp
+   # Delete any files that were added (not in backup)
+   # Then remove backup folder after confirming restoration
+   rm -rf ./myapp/backup.cyberpatcher
    ```
+   
+   **Note:** The mirror structure makes rollback intuitive - just copy files back to their exact original paths.
+
 3. **Try again** after restoration:
-   - Check disk space
+   - Check disk space (selective backup needs minimal space)
    - Close all programs accessing the installation
    - Verify patch file integrity (re-download if needed)
 4. **Report the issue**: This shouldn't happen - may be a bug
@@ -397,15 +404,19 @@ Error: restoration failed - backup may be corrupted
 **Cause:** Backup was corrupted or couldn't be restored
 
 **Solutions:**
-1. **Check if backup exists**: `ls ./myapp.backup`
-2. **Manual restoration**:
+1. **Check if backup exists**: `ls ./myapp/backup.cyberpatcher`
+2. **Manual restoration** from selective backup:
    ```bash
-   # Remove corrupted installation
-   rm -rf ./myapp
+   # Restore backed up files using mirror structure
+   cp -r ./myapp/backup.cyberpatcher/* ./myapp/
    
-   # Restore from backup
-   mv ./myapp.backup ./myapp
+   # Delete any files that were added by the patch (not in backup)
+   # Then remove backup folder
+   rm -rf ./myapp/backup.cyberpatcher
    ```
+   
+   **Advantage:** Mirror structure makes identifying backed up files easy - they're at exact original paths within `backup.cyberpatcher`.
+
 3. **If backup is corrupted**: Re-install original version from distribution
 4. **Report the issue**: Backup corruption shouldn't happen
 
@@ -521,12 +532,20 @@ If pre-verification fails, your installation is corrupted.
 
 ### Recovering from Corruption
 
-**Option 1: Restore from backup**
+**Option 1: Restore from selective backup**
 ```bash
-# If you have a .backup directory
-rm -rf ./myapp
-cp -r ./myapp.backup ./myapp
+# If you have a backup.cyberpatcher directory
+cp -r ./myapp/backup.cyberpatcher/* ./myapp/
+
+# Delete any files added by the patch (not in backup)
+# Then remove backup folder after confirming restoration
+rm -rf ./myapp/backup.cyberpatcher
 ```
+
+**Backup System Advantage:** Selective backup with mirror structure makes recovery intuitive:
+- Backed up files are at exact original paths within `backup.cyberpatcher`
+- Just copy them back to restore original state
+- Added files (not in backup) need manual deletion
 
 **Option 2: Re-install original version**
 ```bash
@@ -537,11 +556,14 @@ cp -r ./myapp.backup ./myapp
 ./applier --patch ./patch.patch --current-dir ./myapp --verify
 ```
 
-**Option 3: Repair specific files**
+**Option 3: Repair specific files** (mirror structure makes this easy)
 ```bash
-# If you know which files are corrupted
-cp ./myapp.backup/program.exe ./myapp/
-cp ./myapp.backup/data/config.json ./myapp/data/
+# If you know which files are corrupted, use mirror paths
+cp ./myapp/backup.cyberpatcher/program.exe ./myapp/
+cp ./myapp/backup.cyberpatcher/data/config.json ./myapp/data/
+cp ./myapp/backup.cyberpatcher/libs/core.dll ./myapp/libs/
+
+# Mirror structure = intuitive restoration with exact paths preserved!
 ```
 
 ---

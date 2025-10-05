@@ -4,7 +4,7 @@ Complete guide to using the CyberPatchMaker applier tool for applying delta patc
 
 ## Overview
 
-The applier tool safely applies binary patches to existing installations. It verifies the current version, creates backups, applies changes, and validates the result.
+The applier tool safely applies binary patches to existing installations. It verifies the current version, creates selective backups of files being changed, applies modifications, and validates the result.
 
 ## Basic Usage
 
@@ -19,10 +19,10 @@ applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --verify
 This will:
 1. Load and display patch information
 2. Verify current version is 1.0.0 (pre-verification)
-3. Create backup of current installation
+3. Create selective backup of files being modified/deleted
 4. Apply all patch operations
 5. Verify result matches version 1.0.3 (post-verification)
-6. Remove backup on success (or restore on failure)
+6. Preserve backup for manual rollback (or restore on failure)
 
 **Example Output:**
 ```
@@ -46,8 +46,11 @@ Applying patch from 1.0.0 to 1.0.3...
 Verifying current version...
 Pre-patch verification successful
 
-Creating backup...
-Backup created at: ./myapp.backup
+Creating selective backup...
+Backing up: program.exe
+Backing up: data\config.json
+Backing up: libs\oldfeature.dll
+Backup created in: C:\MyApp\backup.cyberpatcher
 
 Applying 20 operations...
   Modified: program.exe
@@ -58,10 +61,9 @@ Applying 20 operations...
 
 Post-patch verification successful
 
-Removing backup...
-
 === Patch Applied Successfully ===
 Version updated from 1.0.0 to 1.0.3
+Backup preserved in: C:\MyApp\backup.cyberpatcher
 Time elapsed: 12.3 seconds
 ```
 
@@ -176,18 +178,20 @@ Before any changes are made, the applier verifies:
 
 **When:** After pre-verification passes, before any operations
 
-**Location:** `<current-dir>.backup`
-- Example: If current-dir is `C:\MyApp\`, backup is `C:\MyApp.backup\`
+**Location:** **INSIDE** target directory at `<current-dir>\backup.cyberpatcher\`
+- Example: If current-dir is `C:\MyApp\`, backup is `C:\MyApp\backup.cyberpatcher\`
 
-**Contents:** Complete recursive copy of entire installation
-- All files at all levels
-- All subdirectories
-- Complete directory structure
-- File permissions (where supported)
+**Contents:** **Selective** mirror-structure backup of only files being changed
+- **Modified files** (OpModify operations): Backed up before changes
+- **Deleted files** (OpDelete operations): Backed up before deletion
+- **NOT backed up**: New files being added (OpAdd) - they don't exist yet
+- **Directory structure**: Mirrored exactly to preserve original paths
+- **File permissions**: Preserved where supported
 
 **Cleanup:**
-- On success: Backup is automatically removed
-- On failure: Backup is preserved for restoration
+- **On success**: Backup is **PRESERVED** (kept for manual rollback if needed)
+- **On failure**: Backup **PRESERVED** (used for automatic rollback, then kept for investigation)
+- **User action**: Delete `backup.cyberpatcher` folder when no longer needed
 
 ---
 
