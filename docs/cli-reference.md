@@ -77,7 +77,40 @@ applier [options]
 | `--current-dir <path>` | Yes | Directory containing current installation |
 | `--verify` | No | Enable full verification (recommended!) |
 | `--dry-run` | No | Preview changes without applying |
+| `--create-backup` | No | Create selective backup before patching (default: `true`) |
+| `--no-backup` | No | Disable backup creation (NOT recommended for production!) |
 | `--help` | No | Display help information |
+
+#### Backup Flag Details
+
+**`--create-backup` (default: `true`)**
+- **Strategy**: Selective backup of only modified/deleted files (NOT new files)
+- **Location**: `backup.cyberpatcher` folder created inside `--current-dir`
+- **Structure**: Mirror directory hierarchy preserving exact original paths
+- **Preservation**: Kept after successful patching for manual rollback capability
+- **Benefits**:
+  - Minimal disk space (e.g., 2.8MB vs 5.2GB = 99.5% reduction)
+  - Fast backup creation (e.g., 2s vs 45s = 95% faster)
+  - Intuitive rollback (mirror structure = drag-and-drop restore)
+  - Transparent about changes (shows exactly what was backed up)
+
+**`--no-backup`**
+- **Disables**: Backup creation entirely
+- **Risk**: Cannot automatically rollback on failure
+- **Use Case**: Testing environments, CI/CD pipelines with external backups
+- **WARNING**: Not recommended for production systems!
+
+**Rollback Procedure** (if backup exists):
+```powershell
+# Manual rollback from backup.cyberpatcher
+Copy-Item C:\MyApp\backup.cyberpatcher\* C:\MyApp -Recurse -Force
+
+# Delete any files that were added (not in backup)
+# Then delete backup folder after confirming restoration
+Remove-Item C:\MyApp\backup.cyberpatcher -Recurse -Force
+```
+
+See [Backup Lifecycle](backup-lifecycle.md) for complete backup system documentation.
 
 ### Exit Codes
 
@@ -109,6 +142,16 @@ applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --dry-run
 **Quick Application** (no verification - RISKY!):
 ```bash
 applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp
+```
+
+**Without Backup** (for testing only - NOT recommended!):
+```bash
+applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --no-backup
+```
+
+**Explicit Backup** (default behavior):
+```bash
+applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --create-backup --verify
 ```
 
 ---
@@ -270,23 +313,27 @@ Applying patch from 1.0.0 to 1.0.3...
 Verifying current version...
 ✓ Pre-patch verification successful
 
-Creating backup...
-✓ Backup created at: ./myapp.backup
+Creating selective backup...
+  Backing up: program.exe
+  Backing up: data/config.json
+  Backing up: libs/oldfeature.dll
+  ... (9 more files - only changed/deleted files)
+✓ Selective backup created
 
 Applying 20 operations...
   Modified: program.exe
   Modified: data/config.json
-  Added: libs/newfeature.dll
+  Added: libs/newfeature.dll (NOT backed up - didn't exist before)
   Deleted: libs/oldfeature.dll
   ... (16 more operations)
 
 ✓ Post-patch verification successful
 
-Removing backup...
+Backup preserved in: ./myapp/backup.cyberpatcher
 
 === Patch Applied Successfully ===
 Version updated from 1.0.0 to 1.0.3
-Time elapsed: 12.3 seconds
+Time elapsed: 8.2 seconds (selective backup saved time!)
 ```
 
 ---

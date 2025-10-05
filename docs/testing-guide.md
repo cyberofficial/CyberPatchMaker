@@ -4,7 +4,7 @@ Guide to running and understanding CyberPatchMaker's comprehensive test suite.
 
 ## Overview
 
-CyberPatchMaker includes a comprehensive test suite with 24 tests that validate all core functionality including generation, application, verification, error handling, and advanced scenarios like multi-hop patching, bidirectional patching, downgrade testing, compression formats, and automatic rollback.
+CyberPatchMaker includes a comprehensive test suite with 28 tests that validate all core functionality including generation, application, verification, error handling, backup system, and advanced scenarios like multi-hop patching, bidirectional patching, downgrade testing, compression formats, and automatic rollback.
 
 **Key Feature:** Test data is automatically generated on first run - no bloat files committed to the repository!
 
@@ -60,11 +60,11 @@ Testing: Apply zstd patch to complex directory structure
 ✓ PASSED: Apply zstd patch to complex directory structure
 
 ...
-(All 20 tests with command visibility)
+(All 28 tests with command visibility)
 ========================================
 Advanced Test Results
 ========================================
-Passed: 20
+Passed: 28
 Failed: 0
 
 ✓ All advanced tests passed!

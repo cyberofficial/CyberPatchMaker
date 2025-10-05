@@ -10,15 +10,18 @@ Welcome to the CyberPatchMaker documentation wiki. This comprehensive guide cove
 ### User Guides
 - [Generator Tool Guide](generator-guide.md) - Complete guide to patch generation
 - [Applier Tool Guide](applier-guide.md) - Complete guide to patch application
+- [GUI Usage Guide](gui-usage.md) - Using the graphical interface
 - [Downgrade Guide](downgrade-guide.md) - Rollback to previous versions
 - [CLI Reference](cli-reference.md) - Quick command-line reference
+- [CLI Examples](CLI-EXAMPLES.md) - Real-world command examples
 - [Version Management](version-management.md) - Managing multiple versions
 - [Compression Options](compression-guide.md) - Choosing the right compression
 
 ### Core Concepts
 - [How It Works](how-it-works.md) - Understanding the patch system
 - [System Architecture](architecture.md) - Overall system design
-- [Backup Lifecycle](backup-lifecycle.md) - Backup timing and rollback
+- [Backup System](backup-system.md) - Selective backup and rollback mechanisms
+- [Backup Lifecycle](backup-lifecycle.md) - Detailed backup timing and lifecycle
 
 ### Technical Deep-Dives
 - [Key File System](key-file-system.md) - Automatic key file detection and version identification
@@ -30,17 +33,17 @@ Welcome to the CyberPatchMaker documentation wiki. This comprehensive guide cove
 ### Development
 - [Development Setup](development-setup.md) - Setting up dev environment and contributing
 - [Testing Guide](testing-guide.md) - Running and writing tests
+- [Advanced Test Summary](ADVANCED-TEST-SUMMARY.md) - Comprehensive test suite documentation
 
 ## Quick Links
 
 - **Need Help?** Start with the [Quick Start Guide](quick-start.md)
 - **Generating Patches?** See [Generator Tool Guide](generator-guide.md)
 - **Applying Patches?** See [Applier Tool Guide](applier-guide.md)
+- **Understanding Backups?** Read [Backup System](backup-system.md)
 - **Something Not Working?** Check [Troubleshooting](troubleshooting.md)
 - **Want to Contribute?** Read [Development Setup](development-setup.md)
 
 ## Documentation Version
 
-This documentation corresponds to **CyberPatchMaker v0.1.0** (Phase 1 - Core Foundation Complete)
-
-Last Updated: October 4, 2025
+This documentation corresponds to CyberPatchMaker

@@ -198,10 +198,11 @@ Final size: 10MB (from ~5MB uncompressed)
    │  └─ If wrong: STOP - Modified installation!
    └─ SUCCESS: Confirmed clean version 1.0.0
 
-3. CREATE BACKUP ← Only after verification passes!
-   ├─ Create backup directory
-   ├─ Recursively copy ALL files
-   └─ Backup captures VERIFIED CLEAN STATE
+3. CREATE SELECTIVE BACKUP ← Only after verification passes!
+   ├─ Create backup.cyberpatcher directory inside target
+   ├─ Selectively copy only files being MODIFIED or DELETED
+   ├─ Mirror directory structure (preserve exact paths)
+   └─ Backup captures VERIFIED CLEAN STATE of changed files only
 
 4. APPLY OPERATIONS
    ├─ For each operation:
@@ -217,8 +218,8 @@ Final size: 10MB (from ~5MB uncompressed)
    └─ SUCCESS: Confirmed clean version 1.0.1
 
 6. CLEANUP
-   ├─ If success: Remove backup
-   └─ If failure: Keep backup for manual recovery
+   ├─ If success: Preserve backup.cyberpatcher for manual rollback
+   └─ If failure: Keep backup.cyberpatcher for investigation and recovery
 ```
 
 ---
@@ -268,10 +269,20 @@ If **ANY file is wrong** → Patch rejected, no changes made
 
 ### 4. Backup & Rollback
 
-**Backup created after verification:**
-- Captures **verified clean state**
+**Selective backup created after verification:**
+- **Strategy**: Only backs up files being modified or deleted (NOT new files)
+- **Location**: `backup.cyberpatcher` folder inside target directory
+- **Structure**: Mirror directory hierarchy preserving exact original paths
+- **Preservation**: Kept after successful patching for manual rollback capability
+- Captures **verified clean state** of changed files only
 - Enables **safe restoration** on failure
 - **Never backs up corrupted state**
+
+**Benefits:**
+- **Minimal disk space**: Only changed files backed up (e.g., 2.8MB vs 5.2GB = 99.5% reduction)
+- **Fast backup creation**: Selective copy much faster than full copy (e.g., 2s vs 45s = 95% faster)
+- **Intuitive rollback**: Mirror structure means drag-and-drop restore with exact paths
+- **Transparency**: Shows exactly which files changed
 
 **Restoration triggers:**
 - Operation failure (disk full, permission error)
@@ -340,10 +351,10 @@ If **ANY file is wrong** → Patch rejected, no changes made
 **Time:** O(k) where k = number of operations
 - Load patch: <1 second
 - Pre-verification: ~10 seconds for 5GB installation
-- Create backup: ~30 seconds for 5GB
+- Create selective backup: ~2 seconds (only changed files, not full 5GB copy)
 - Apply operations: ~30 seconds for 50MB of changes
 - Post-verification: ~10 seconds
-- **Total: ~1-2 minutes**
+- **Total: ~45-60 seconds** (much faster than OLD system with full backup)
 
 ---
 

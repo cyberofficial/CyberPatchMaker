@@ -325,7 +325,7 @@ CyberPatchMaker performs verification at three critical stages:
 
 **Verification Flow**:
 
-#### Phase 1: Pre-Patch Verification
+#### Pre-Patch Verification
 
 ```
 [User] Apply patch to C:\MyApp\
@@ -350,7 +350,7 @@ CyberPatchMaker performs verification at three critical stages:
 → Proceed with patch application
 ```
 
-#### Phase 2: During-Patch Verification
+#### During-Patch Verification
 
 ```
 [System] Create backup: C:\MyApp\.backup\
@@ -382,7 +382,7 @@ CyberPatchMaker performs verification at three critical stages:
 [System] All operations completed
 ```
 
-#### Phase 3: Post-Patch Verification
+#### Post-Patch Verification
 
 ```
 [System] Verify target version integrity
@@ -574,7 +574,7 @@ func calculateSHA256Large(filePath string) (string, error) {
 
 **For 5GB Application with 1,000 files**:
 
-| Phase | Operations | Time (HDD) | Time (SSD) |
+| Step | Operations | Time (HDD) | Time (SSD) |
 |-------|-----------|-----------|-----------|
 | Pre-Patch Verification | Hash 1,000 files (5GB) | ~60s | ~10s |
 | During-Patch | Apply 50 operations | ~10s | ~5s |
@@ -891,6 +891,6 @@ The Hash Verification System provides **cryptographic-strength integrity protect
 ## See Also
 
 - [Key File System](key-file-system.md) - Deep dive into key file detection
-- [Backup Lifecycle](backup-lifecycle.md) - Rollback mechanisms when verification fails
+- [Backup System](backup-system.md) - Rollback mechanisms when verification fails
 - [Architecture](architecture.md) - Overall system architecture and verification points
 - [Troubleshooting](troubleshooting.md) - Solving common verification errors
