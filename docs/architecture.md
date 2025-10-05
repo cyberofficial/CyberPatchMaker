@@ -464,7 +464,7 @@ Output: Success/Error Message
 - `testdata/versions/` - Generated test versions (1.0.0, 1.0.1, 1.0.2)
 - `testdata/test-output/` - Test execution workspace
 
-### Test Coverage (20 Comprehensive Tests)
+### Test Coverage (28 Comprehensive Tests)
 1. Build validation (generator and applier)
 2. Test data auto-generation
 3. Basic patch generation (zstd compression)
@@ -476,7 +476,9 @@ Output: Success/Error Message
 9. Patch rejection (missing files)
 10-12. Compression alternatives (zstd, gzip, none)
 13-17. Advanced scenarios (multi-hop patching, performance benchmarks)
-18-20. Cleanup and validation
+18-22. Error handling (corrupted patches, disk space, permissions)
+23-27. Backup system validation (creation, preservation, rollback, cleanup)
+28. Cleanup and validation
 
 See [Testing Guide](testing-guide.md) for details.
 
@@ -484,7 +486,7 @@ See [Testing Guide](testing-guide.md) for details.
 
 ## Future Architecture
 
-### Planned Phase 4: GUI Application
+### Planned Feature: GUI Application
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                       GUI Layer (Fyne)                       │

@@ -562,14 +562,18 @@ applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 Loading patch file...
 Verifying current version (1.0.0)...
 ✓ Version verified
-Creating backup...
+Creating selective backup...
+  Backing up: program.exe
+  Backing up: libs\core.dll
+  ✓ Selective backup created
 Applying patch operations...
   Modified: program.exe
-  Added: data/newfile.json
+  Added: data/newfile.json (not backed up - didn't exist)
   Modified: libs/core.dll
 Verifying patched version (1.0.1)...
 ✓ Verification passed
 Patch applied successfully!
+Backup preserved in: C:\MyApp\backup.cyberpatcher
 ```
 
 ---
@@ -619,7 +623,7 @@ applier.exe --patch .\patches-none\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 
 **Type:** String (required)
 
-**Important:** This directory will be modified in-place (with backup).
+**Important:** This directory will be modified in-place (with selective backup of changed files preserved in `backup.cyberpatcher` subfolder).
 
 #### Example 1: Local Application Directory
 ```powershell
@@ -628,7 +632,7 @@ applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 
 **What This Does:**
 - Verifies C:\MyApp contains version 1.0.0
-- Creates backup
+- Creates selective backup of changed files in C:\MyApp\backup.cyberpatcher
 - Updates files in C:\MyApp to version 1.0.1
 
 #### Example 2: Relative Path
@@ -868,14 +872,16 @@ You need to apply the 1.0.0-to-1.0.1 patch first.
 
 ### `--backup`
 
-**Purpose:** Create backup of current files before patching.
+**Purpose:** Create selective backup of files being changed before patching.
 
 **Type:** Boolean (optional, default: `true`)
 
 **Behavior:**
-- Creates timestamped backup directory
-- Copies all files before modification
-- Enables manual rollback if needed
+- Creates selective backup of only modified/deleted files (NOT added files)
+- Backup stored INSIDE target directory at `backup.cyberpatcher`
+- Uses mirror directory structure preserving exact paths
+- Backup is PRESERVED after success (manual cleanup required)
+- Enables easy manual rollback using drag-and-drop
 
 #### Example 1: Default (Backup Enabled)
 ```powershell
@@ -885,15 +891,20 @@ applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 **Output:**
 ```
 Loading patch file...
-Creating backup...
-  Backup location: C:\MyApp\.backup_20251004_143522
-  Copying 234 files...
-  ✓ Backup created
+Creating selective backup...
+  Backing up: program.exe
+  Backing up: libs\core.dll
+  Backing up: data\oldconfig.json
+  Backup created in: C:\MyApp\backup.cyberpatcher
 Applying patch...
+  Modified: program.exe
+  Modified: libs\core.dll
+  Added: data\newfeature.json (NOT backed up - didn't exist)
+  Deleted: data\oldconfig.json
 ✓ Patch applied successfully
 
-Backup is stored at: C:\MyApp\.backup_20251004_143522
-You can delete it manually if update is successful.
+Backup preserved in: C:\MyApp\backup.cyberpatcher
+Files can be manually restored if needed. Delete backup.cyberpatcher when no longer needed.
 ```
 
 #### Example 2: Explicitly Enable Backup
@@ -909,7 +920,7 @@ applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --back
 ```
 
 **Use Case:**
-- Disk space is extremely limited
+- Disk space is extremely limited (selective backup uses minimal space)
 - Already have external backup
 - Testing in disposable environment
 
@@ -928,36 +939,48 @@ WARNING: No backup was created. Cannot rollback if issues occur.
 applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --backup
 ```
 
-**Output for 5GB application:**
+**Output for 5GB application (only 15 files changed):**
 ```
 Loading patch file...
-Creating backup...
-  Backup location: C:\MyApp\.backup_20251004_143522
-  Copying 5,234 files (5.2 GB)...
-  Progress: [████████████████████] 100%
-  ✓ Backup created (took 45 seconds)
+Creating selective backup...
+  Backing up: program.exe (2.1 MB)
+  Backing up: libs\core.dll (512 KB)
+  Backing up: libs\deprecated.dll (230 KB)
+  ... (12 more files)
+  Backup created in: C:\MyApp\backup.cyberpatcher (2.8 MB total)
+  ✓ Selective backup created (took 2 seconds)
 Applying patch...
 ```
 
+**Note:** Selective backup only backs up changed files (2.8 MB), not the entire 5GB application. This saves significant disk space and time.
+
 #### Example 5: Manual Rollback Using Backup
 ```powershell
-# If patch causes problems, manually rollback:
+# If patch causes problems, manually rollback using mirror structure:
 
 # Stop application
 Stop-Process -Name MyApp
 
-# Remove patched files
-Remove-Item C:\MyApp\* -Recurse -Force -Exclude .backup_*
+# Restore files from backup (mirror structure makes this easy)
+# Each file in backup.cyberpatcher has the exact path it should go to
+Copy-Item C:\MyApp\backup.cyberpatcher\program.exe C:\MyApp\program.exe -Force
+Copy-Item C:\MyApp\backup.cyberpatcher\libs\core.dll C:\MyApp\libs\core.dll -Force
+Copy-Item C:\MyApp\backup.cyberpatcher\data\oldconfig.json C:\MyApp\data\oldconfig.json -Force
 
-# Restore from backup
-Copy-Item C:\MyApp\.backup_20251004_143522\* C:\MyApp\ -Recurse
+# Or restore all backed up files at once
+Copy-Item C:\MyApp\backup.cyberpatcher\* C:\MyApp\ -Recurse -Force
 
-# Cleanup backup
-Remove-Item C:\MyApp\.backup_20251004_143522 -Recurse -Force
+# Delete new files that were added by patch (these weren't backed up)
+Remove-Item C:\MyApp\data\newfeature.json -Force
+
+# Cleanup backup when rollback is confirmed working
+Remove-Item C:\MyApp\backup.cyberpatcher -Recurse -Force
 
 # Restart application
 Start-Process C:\MyApp\program.exe
 ```
+
+**Note:** The mirror structure in `backup.cyberpatcher` preserves exact paths, making manual rollback intuitive - just copy files back to their original locations.
 
 #### Example 6: Automatic Rollback on Failure
 ```powershell
@@ -967,27 +990,32 @@ applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --back
 **If post-verification fails:**
 ```
 Loading patch file...
-Creating backup...
-  ✓ Backup created
+Creating selective backup...
+  Backing up: program.exe
+  Backing up: libs\core.dll
+  ✓ Selective backup created
 Applying patch...
 Verifying patched version...
   ✗ Verification failed: File checksum mismatch
 
 ✗ ERROR: Post-verification failed
-  Automatically rolling back to backup...
+  Automatically rolling back from backup...
+  Restored: program.exe
+  Restored: libs\core.dll
   ✓ Rollback complete
   ✓ Original version restored
 
 The patch was NOT applied due to verification failure.
-Backup location: C:\MyApp\.backup_20251004_143522
+Backup preserved in: C:\MyApp\backup.cyberpatcher for investigation.
 ```
 
 **Backup Best Practices:**
 - **Always enable for production** (default)
 - Test rollback procedure before production deployment
-- Ensure sufficient disk space (need 2x application size temporarily)
-- Delete old backups after confirming successful update
+- Ensure sufficient disk space (need space for changed files only - much less than full application)
+- Delete `backup.cyberpatcher` folder after confirming successful update
 - Consider external backups for critical systems
+- Selective backup minimizes disk space requirements
 
 ---
 
@@ -1195,11 +1223,9 @@ Write-Host "`nStep 3: Running application tests..."
 if ($LASTEXITCODE -ne 0) {
     Write-Host "✗ Application tests failed"
     
-    # Rollback
-    Write-Host "Rolling back..."
-    $backupDir = Get-ChildItem "$TestDir\.backup_*" | Sort-Object -Descending | Select-Object -First 1
-    Remove-Item "$TestDir\*" -Recurse -Force -Exclude .backup_*
-    Copy-Item "$($backupDir.FullName)\*" $TestDir -Recurse
+    # Rollback using mirror structure backup
+    Write-Host "Rolling back from backup.cyberpatcher..."
+    Copy-Item "$TestDir\backup.cyberpatcher\*" $TestDir -Recurse -Force
     Write-Host "✓ Rollback complete"
     exit 1
 }
@@ -1373,11 +1399,11 @@ applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 **Error:**
 ```
 Error: Insufficient disk space
-  Required: 10.5 GB (5 GB app + 5.5 GB backup)
-  Available: 3.2 GB
+  Required: 50 MB (5 GB app + 50 MB selective backup for changed files)
+  Available: 30 MB
 ```
 
-**Solution:** Free up disk space or disable backup
+**Solution:** Free up minimal disk space (selective backup is much smaller than old system) or disable backup
 ```powershell
 # Option 1: Free up space and retry
 # Option 2: Disable backup (not recommended)
@@ -1432,7 +1458,7 @@ This guide covered every CLI argument with comprehensive examples. Key takeaways
 - Use `--dry-run` to preview changes before applying
 - Always leave `--verify` enabled to catch corruption and version mismatches
 - Always leave `--backup` enabled for safety (can rollback if issues occur)
-- Check available disk space (need 2x application size for backup)
+- Check available disk space (need minimal space for selective backup - only changed files, not entire application)
 
 **Best Practices:**
 1. Test patches with `--dry-run` before production

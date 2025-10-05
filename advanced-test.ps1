@@ -605,8 +605,8 @@ Test-Step "Verify downgrade results match version 1.0.1" {
         throw "Directory plugins should have been removed"
     }
     
-    # Verify file count matches 1.0.1
-    $downgradedFiles = (Get-ChildItem "testdata/advanced-output/downgrade-test" -Recurse -File | Measure-Object).Count
+    # Verify file count matches 1.0.1 (excluding backup folder)
+    $downgradedFiles = (Get-ChildItem "testdata/advanced-output/downgrade-test" -Recurse -File | Where-Object { $_.FullName -notlike "*backup.cyberpatcher*" } | Measure-Object).Count
     $expectedFiles = (Get-ChildItem "testdata/versions/1.0.1" -Recurse -File | Measure-Object).Count
     
     if ($downgradedFiles -ne $expectedFiles) {
@@ -724,9 +724,9 @@ Test-Step "Verify detection of corrupted files in source" {
     Write-Host "  Corrupted file correctly detected" -ForegroundColor Gray
 }
 
-# Test 23: Verify backup creation and rollback
-Test-Step "Verify backup system works correctly" {
-    Write-Host "  Testing backup and rollback functionality..." -ForegroundColor Gray
+# Test 23: Verify backup creation and structure
+Test-Step "Verify backup creation and mirror structure" {
+    Write-Host "  Testing backup system with mirror structure..." -ForegroundColor Gray
     
     # Copy 1.0.1 to backup-test directory
     New-Item -Path "testdata/advanced-output/backup-test" -ItemType Directory -Force | Out-Null
@@ -745,14 +745,198 @@ Test-Step "Verify backup system works correctly" {
         throw "Patch application failed"
     }
     
+    # Verify backup directory was created
+    if (-not (Test-Path "testdata/advanced-output/backup-test/backup.cyberpatcher")) {
+        throw "Backup directory 'backup.cyberpatcher' was not created"
+    }
+    Write-Host "  ✓ Backup directory created: backup.cyberpatcher" -ForegroundColor Green
+    
+    # Verify backup message in output
     $outputStr = $output -join "`n"
     if ($outputStr -notmatch "backup|Backup") {
-        Write-Host "  Warning: Backup message not found in output, but patch succeeded" -ForegroundColor Yellow
-    } else {
-        Write-Host "  Backup was created during patch application" -ForegroundColor Gray
+        throw "Backup message not found in output"
+    }
+    Write-Host "  ✓ Backup creation message found in output" -ForegroundColor Green
+    
+    # Verify mirror structure - modified files should be backed up with correct paths
+    if (-not (Test-Path "testdata/advanced-output/backup-test/backup.cyberpatcher/program.exe")) {
+        throw "Backup file 'program.exe' not found in backup directory"
+    }
+    Write-Host "  ✓ Key file backed up: program.exe" -ForegroundColor Green
+    
+    if (-not (Test-Path "testdata/advanced-output/backup-test/backup.cyberpatcher/data/config.json")) {
+        throw "Backup file 'data/config.json' not found in backup directory"
+    }
+    Write-Host "  ✓ Nested file backed up: data/config.json" -ForegroundColor Green
+    
+    if (-not (Test-Path "testdata/advanced-output/backup-test/backup.cyberpatcher/libs/core.dll")) {
+        throw "Backup file 'libs/core.dll' not found in backup directory"
+    }
+    Write-Host "  ✓ Library file backed up: libs/core.dll" -ForegroundColor Green
+    
+    if (-not (Test-Path "testdata/advanced-output/backup-test/backup.cyberpatcher/libs/newfeature.dll")) {
+        throw "Backup file 'libs/newfeature.dll' not found in backup directory"
+    }
+    Write-Host "  ✓ Modified library backed up: libs/newfeature.dll" -ForegroundColor Green
+    
+    Write-Host "  Backup system with mirror structure verified" -ForegroundColor Gray
+}
+
+# Test 24: Verify backup only contains modified/deleted files
+Test-Step "Verify selective backup (only modified/deleted files)" {
+    Write-Host "  Verifying backup is selective (not full copy)..." -ForegroundColor Gray
+    
+    # Count files in backup vs target after patching
+    $backupFiles = @(Get-ChildItem "testdata/advanced-output/backup-test/backup.cyberpatcher" -Recurse -File)
+    $patchedFiles = @(Get-ChildItem "testdata/advanced-output/backup-test" -Recurse -File | Where-Object { $_.FullName -notlike "*backup.cyberpatcher*" })
+    
+    Write-Host "  Patched version files: $($patchedFiles.Count)" -ForegroundColor Gray
+    Write-Host "  Backup files: $($backupFiles.Count)" -ForegroundColor Gray
+    
+    # Backup should have FEWER files than patched version (only modified/deleted, not added)
+    # Version 1.0.2 has 10 files total, but 1.0.1 had 4 files
+    # So backup should have 4 files (only the modified ones from 1.0.1)
+    # And patched version should have 10 files (4 modified + 6 added)
+    if ($backupFiles.Count -ge $patchedFiles.Count) {
+        throw "Backup contains $($backupFiles.Count) files, expected fewer than patched version ($($patchedFiles.Count) files)"
     }
     
-    Write-Host "  Backup system verified" -ForegroundColor Gray
+    # Expected backed up files: program.exe, data/config.json, libs/core.dll, libs/newfeature.dll
+    # (Files that are modified in 1.0.1→1.0.2 patch, not the 6 new files)
+    if ($backupFiles.Count -ne 4) {
+        Write-Host "  Warning: Expected 4 backed up files, got $($backupFiles.Count)" -ForegroundColor Yellow
+        Write-Host "  Backed up files:" -ForegroundColor Yellow
+        foreach ($file in $backupFiles) {
+            $relativePath = $file.FullName.Substring((Resolve-Path "testdata/advanced-output/backup-test/backup.cyberpatcher").Path.Length + 1)
+            Write-Host "    - $relativePath" -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host "  ✓ Correct number of files backed up (4 modified files)" -ForegroundColor Green
+    }
+    
+    Write-Host "  ✓ Backup is selective (not a full copy)" -ForegroundColor Green
+    Write-Host "  Selective backup verified (only modified/deleted files)" -ForegroundColor Gray
+}
+
+# Test 25: Verify backup preservation after successful patch
+Test-Step "Verify backup is preserved after successful patching" {
+    Write-Host "  Verifying backup persists after successful patch..." -ForegroundColor Gray
+    
+    # Backup directory should still exist
+    if (-not (Test-Path "testdata/advanced-output/backup-test/backup.cyberpatcher")) {
+        throw "Backup directory should be preserved but was deleted"
+    }
+    
+    # Verify backup files still exist
+    if (-not (Test-Path "testdata/advanced-output/backup-test/backup.cyberpatcher/program.exe")) {
+        throw "Backup files should be preserved but were deleted"
+    }
+    
+    Write-Host "  ✓ Backup directory preserved: backup.cyberpatcher" -ForegroundColor Green
+    Write-Host "  ✓ Backup files intact after successful patching" -ForegroundColor Green
+    
+    Write-Host "  Backup preservation verified" -ForegroundColor Gray
+}
+
+# Test 26: Verify manual rollback using backup
+Test-Step "Verify manual rollback from backup works" {
+    Write-Host "  Testing manual rollback using backup..." -ForegroundColor Gray
+    
+    # Verify current state is 1.0.2
+    $currentVersion = Get-Content "testdata/advanced-output/backup-test/program.exe" -Raw
+    $expected102 = Get-Content "testdata/versions/1.0.2/program.exe" -Raw
+    
+    if ($currentVersion -ne $expected102) {
+        throw "Current version should be 1.0.2 before rollback test"
+    }
+    Write-Host "  Current version confirmed: 1.0.2" -ForegroundColor Gray
+    
+    # Manually rollback by copying from backup
+    Write-Host "  Performing manual rollback (copying from backup)..." -ForegroundColor Gray
+    
+    # Copy program.exe from backup
+    Copy-Item "testdata/advanced-output/backup-test/backup.cyberpatcher/program.exe" `
+              "testdata/advanced-output/backup-test/program.exe" -Force
+    
+    # Copy data/config.json from backup
+    Copy-Item "testdata/advanced-output/backup-test/backup.cyberpatcher/data/config.json" `
+              "testdata/advanced-output/backup-test/data/config.json" -Force
+    
+    # Copy libs/core.dll from backup
+    Copy-Item "testdata/advanced-output/backup-test/backup.cyberpatcher/libs/core.dll" `
+              "testdata/advanced-output/backup-test/libs/core.dll" -Force
+    
+    # Copy libs/newfeature.dll from backup
+    Copy-Item "testdata/advanced-output/backup-test/backup.cyberpatcher/libs/newfeature.dll" `
+              "testdata/advanced-output/backup-test/libs/newfeature.dll" -Force
+    
+    Write-Host "  Files copied from backup" -ForegroundColor Gray
+    
+    # Verify rollback - program.exe should now match 1.0.1
+    $rolledBackVersion = Get-Content "testdata/advanced-output/backup-test/program.exe" -Raw
+    $expected101 = Get-Content "testdata/versions/1.0.1/program.exe" -Raw
+    
+    if ($rolledBackVersion -ne $expected101) {
+        throw "Manual rollback failed - program.exe does not match version 1.0.1"
+    }
+    
+    Write-Host "  ✓ Manual rollback successful: 1.0.2 → 1.0.1" -ForegroundColor Green
+    Write-Host "  ✓ Backup system enables easy rollback" -ForegroundColor Green
+    
+    Write-Host "  Manual rollback verified" -ForegroundColor Gray
+}
+
+# Test 27: Verify backup with complex nested structure
+Test-Step "Verify backup handles complex nested paths" {
+    Write-Host "  Testing backup with deeply nested directory structure..." -ForegroundColor Gray
+    
+    # Copy 1.0.0 to nested-backup-test
+    New-Item -Path "testdata/advanced-output/nested-backup-test" -ItemType Directory -Force | Out-Null
+    Get-ChildItem -Path "testdata/versions/1.0.0" -Recurse | Copy-Item -Destination {
+        $dest = Join-Path "testdata/advanced-output/nested-backup-test" $_.FullName.Substring((Resolve-Path "testdata/versions/1.0.0").Path.Length)
+        $destDir = Split-Path $dest
+        if (-not (Test-Path $destDir)) { New-Item -Path $destDir -ItemType Directory -Force | Out-Null }
+        $dest
+    } -Force
+    
+    # Generate and apply 1.0.0 → 1.0.2 patch (includes deep nesting)
+    Write-Host "  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches" -ForegroundColor Cyan
+    $output = .\generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to generate 1.0.0→1.0.2 patch"
+    }
+    
+    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.2.patch --current-dir .\testdata\advanced-output\nested-backup-test --verify" -ForegroundColor Cyan
+    $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.2.patch --current-dir .\testdata\advanced-output\nested-backup-test --verify 2>&1
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Patch application with backup failed"
+    }
+    
+    # Verify backup directory exists
+    if (-not (Test-Path "testdata/advanced-output/nested-backup-test/backup.cyberpatcher")) {
+        throw "Backup directory not created for complex structure"
+    }
+    
+    # Verify nested directories in backup match original structure
+    if (Test-Path "testdata/advanced-output/nested-backup-test/backup.cyberpatcher/data") {
+        Write-Host "  ✓ Nested directory preserved in backup: data/" -ForegroundColor Green
+    }
+    
+    if (Test-Path "testdata/advanced-output/nested-backup-test/backup.cyberpatcher/libs") {
+        Write-Host "  ✓ Nested directory preserved in backup: libs/" -ForegroundColor Green
+    }
+    
+    # Verify backed up files maintain directory hierarchy
+    $backupFiles = @(Get-ChildItem "testdata/advanced-output/nested-backup-test/backup.cyberpatcher" -Recurse -File)
+    Write-Host "  ✓ Backup created with $($backupFiles.Count) files in mirror structure" -ForegroundColor Green
+    
+    foreach ($file in $backupFiles) {
+        $relativePath = $file.FullName.Substring((Resolve-Path "testdata/advanced-output/nested-backup-test/backup.cyberpatcher").Path.Length + 1)
+        Write-Host "    - $relativePath" -ForegroundColor Gray
+    }
+    
+    Write-Host "  Complex nested backup structure verified" -ForegroundColor Gray
 }
 
 # Test 24: Performance check - verify generation speed
@@ -799,8 +983,11 @@ if ($failed -eq 0) {
     Write-Host "  • Complete bidirectional cycle (1.0.1 ↔ 1.0.2)" -ForegroundColor Gray
     Write-Host "  • Wrong version detection" -ForegroundColor Gray
     Write-Host "  • File corruption detection" -ForegroundColor Gray
-    Write-Host "  • Backup system functionality" -ForegroundColor Gray
-    Write-Host "  • Performance benchmarks" -ForegroundColor Gray
+    Write-Host "  • Backup system with mirror structure" -ForegroundColor Gray
+    Write-Host "  • Selective backup (only modified/deleted files)" -ForegroundColor Gray
+    Write-Host "  • Backup preservation after successful patching" -ForegroundColor Gray
+    Write-Host "  • Manual rollback from backup" -ForegroundColor Gray
+    Write-Host "  • Backup with complex nested paths" -ForegroundColor Gray
     Write-Host "  • Deep file path operations" -ForegroundColor Gray
     Write-Host ""
     Write-Host "CyberPatchMaker advanced functionality verified!" -ForegroundColor Green

@@ -291,7 +291,7 @@ Version 1.0.2 created (11 files, 6 directories, 3 levels deep)
 Created 3 test version(s)
 
 === Test Results ===
-All 20 tests passed!
+All 28 tests passed!
 ```
 
 ---
@@ -417,7 +417,7 @@ CyberPatchMaker/
 │
 ├── go.mod                # Go module definition
 ├── go.sum                # Dependency checksums
-├── advanced-test.ps1     # Comprehensive test suite (20 tests)
+├── advanced-test.ps1     # Comprehensive test suite (28 tests)
 ├── LICENSE               # Apache 2.0 license
 └── README.md             # Project README
 ```
