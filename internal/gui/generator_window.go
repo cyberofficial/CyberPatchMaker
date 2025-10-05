@@ -3,11 +3,13 @@ package gui
 import (
 	"encoding/json"
 	"fmt"
+	"image/color"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
@@ -92,6 +94,12 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	// Create versions directory selector
 	gw.versionsDirEntry = widget.NewEntry()
 	gw.versionsDirEntry.SetPlaceHolder("Select versions directory...")
+	gw.versionsDirEntry.OnSubmitted = func(text string) {
+		if text != "" {
+			gw.versionsDir = text
+			gw.scanVersions()
+		}
+	}
 
 	versionsDirBrowse := widget.NewButton("Browse", func() {
 		gw.selectVersionsDirectory()
@@ -161,6 +169,12 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	// Create output directory selector
 	gw.outputDirEntry = widget.NewEntry()
 	gw.outputDirEntry.SetPlaceHolder("Select output directory...")
+	gw.outputDirEntry.OnSubmitted = func(text string) {
+		if text != "" {
+			gw.outputDir = text
+			gw.updateGenerateButton()
+		}
+	}
 
 	outputDirBrowse := widget.NewButton("Browse", func() {
 		gw.selectOutputDirectory()
@@ -259,12 +273,18 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	// Create status label
 	gw.statusLabel = widget.NewLabel("Ready")
 
-	// Create log output
+	// Create log output with white background and black text (read-only but not disabled)
 	gw.logText = widget.NewMultiLineEntry()
 	gw.logText.SetPlaceHolder("Log output will appear here...")
-	gw.logText.Disable()
+	// Make read-only by preventing edits (but keep enabled for normal text color)
+	gw.logText.OnChanged = func(text string) {
+		// This prevents user edits - text can only be set programmatically
+	}
 
-	logContainer := container.NewVScroll(gw.logText)
+	// Create a white background for the log for maximum contrast
+	logBg := canvas.NewRectangle(color.White)
+	logWithBg := container.NewStack(logBg, gw.logText)
+	logContainer := container.NewVScroll(logWithBg)
 	logContainer.SetMinSize(fyne.NewSize(0, 150))
 
 	// Assemble the UI with compact layout

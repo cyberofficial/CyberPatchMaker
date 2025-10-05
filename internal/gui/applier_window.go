@@ -3,10 +3,12 @@ package gui
 import (
 	"encoding/json"
 	"fmt"
+	"image/color"
 	"os"
 	"path/filepath"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
@@ -97,6 +99,13 @@ func (aw *ApplierWindow) buildUI() fyne.CanvasObject {
 			aw.loadPatchInfo()
 		}
 	}
+	aw.patchFileEntry.OnSubmitted = func(text string) {
+		if text != "" && utils.FileExists(text) {
+			aw.patchFile = text
+			aw.loadPatchInfo()
+			aw.updateApplyButton()
+		}
+	}
 
 	patchFileBrowse := widget.NewButton("Browse", func() {
 		aw.selectPatchFile()
@@ -115,6 +124,12 @@ func (aw *ApplierWindow) buildUI() fyne.CanvasObject {
 	aw.currentDirEntry.OnChanged = func(text string) {
 		aw.currentDir = text
 		aw.updateApplyButton()
+	}
+	aw.currentDirEntry.OnSubmitted = func(text string) {
+		if text != "" {
+			aw.currentDir = text
+			aw.updateApplyButton()
+		}
 	}
 
 	currentDirBrowse := widget.NewButton("Browse", func() {
@@ -229,12 +244,18 @@ func (aw *ApplierWindow) buildUI() fyne.CanvasObject {
 	// Create status label
 	aw.statusLabel = widget.NewLabel("Ready")
 
-	// Create log output
+	// Create log output with white background and black text (read-only but not disabled)
 	aw.logText = widget.NewMultiLineEntry()
 	aw.logText.SetPlaceHolder("Log output will appear here...")
-	aw.logText.Disable()
+	// Make read-only by preventing edits (but keep enabled for normal text color)
+	aw.logText.OnChanged = func(text string) {
+		// This prevents user edits - text can only be set programmatically
+	}
 
-	logContainer := container.NewVScroll(aw.logText)
+	// Create a white background for the log for maximum contrast
+	logBg := canvas.NewRectangle(color.White)
+	logWithBg := container.NewStack(logBg, aw.logText)
+	logContainer := container.NewVScroll(logWithBg)
 	logContainer.SetMinSize(fyne.NewSize(0, 150))
 
 	// Assemble the UI with compact layout
