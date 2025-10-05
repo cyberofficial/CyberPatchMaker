@@ -40,8 +40,8 @@ type GeneratorWindow struct {
 	toKeyFile        string
 
 	versionsDirEntry   *widget.Entry
-	fromKeyFileEntry   *widget.Entry
-	toKeyFileEntry     *widget.Entry
+	fromKeyFileSelect  *widget.Select
+	toKeyFileSelect    *widget.Select
 	fromVersionSelect  *widget.Select
 	toVersionSelect    *widget.Select
 	outputDirEntry     *widget.Entry
@@ -110,10 +110,10 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		if checked {
 			// In batch mode, from version is not used
 			gw.fromVersionSelect.Disable()
-			gw.fromKeyFileEntry.Disable()
+			gw.fromKeyFileSelect.Disable()
 		} else {
 			gw.fromVersionSelect.Enable()
-			gw.fromKeyFileEntry.Enable()
+			gw.fromKeyFileSelect.Enable()
 		}
 		gw.updateGenerateButton()
 	})
@@ -121,39 +121,41 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	// Create from version selector
 	gw.fromVersionSelect = widget.NewSelect([]string{}, func(selected string) {
 		gw.fromVersion = selected
+		gw.updateFromKeyFileOptions()
 		gw.updateGenerateButton()
 	})
 	gw.fromVersionSelect.PlaceHolder = "Select source version..."
 
 	// Create from key file selector
-	gw.fromKeyFileEntry = widget.NewEntry()
-	gw.fromKeyFileEntry.SetText(gw.fromKeyFile)
-	gw.fromKeyFileEntry.OnChanged = func(text string) {
-		gw.fromKeyFile = text
-	}
+	gw.fromKeyFileSelect = widget.NewSelect([]string{}, func(selected string) {
+		gw.fromKeyFile = selected
+	})
+	gw.fromKeyFileSelect.PlaceHolder = "Select key file..."
+	gw.fromKeyFileSelect.SetSelected(gw.fromKeyFile)
 
 	// Create to version selector
 	gw.toVersionSelect = widget.NewSelect([]string{}, func(selected string) {
 		gw.toVersion = selected
+		gw.updateToKeyFileOptions()
 		gw.updateGenerateButton()
 	})
 	gw.toVersionSelect.PlaceHolder = "Select target version..."
 
 	// Create to key file selector
-	gw.toKeyFileEntry = widget.NewEntry()
-	gw.toKeyFileEntry.SetText(gw.toKeyFile)
-	gw.toKeyFileEntry.OnChanged = func(text string) {
-		gw.toKeyFile = text
-	}
+	gw.toKeyFileSelect = widget.NewSelect([]string{}, func(selected string) {
+		gw.toKeyFile = selected
+	})
+	gw.toKeyFileSelect.PlaceHolder = "Select key file..."
+	gw.toKeyFileSelect.SetSelected(gw.toKeyFile)
 
 	// Left column: Version selection
 	leftColumn := container.NewVBox(
 		widget.NewLabel("Version Selection:"),
 		container.NewBorder(nil, nil, widget.NewLabel("From:"), nil, gw.fromVersionSelect),
-		container.NewBorder(nil, nil, widget.NewLabel("Key:"), nil, gw.fromKeyFileEntry),
+		container.NewBorder(nil, nil, widget.NewLabel("Key:"), nil, gw.fromKeyFileSelect),
 		widget.NewSeparator(),
 		container.NewBorder(nil, nil, widget.NewLabel("To:"), nil, gw.toVersionSelect),
-		container.NewBorder(nil, nil, widget.NewLabel("Key:"), nil, gw.toKeyFileEntry),
+		container.NewBorder(nil, nil, widget.NewLabel("Key:"), nil, gw.toKeyFileSelect),
 	)
 
 	// Create output directory selector
@@ -375,6 +377,70 @@ func (gw *GeneratorWindow) updateGenerateButton() {
 // updateCompressionLabel updates the compression level label
 func (gw *GeneratorWindow) updateCompressionLabel() {
 	gw.compressionLabel.SetText(fmt.Sprintf("Level: %d", gw.compressionLevel))
+}
+
+// updateFromKeyFileOptions scans from version and populates key file options
+func (gw *GeneratorWindow) updateFromKeyFileOptions() {
+	if gw.fromVersion == "" || gw.versionsDir == "" {
+		return
+	}
+
+	versionPath := filepath.Join(gw.versionsDir, gw.fromVersion)
+	files := gw.getFilesInDirectory(versionPath)
+	gw.fromKeyFileSelect.Options = files
+	gw.fromKeyFileSelect.Refresh()
+
+	// Auto-select if only one executable found
+	if len(files) > 0 {
+		for _, file := range files {
+			if strings.HasSuffix(strings.ToLower(file), ".exe") {
+				gw.fromKeyFileSelect.SetSelected(file)
+				gw.fromKeyFile = file
+				break
+			}
+		}
+	}
+}
+
+// updateToKeyFileOptions scans to version and populates key file options
+func (gw *GeneratorWindow) updateToKeyFileOptions() {
+	if gw.toVersion == "" || gw.versionsDir == "" {
+		return
+	}
+
+	versionPath := filepath.Join(gw.versionsDir, gw.toVersion)
+	files := gw.getFilesInDirectory(versionPath)
+	gw.toKeyFileSelect.Options = files
+	gw.toKeyFileSelect.Refresh()
+
+	// Auto-select if only one executable found
+	if len(files) > 0 {
+		for _, file := range files {
+			if strings.HasSuffix(strings.ToLower(file), ".exe") {
+				gw.toKeyFileSelect.SetSelected(file)
+				gw.toKeyFile = file
+				break
+			}
+		}
+	}
+}
+
+// getFilesInDirectory returns a list of all files in the directory (not recursive)
+func (gw *GeneratorWindow) getFilesInDirectory(dirPath string) []string {
+	files := []string{}
+
+	entries, err := os.ReadDir(dirPath)
+	if err != nil {
+		return files
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			files = append(files, entry.Name())
+		}
+	}
+
+	return files
 }
 
 // generatePatch generates the patch file
