@@ -48,7 +48,7 @@ Write-Info "Building components..."
 Write-Info ""
 
 # Build CLI Generator
-Write-Info "[1/3] Building patch generator (CLI)..."
+Write-Info "[1/5] Building patch generator (CLI)..."
 $generatorPath = Join-Path $distDir "patch-gen.exe"
 & go build @buildFlags $generatorPath ./cmd/generator
 if ($LASTEXITCODE -eq 0) {
@@ -59,7 +59,7 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 # Build CLI Applier
-Write-Info "[2/3] Building patch applier (CLI)..."
+Write-Info "[2/5] Building patch applier (CLI)..."
 $applierPath = Join-Path $distDir "patch-apply.exe"
 & go build @buildFlags $applierPath ./cmd/applier
 if ($LASTEXITCODE -eq 0) {
@@ -69,14 +69,25 @@ if ($LASTEXITCODE -eq 0) {
     exit 1
 }
 
-# Build GUI
-Write-Info "[3/3] Building patch GUI..."
-$guiPath = Join-Path $distDir "patch-gui.exe"
-& go build @buildFlags $guiPath ./cmd/patch-gui
+# Build Generator GUI
+Write-Info "[3/5] Building patch generator GUI..."
+$genGuiPath = Join-Path $distDir "patch-gen-gui.exe"
+& go build @buildFlags $genGuiPath ./cmd/patch-gui
 if ($LASTEXITCODE -eq 0) {
-    Write-Success "  ✓ patch-gui.exe"
+    Write-Success "  ✓ patch-gen-gui.exe"
 } else {
-    Write-Error "  ✗ Failed to build patch-gui.exe"
+    Write-Error "  ✗ Failed to build patch-gen-gui.exe"
+    exit 1
+}
+
+# Build Applier GUI
+Write-Info "[4/5] Building patch applier GUI..."
+$appGuiPath = Join-Path $distDir "patch-apply-gui.exe"
+& go build @buildFlags $appGuiPath ./cmd/applier-gui
+if ($LASTEXITCODE -eq 0) {
+    Write-Success "  ✓ patch-apply-gui.exe"
+} else {
+    Write-Error "  ✗ Failed to build patch-apply-gui.exe"
     exit 1
 }
 
@@ -91,7 +102,8 @@ Get-ChildItem $distDir -Filter *.exe | ForEach-Object {
 
 Write-Info ""
 Write-Info "To run:"
-Write-Info "  CLI Generator:  .\dist\patch-gen.exe --help"
-Write-Info "  CLI Applier:    .\dist\patch-apply.exe --help"
-Write-Info "  GUI:            .\dist\patch-gui.exe"
+Write-Info "  CLI Generator:      .\dist\patch-gen.exe --help"
+Write-Info "  CLI Applier:        .\dist\patch-apply.exe --help"
+Write-Info "  Generator GUI:      .\dist\patch-gen-gui.exe"
+Write-Info "  Applier GUI:        .\dist\patch-apply-gui.exe"
 Write-Info ""

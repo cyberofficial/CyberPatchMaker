@@ -26,22 +26,35 @@ type GeneratorWindow struct {
 	window fyne.Window
 
 	// UI Components
-	versionsDir string
-	fromVersion string
-	toVersion   string
-	outputDir   string
-	compression string
-	keyFile     string
+	versionsDir      string
+	fromVersion      string
+	toVersion        string
+	outputDir        string
+	compression      string
+	compressionLevel int
+	verifyAfter      bool
+	diffThresholdKB  int
+	skipIdentical    bool
+	batchMode        bool
+	fromKeyFile      string
+	toKeyFile        string
 
-	versionsDirEntry  *widget.Entry
-	keyFileEntry      *widget.Entry
-	fromVersionSelect *widget.Select
-	toVersionSelect   *widget.Select
-	outputDirEntry    *widget.Entry
-	compressionRadio  *widget.RadioGroup
-	generateBtn       *widget.Button
-	statusLabel       *widget.Label
-	logText           *widget.Entry
+	versionsDirEntry   *widget.Entry
+	fromKeyFileEntry   *widget.Entry
+	toKeyFileEntry     *widget.Entry
+	fromVersionSelect  *widget.Select
+	toVersionSelect    *widget.Select
+	outputDirEntry     *widget.Entry
+	compressionRadio   *widget.RadioGroup
+	compressionSlider  *widget.Slider
+	compressionLabel   *widget.Label
+	verifyCheck        *widget.Check
+	diffThresholdEntry *widget.Entry
+	skipIdenticalCheck *widget.Check
+	batchModeCheck     *widget.Check
+	generateBtn        *widget.Button
+	statusLabel        *widget.Label
+	logText            *widget.Entry
 
 	// Data
 	availableVersions []string
@@ -51,8 +64,14 @@ type GeneratorWindow struct {
 // NewGeneratorWindow creates a new generator window
 func NewGeneratorWindow() *GeneratorWindow {
 	gw := &GeneratorWindow{
-		compression: "zstd",
-		keyFile:     "program.exe",
+		compression:      "zstd",
+		compressionLevel: 3,
+		verifyAfter:      true,
+		diffThresholdKB:  1,
+		skipIdentical:    true,
+		batchMode:        false,
+		fromKeyFile:      "program.exe",
+		toKeyFile:        "program.exe",
 	}
 	gw.ExtendBaseWidget(gw)
 	return gw
@@ -85,18 +104,32 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		gw.versionsDirEntry,
 	)
 
-	// Create key file selector
-	gw.keyFileEntry = widget.NewEntry()
-	gw.keyFileEntry.SetText(gw.keyFile)
-	gw.keyFileEntry.OnChanged = func(text string) {
-		gw.keyFile = text
+	// Create from key file selector
+	gw.fromKeyFileEntry = widget.NewEntry()
+	gw.fromKeyFileEntry.SetText(gw.fromKeyFile)
+	gw.fromKeyFileEntry.OnChanged = func(text string) {
+		gw.fromKeyFile = text
 	}
 
-	keyFileContainer := container.NewBorder(
+	fromKeyFileContainer := container.NewBorder(
 		nil, nil,
-		widget.NewLabel("Key File:"),
+		widget.NewLabel("From Key File:"),
 		nil,
-		gw.keyFileEntry,
+		gw.fromKeyFileEntry,
+	)
+
+	// Create to key file selector
+	gw.toKeyFileEntry = widget.NewEntry()
+	gw.toKeyFileEntry.SetText(gw.toKeyFile)
+	gw.toKeyFileEntry.OnChanged = func(text string) {
+		gw.toKeyFile = text
+	}
+
+	toKeyFileContainer := container.NewBorder(
+		nil, nil,
+		widget.NewLabel("To Key File:"),
+		nil,
+		gw.toKeyFileEntry,
 	)
 
 	// Create from version selector
@@ -142,9 +175,36 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		gw.outputDirEntry,
 	)
 
-	// Create compression selector
+	// Create compression level slider FIRST (before radio group that references it)
+	gw.compressionSlider = widget.NewSlider(1, 4)
+	gw.compressionSlider.Value = 3
+	gw.compressionSlider.Step = 1
+	gw.compressionSlider.OnChanged = func(value float64) {
+		gw.compressionLevel = int(value)
+		gw.updateCompressionLabel()
+	}
+
+	gw.compressionLabel = widget.NewLabel("Level: 3")
+
+	// Create compression selector (references slider, so create it after)
 	gw.compressionRadio = widget.NewRadioGroup([]string{"zstd", "gzip", "none"}, func(selected string) {
 		gw.compression = selected
+		// Update slider range based on compression type
+		if selected == "zstd" {
+			gw.compressionSlider.Max = 4
+			if gw.compressionLevel > 4 {
+				gw.compressionLevel = 3
+				gw.compressionSlider.Value = 3
+			}
+		} else if selected == "gzip" {
+			gw.compressionSlider.Max = 9
+		} else {
+			gw.compressionSlider.Disable()
+			return
+		}
+		gw.compressionSlider.Enable()
+		gw.compressionSlider.Refresh()
+		gw.updateCompressionLabel()
 	})
 	gw.compressionRadio.Horizontal = true
 	gw.compressionRadio.SetSelected("zstd")
@@ -152,7 +212,57 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	compressionContainer := container.NewVBox(
 		widget.NewLabel("Compression:"),
 		gw.compressionRadio,
+		container.NewBorder(nil, nil, widget.NewLabel("Level:"), gw.compressionLabel, gw.compressionSlider),
 	)
+
+	// Create advanced options
+	gw.verifyCheck = widget.NewCheck("Verify patches after creation", func(checked bool) {
+		gw.verifyAfter = checked
+	})
+	gw.verifyCheck.SetChecked(true)
+
+	gw.skipIdenticalCheck = widget.NewCheck("Skip binary-identical files", func(checked bool) {
+		gw.skipIdentical = checked
+	})
+	gw.skipIdenticalCheck.SetChecked(true)
+
+	gw.diffThresholdEntry = widget.NewEntry()
+	gw.diffThresholdEntry.SetText("1")
+	gw.diffThresholdEntry.OnChanged = func(text string) {
+		var threshold int
+		fmt.Sscanf(text, "%d", &threshold)
+		if threshold > 0 {
+			gw.diffThresholdKB = threshold
+		}
+	}
+
+	diffThresholdContainer := container.NewBorder(
+		nil, nil,
+		widget.NewLabel("Diff Threshold (KB):"),
+		nil,
+		gw.diffThresholdEntry,
+	)
+
+	advancedContainer := container.NewVBox(
+		widget.NewLabel("Advanced Options:"),
+		gw.verifyCheck,
+		gw.skipIdenticalCheck,
+		diffThresholdContainer,
+	)
+
+	// Create batch mode checkbox
+	gw.batchModeCheck = widget.NewCheck("Batch Mode: Generate patches from ALL versions to target", func(checked bool) {
+		gw.batchMode = checked
+		if checked {
+			// In batch mode, from version is not used
+			gw.fromVersionSelect.Disable()
+			gw.fromKeyFileEntry.Disable()
+		} else {
+			gw.fromVersionSelect.Enable()
+			gw.fromKeyFileEntry.Enable()
+		}
+		gw.updateGenerateButton()
+	})
 
 	// Create generate button
 	gw.generateBtn = widget.NewButton("Generate Patch", func() {
@@ -174,13 +284,17 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	// Assemble the UI
 	return container.NewVBox(
 		versionsDirContainer,
-		keyFileContainer,
+		widget.NewSeparator(),
+		gw.batchModeCheck,
 		widget.NewSeparator(),
 		fromVersionContainer,
+		fromKeyFileContainer,
 		toVersionContainer,
+		toKeyFileContainer,
 		widget.NewSeparator(),
 		outputDirContainer,
 		compressionContainer,
+		advancedContainer,
 		widget.NewSeparator(),
 		gw.generateBtn,
 		widget.NewSeparator(),
@@ -268,17 +382,37 @@ func (gw *GeneratorWindow) scanVersions() {
 
 // updateGenerateButton enables/disables generate button based on selections
 func (gw *GeneratorWindow) updateGenerateButton() {
-	if gw.fromVersion != "" && gw.toVersion != "" && gw.outputDir != "" {
-		gw.generateBtn.Enable()
+	if gw.batchMode {
+		// In batch mode, only need to version and output dir
+		if gw.toVersion != "" && gw.outputDir != "" {
+			gw.generateBtn.Enable()
+		} else {
+			gw.generateBtn.Disable()
+		}
 	} else {
-		gw.generateBtn.Disable()
+		// In normal mode, need both from and to versions
+		if gw.fromVersion != "" && gw.toVersion != "" && gw.outputDir != "" {
+			gw.generateBtn.Enable()
+		} else {
+			gw.generateBtn.Disable()
+		}
 	}
+}
+
+// updateCompressionLabel updates the compression level label
+func (gw *GeneratorWindow) updateCompressionLabel() {
+	gw.compressionLabel.SetText(fmt.Sprintf("Level: %d", gw.compressionLevel))
 }
 
 // generatePatch generates the patch file
 func (gw *GeneratorWindow) generatePatch() {
 	gw.setStatus("Generating patch...")
 	gw.generateBtn.Disable()
+
+	if gw.batchMode {
+		gw.generateBatchPatches()
+		return
+	}
 
 	// Validate selections
 	if gw.fromVersion == gw.toVersion {
@@ -304,8 +438,8 @@ func (gw *GeneratorWindow) generatePatch() {
 
 	// Register and scan source version
 	gw.appendLog("Scanning source version...")
-	gw.appendLog(fmt.Sprintf("Using key file: %s", gw.keyFile))
-	fromVer, err := versionMgr.RegisterVersion(gw.fromVersion, fromPath, gw.keyFile)
+	gw.appendLog(fmt.Sprintf("Using from key file: %s", gw.fromKeyFile))
+	fromVer, err := versionMgr.RegisterVersion(gw.fromVersion, fromPath, gw.fromKeyFile)
 	if err != nil {
 		gw.setStatus("Error: Failed to register source version")
 		gw.appendLog("ERROR: " + err.Error())
@@ -334,7 +468,8 @@ func (gw *GeneratorWindow) generatePatch() {
 
 	// Register and scan target version
 	gw.appendLog("Scanning target version...")
-	toVer, err := versionMgr.RegisterVersion(gw.toVersion, toPath, gw.keyFile)
+	gw.appendLog(fmt.Sprintf("Using to key file: %s", gw.toKeyFile))
+	toVer, err := versionMgr.RegisterVersion(gw.toVersion, toPath, gw.toKeyFile)
 	if err != nil {
 		gw.setStatus("Error: Failed to register target version")
 		gw.appendLog("ERROR: " + err.Error())
@@ -371,10 +506,10 @@ func (gw *GeneratorWindow) generatePatch() {
 
 	options := &utils.PatchOptions{
 		Compression:      compressionStr,
-		CompressionLevel: 3,
-		VerifyAfter:      false,
-		DiffThresholdKB:  1,
-		SkipIdentical:    true,
+		CompressionLevel: gw.compressionLevel,
+		VerifyAfter:      gw.verifyAfter,
+		DiffThresholdKB:  gw.diffThresholdKB,
+		SkipIdentical:    gw.skipIdentical,
 	}
 
 	generator := patcher.NewGenerator()
@@ -425,6 +560,165 @@ func (gw *GeneratorWindow) generatePatch() {
 			fmt.Sprintf("Patch generated successfully!\n\nOutput: %s", outputPath),
 			gw.window)
 	}
+}
+
+// generateBatchPatches generates patches from all versions to target version
+func (gw *GeneratorWindow) generateBatchPatches() {
+	gw.appendLog("=== BATCH MODE: Generating patches from ALL versions ===")
+	gw.appendLog(fmt.Sprintf("Target version: %s", gw.toVersion))
+	gw.appendLog(fmt.Sprintf("Compression: %s (level %d)", gw.compression, gw.compressionLevel))
+
+	// Create version manager
+	versionMgr := version.NewManager()
+	gw.manifestMgr = manifest.NewManager()
+
+	// Register target version
+	toPath := filepath.Join(gw.versionsDir, gw.toVersion)
+	gw.appendLog("Scanning target version...")
+	gw.appendLog(fmt.Sprintf("Using to key file: %s", gw.toKeyFile))
+
+	toVer, err := versionMgr.RegisterVersion(gw.toVersion, toPath, gw.toKeyFile)
+	if err != nil {
+		gw.setStatus("Error: Failed to register target version")
+		gw.appendLog("ERROR: " + err.Error())
+		gw.generateBtn.Enable()
+		return
+	}
+
+	// Scan target directory
+	toScanner := scanner.NewScanner(toPath)
+	toFiles, toDirs, err := toScanner.ScanDirectory()
+	if err != nil {
+		gw.setStatus("Error: Failed to scan target version")
+		gw.appendLog("ERROR: " + err.Error())
+		gw.generateBtn.Enable()
+		return
+	}
+
+	if toVer.Manifest == nil {
+		toVer.Manifest = &utils.Manifest{}
+	}
+	toVer.Manifest.Files = toFiles
+	toVer.Manifest.Directories = toDirs
+	toVer.Manifest.Version = gw.toVersion
+	gw.appendLog(fmt.Sprintf("Target version: %d files, %d directories", len(toFiles), len(toDirs)))
+
+	// Process each source version
+	patchCount := 0
+	failCount := 0
+
+	for _, fromVersion := range gw.availableVersions {
+		if fromVersion == gw.toVersion {
+			continue // Skip target version itself
+		}
+
+		gw.appendLog(fmt.Sprintf("\n--- Processing %s → %s ---", fromVersion, gw.toVersion))
+
+		fromPath := filepath.Join(gw.versionsDir, fromVersion)
+
+		// Register source version (use from key file or fall back to to key file)
+		keyFile := gw.fromKeyFile
+		if keyFile == "" {
+			keyFile = gw.toKeyFile
+		}
+
+		fromVer, err := versionMgr.RegisterVersion(fromVersion, fromPath, keyFile)
+		if err != nil {
+			gw.appendLog(fmt.Sprintf("WARNING: Skipping %s: %v", fromVersion, err))
+			failCount++
+			continue
+		}
+
+		// Scan source directory
+		fromScanner := scanner.NewScanner(fromPath)
+		fromFiles, fromDirs, err := fromScanner.ScanDirectory()
+		if err != nil {
+			gw.appendLog(fmt.Sprintf("WARNING: Failed to scan %s: %v", fromVersion, err))
+			failCount++
+			continue
+		}
+
+		if fromVer.Manifest == nil {
+			fromVer.Manifest = &utils.Manifest{}
+		}
+		fromVer.Manifest.Files = fromFiles
+		fromVer.Manifest.Directories = fromDirs
+		fromVer.Manifest.Version = fromVersion
+
+		// Generate patch
+		outputPath := filepath.Join(gw.outputDir, fmt.Sprintf("%s-to-%s.patch", fromVersion, gw.toVersion))
+
+		compressionStr := "zstd"
+		switch gw.compression {
+		case "gzip":
+			compressionStr = "gzip"
+		case "none":
+			compressionStr = "none"
+		}
+
+		options := &utils.PatchOptions{
+			Compression:      compressionStr,
+			CompressionLevel: gw.compressionLevel,
+			VerifyAfter:      gw.verifyAfter,
+			DiffThresholdKB:  gw.diffThresholdKB,
+			SkipIdentical:    gw.skipIdentical,
+		}
+
+		generator := patcher.NewGenerator()
+		patch, err := generator.GeneratePatch(fromVer, toVer, options)
+		if err != nil {
+			gw.appendLog(fmt.Sprintf("ERROR: Failed to generate patch: %v", err))
+			failCount++
+			continue
+		}
+
+		// Validate patch
+		if err := generator.ValidatePatch(patch); err != nil {
+			gw.appendLog(fmt.Sprintf("ERROR: Patch validation failed: %v", err))
+			failCount++
+			continue
+		}
+
+		// Save patch
+		if err := gw.savePatch(patch, outputPath, options); err != nil {
+			gw.appendLog(fmt.Sprintf("ERROR: Failed to save patch: %v", err))
+			failCount++
+			continue
+		}
+
+		// Get patch file size
+		info, err := os.Stat(outputPath)
+		if err == nil {
+			sizeKB := float64(info.Size()) / 1024.0
+			sizeMB := sizeKB / 1024.0
+			if sizeMB >= 1.0 {
+				gw.appendLog(fmt.Sprintf("✓ Patch saved: %.2f MB", sizeMB))
+			} else {
+				gw.appendLog(fmt.Sprintf("✓ Patch saved: %.2f KB", sizeKB))
+			}
+		}
+
+		patchCount++
+	}
+
+	gw.appendLog(fmt.Sprintf("\n=== BATCH COMPLETE ==="))
+	gw.appendLog(fmt.Sprintf("Generated: %d patches", patchCount))
+	if failCount > 0 {
+		gw.appendLog(fmt.Sprintf("Failed: %d patches", failCount))
+	}
+
+	if patchCount > 0 {
+		gw.setStatus(fmt.Sprintf("Success! Generated %d patches", patchCount))
+		if gw.window != nil {
+			dialog.ShowInformation("Batch Complete",
+				fmt.Sprintf("Successfully generated %d patches\n\nOutput: %s", patchCount, gw.outputDir),
+				gw.window)
+		}
+	} else {
+		gw.setStatus("Error: No patches generated")
+	}
+
+	gw.generateBtn.Enable()
 }
 
 // setStatus updates the status label
