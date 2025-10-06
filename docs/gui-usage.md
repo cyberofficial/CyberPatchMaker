@@ -52,6 +52,13 @@ The Patch Generator GUI provides a user-friendly interface for creating binary p
   - Improves performance by avoiding unnecessary diffs
   - Reduces patch size for files that haven't changed
   - Default: Enabled
+- **Create self-contained executable**: Generate standalone `.exe` with embedded patch data
+  - Creates both `.patch` file and self-contained `.exe` file
+  - End users get single file that includes applier + patch data
+  - Executable size: ~50 MB + patch size
+  - Perfect for non-technical users (just double-click to apply)
+  - See [Self-Contained Executables Guide](self-contained-executables.md) for details
+  - Default: Disabled
 
 #### Patch Generation
 
@@ -179,10 +186,17 @@ The log area shows detailed information:
 7. **Advanced options**:
    - Keep "Verify" enabled for production patches (catches errors early)
    - "Skip identical" improves performance (recommended)
-8. **Batch mode benefits**:
+8. **Self-contained executables**:
+   - Enable the checkbox for end-user friendly distribution
+   - Creates both `.patch` (advanced) and `.exe` (simple) files
+   - Perfect for non-technical users - just double-click and apply
+   - Increases file size by ~50 MB per patch (includes GUI applier)
+   - See [Self-Contained Executables Guide](self-contained-executables.md) for details
+9. **Batch mode benefits**:
    - Generate all upgrade paths at once
    - Consistent compression settings across all patches
    - Faster than manual single-patch generation
+   - Works with self-contained executables (creates .exe for each patch)
 
 ### Error Handling
 

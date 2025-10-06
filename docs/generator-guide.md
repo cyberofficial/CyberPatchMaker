@@ -6,6 +6,18 @@ Complete guide to using the CyberPatchMaker generator tool for creating delta pa
 
 The generator tool creates efficient binary patches between software versions. It compares two complete directory trees and generates a small patch file containing only the changes.
 
+> **💡 GUI Alternative Available**
+> 
+> For a visual interface with additional features like self-contained executables, see the [GUI Usage Guide](gui-usage.md).
+> 
+> The GUI includes:
+> - User-friendly interface for all options
+> - Real-time validation and progress monitoring
+> - **Self-contained executable creation** (generates standalone `.exe` files with embedded patches)
+> - Batch mode for generating multiple patches at once
+> 
+> This guide focuses on the command-line tool.
+
 ## Basic Usage
 
 ### Generate Patches from All Versions to New Version
