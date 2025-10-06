@@ -75,6 +75,7 @@ patch-apply [options]
 |--------|----------|-------------|
 | `--patch <path>` | Yes | Path to patch file |
 | `--current-dir <path>` | Yes | Directory containing current installation |
+| `--key-file <path>` | No | Custom key file path (if renamed or moved) |
 | `--verify` | No | Enable full verification (recommended!) |
 | `--dry-run` | No | Preview changes without applying |
 | `--create-backup` | No | Create selective backup before patching (default: `true`) |
@@ -152,6 +153,19 @@ patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --no-ba
 **Explicit Backup** (default behavior):
 ```bash
 patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --create-backup --verify
+```
+
+**Custom Key File** (if the key file was renamed):
+```bash
+# If program.exe was renamed to app.exe
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch \
+            --current-dir ./myapp \
+            --key-file app.exe
+
+# Or with absolute path
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch \
+            --current-dir ./myapp \
+            --key-file C:\MyApp\renamed_program.exe
 ```
 
 ---

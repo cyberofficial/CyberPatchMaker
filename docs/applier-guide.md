@@ -126,6 +126,13 @@ No changes were made to your installation
 
 ### Optional Options
 
+**`--key-file <path>`**
+- Specify custom key file path if renamed or moved
+- Can be absolute path or relative to current-dir
+- Example: `--key-file app.exe` or `--key-file C:\MyApp\renamed.exe`
+- Use case: When the key file (typically the main executable) has been renamed
+- Default: Uses key file path stored in patch
+
 **`--verify`** (Enabled by Default)
 - Check files before and after patching
 - Verifies current version before patching
@@ -336,6 +343,108 @@ Restoring from backup...
 - Check disk for errors
 - Retry patching
 - Report bug if persistent
+
+---
+
+**"Key file not found"**
+```
+Error: patch application failed: key file verification failed:
+  key file not found: program.exe
+```
+
+**Meaning:** The key file specified in the patch cannot be found
+
+**Causes:**
+- Key file was renamed (e.g., program.exe → app.exe)
+- Key file was moved to different location
+- Key file was deleted
+
+**Solution:**
+- Use `--key-file` option to specify the renamed/moved key file
+- Example: `patch-apply --patch 1.0.0-to-1.0.1.patch --current-dir ./myapp --key-file app.exe`
+- Restore the key file to its original name/location
+
+---
+
+## Custom Key File Usage
+
+### When to Use Custom Key File
+
+The `--key-file` option is useful when:
+
+1. **Main executable was renamed** for branding or clarity
+   - `program.exe` → `MyApp.exe`
+   - `server.exe` → `MyCompanyServer.exe`
+
+2. **Executable location changed** in directory structure
+   - Moved from root to `bin/` subdirectory
+   - Restructured folder hierarchy
+
+3. **Testing with renamed files** in development/staging environments
+
+### How It Works
+
+The key file is the primary executable that uniquely identifies your application version. When you specify a custom key file:
+
+1. The applier uses your specified file for version verification
+2. Hash is checked against expected version hash from patch
+3. All other patch operations proceed normally
+4. Custom key file path only affects verification, not patching operations
+
+### Examples
+
+**Simple rename (relative path):**
+```bash
+# Key file renamed from program.exe to MyApp.exe
+patch-apply --patch ./patches/1.0.0-to-1.0.1.patch \
+            --current-dir ./myapp \
+            --key-file MyApp.exe
+```
+
+**Moved to subdirectory:**
+```bash
+# Key file moved to bin/ subdirectory
+patch-apply --patch ./patches/1.0.0-to-1.0.1.patch \
+            --current-dir ./myapp \
+            --key-file bin/program.exe
+```
+
+**Absolute path:**
+```bash
+# Using absolute path to key file
+patch-apply --patch ./patches/1.0.0-to-1.0.1.patch \
+            --current-dir C:\MyApp \
+            --key-file C:\MyApp\renamed_program.exe
+```
+
+**With dry-run (test before applying):**
+```bash
+# Test with custom key file first
+patch-apply --patch ./patches/1.0.0-to-1.0.1.patch \
+            --current-dir ./myapp \
+            --key-file MyApp.exe \
+            --dry-run
+```
+
+### GUI Support
+
+The GUI applier also supports custom key files:
+
+1. Select your patch file
+2. Select current directory
+3. Enter custom key file path in the "Custom Key:" field (optional)
+4. Browse or type the path manually
+5. Apply patch as normal
+
+### Self-Contained Executable Support
+
+Self-contained `.exe` patches also support custom key files:
+
+1. Run the self-contained executable
+2. Accept or change the target directory
+3. Select option **5: Specify Custom Key File**
+4. Enter the custom key file path
+5. Choose **1: Dry Run** to test or **2: Apply Patch**
 
 ---
 

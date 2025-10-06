@@ -24,29 +24,31 @@ type ApplierWindow struct {
 	window fyne.Window
 
 	// UI Components
-	patchFile    string
-	currentDir   string
-	dryRun       bool
-	verifyBefore bool
-	verifyAfter  bool
-	createBackup bool
-	autoDetect   bool
-	ignore1GB    bool
+	patchFile     string
+	currentDir    string
+	customKeyFile string
+	dryRun        bool
+	verifyBefore  bool
+	verifyAfter   bool
+	createBackup  bool
+	autoDetect    bool
+	ignore1GB     bool
 
 	// Callback for when ignore1GB changes (to update global flag)
 	onIgnore1GBChanged func(bool)
 
-	patchFileEntry    *widget.Entry
-	currentDirEntry   *widget.Entry
-	dryRunCheck       *widget.Check
-	verifyBeforeCheck *widget.Check
-	verifyAfterCheck  *widget.Check
-	backupCheck       *widget.Check
-	autoDetectCheck   *widget.Check
-	ignore1GBCheck    *widget.Check
-	applyBtn          *widget.Button
-	statusLabel       *widget.Label
-	logText           *widget.Entry
+	patchFileEntry     *widget.Entry
+	currentDirEntry    *widget.Entry
+	customKeyFileEntry *widget.Entry
+	dryRunCheck        *widget.Check
+	verifyBeforeCheck  *widget.Check
+	verifyAfterCheck   *widget.Check
+	backupCheck        *widget.Check
+	autoDetectCheck    *widget.Check
+	ignore1GBCheck     *widget.Check
+	applyBtn           *widget.Button
+	statusLabel        *widget.Label
+	logText            *widget.Entry
 
 	// Patch info display
 	patchInfoBox     *fyne.Container
@@ -151,6 +153,27 @@ func (aw *ApplierWindow) buildUI() fyne.CanvasObject {
 		widget.NewLabel("Current Dir:"),
 		currentDirBrowse,
 		aw.currentDirEntry,
+	)
+
+	// Create custom key file selector (optional)
+	aw.customKeyFileEntry = widget.NewEntry()
+	aw.customKeyFileEntry.SetPlaceHolder("Optional: Custom key file path (if renamed)...")
+	aw.customKeyFileEntry.OnChanged = func(text string) {
+		aw.customKeyFile = text
+	}
+	aw.customKeyFileEntry.OnSubmitted = func(text string) {
+		aw.customKeyFile = text
+	}
+
+	customKeyFileBrowse := widget.NewButton("Browse", func() {
+		aw.selectCustomKeyFile()
+	})
+
+	customKeyFileContainer := container.NewBorder(
+		nil, nil,
+		widget.NewLabel("Custom Key:"),
+		customKeyFileBrowse,
+		aw.customKeyFileEntry,
 	)
 
 	// Create patch information display labels
@@ -283,6 +306,7 @@ func (aw *ApplierWindow) buildUI() fyne.CanvasObject {
 	return container.NewVBox(
 		patchFileContainer,
 		currentDirContainer,
+		customKeyFileContainer,
 		widget.NewSeparator(),
 		aw.patchInfoBox,
 		widget.NewSeparator(),
@@ -326,6 +350,22 @@ func (aw *ApplierWindow) selectCurrentDirectory() {
 	}, aw.window)
 }
 
+// selectCustomKeyFile opens a file dialog for selecting custom key file
+func (aw *ApplierWindow) selectCustomKeyFile() {
+	if aw.window == nil {
+		return
+	}
+
+	dialog.ShowFileOpen(func(file fyne.URIReadCloser, err error) {
+		if err == nil && file != nil {
+			path := file.URI().Path()
+			aw.customKeyFileEntry.SetText(path)
+			aw.customKeyFile = path
+			file.Close()
+		}
+	}, aw.window)
+}
+
 // updateApplyButton enables/disables apply button based on selections
 func (aw *ApplierWindow) updateApplyButton() {
 	if aw.patchFile != "" && aw.currentDir != "" {
@@ -359,12 +399,7 @@ func (aw *ApplierWindow) loadPatchInfo() {
 	aw.fromVersionLabel.SetText(patch.FromVersion)
 	aw.toVersionLabel.SetText(patch.ToVersion)
 	aw.keyFileLabel.SetText(patch.FromKeyFile.Path)
-
-	hashStr := patch.FromKeyFile.Checksum
-	if len(hashStr) > 16 {
-		hashStr = hashStr[:16] + "..."
-	}
-	aw.hashLabel.SetText(hashStr)
+	aw.hashLabel.SetText(patch.FromKeyFile.Checksum)
 
 	sizeKB := float64(patch.Header.PatchSize) / 1024.0
 	sizeMB := sizeKB / 1024.0
@@ -466,6 +501,12 @@ func (aw *ApplierWindow) applyPatch() {
 	aw.appendLog("=== Starting Patch Application ===")
 	aw.appendLog(fmt.Sprintf("Patch: %s → %s", aw.loadedPatch.FromVersion, aw.loadedPatch.ToVersion))
 	aw.appendLog(fmt.Sprintf("Target: %s", aw.currentDir))
+
+	// Override key file path if custom one is provided
+	if aw.customKeyFile != "" {
+		aw.appendLog(fmt.Sprintf("Using custom key file: %s", aw.customKeyFile))
+		aw.loadedPatch.FromKeyFile.Path = aw.customKeyFile
+	}
 
 	if aw.dryRun {
 		aw.appendLog("\n=== DRY RUN MODE ===")

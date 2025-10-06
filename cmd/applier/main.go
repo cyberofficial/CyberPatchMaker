@@ -37,6 +37,7 @@ func main() {
 	// Define flags
 	patchFile := flag.String("patch", "", "Path to patch file")
 	currentDir := flag.String("current-dir", "", "Directory containing current version")
+	keyFile := flag.String("key-file", "", "Custom key file path (if renamed or moved)")
 	dryRun := flag.Bool("dry-run", false, "Simulate patch without making changes")
 	verify := flag.Bool("verify", true, "Verify file hashes before and after patching")
 	backup := flag.Bool("backup", true, "Create backup before patching")
@@ -98,10 +99,16 @@ func main() {
 	// Display patch information
 	displayPatchInfo(patch)
 
+	// Override key file path if custom one is provided
+	if *keyFile != "" {
+		fmt.Printf("\nUsing custom key file: %s\n", *keyFile)
+		patch.FromKeyFile.Path = *keyFile
+	}
+
 	if *dryRun {
 		fmt.Println("\n=== DRY RUN MODE ===")
 		fmt.Println("No changes will be made")
-		performDryRun(patch, *currentDir)
+		performDryRun(patch, *currentDir, *keyFile)
 		return
 	}
 
@@ -205,12 +212,31 @@ func displayPatchInfo(patch *utils.Patch) {
 	fmt.Printf("Required Files:   %d (must match exact hashes)\n", len(patch.RequiredFiles))
 }
 
-func performDryRun(patch *utils.Patch, currentDir string) {
+// resolveKeyFilePath resolves the actual key file path, using custom path if provided
+func resolveKeyFilePath(patch *utils.Patch, currentDir string, customKeyFile string) string {
+	if customKeyFile != "" {
+		// Use custom key file path (can be absolute or relative)
+		if strings.Contains(customKeyFile, string(os.PathSeparator)) || strings.Contains(customKeyFile, "/") {
+			// If it contains path separators, treat as-is
+			return customKeyFile
+		}
+		// Otherwise, treat as relative to currentDir
+		return currentDir + string(os.PathSeparator) + customKeyFile
+	}
+	// Use default key file from patch
+	return currentDir + string(os.PathSeparator) + patch.FromKeyFile.Path
+}
+
+func performDryRun(patch *utils.Patch, currentDir string, customKeyFile string) {
 	fmt.Println("\nSimulating patch application...")
 
 	// Verify key file
-	fmt.Printf("\nVerifying key file: %s\n", patch.FromKeyFile.Path)
-	keyFilePath := currentDir + string(os.PathSeparator) + patch.FromKeyFile.Path
+	if customKeyFile != "" {
+		fmt.Printf("\nVerifying custom key file: %s\n", customKeyFile)
+	} else {
+		fmt.Printf("\nVerifying key file: %s\n", patch.FromKeyFile.Path)
+	}
+	keyFilePath := resolveKeyFilePath(patch, currentDir, customKeyFile)
 	if !utils.FileExists(keyFilePath) {
 		fmt.Printf("✗ Key file not found: %s\n", keyFilePath)
 		return
@@ -426,6 +452,7 @@ func checkEmbeddedPatch(ignore1GB bool) (*utils.Patch, string, bool) {
 // runInteractiveMode runs the interactive console interface for embedded patches
 func runInteractiveMode(patch *utils.Patch, defaultTargetDir string, ignore1GB bool) {
 	reader := bufio.NewReader(os.Stdin)
+	customKeyFile := "" // Track custom key file path
 
 	// Display patch information
 	fmt.Println()
@@ -456,9 +483,15 @@ func runInteractiveMode(patch *utils.Patch, defaultTargetDir string, ignore1GB b
 		fmt.Println("  2. Apply Patch")
 		fmt.Println("  3. Toggle 1GB Bypass Mode (currently: " + formatBoolState(ignore1GB) + ")")
 		fmt.Println("  4. Change Target Directory")
-		fmt.Println("  5. Exit")
+		fmt.Println("  5. Specify Custom Key File")
+		if customKeyFile != "" {
+			fmt.Printf("     (Currently: %s)\n", customKeyFile)
+		} else {
+			fmt.Printf("     (Currently: %s - default)\n", patch.FromKeyFile.Path)
+		}
+		fmt.Println("  6. Exit")
 		fmt.Println("==============================================")
-		fmt.Print("Select option [1-5]: ")
+		fmt.Print("Select option [1-6]: ")
 
 		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(input)
@@ -468,7 +501,7 @@ func runInteractiveMode(patch *utils.Patch, defaultTargetDir string, ignore1GB b
 			// Dry run
 			fmt.Println("\n=== DRY RUN MODE ===")
 			fmt.Println("Simulating patch application...")
-			performDryRun(patch, targetDir)
+			performDryRun(patch, targetDir, customKeyFile)
 			fmt.Println("\nPress Enter to continue...")
 			reader.ReadString('\n')
 
@@ -476,6 +509,13 @@ func runInteractiveMode(patch *utils.Patch, defaultTargetDir string, ignore1GB b
 			// Apply patch
 			fmt.Println("\n=== APPLYING PATCH ===")
 			fmt.Printf("Target: %s\n", targetDir)
+
+			// Override key file path if custom one is provided
+			if customKeyFile != "" {
+				fmt.Printf("Using custom key file: %s\n", customKeyFile)
+				patch.FromKeyFile.Path = customKeyFile
+			}
+
 			fmt.Print("Are you sure you want to apply this patch? (yes/no): ")
 			confirm, _ := reader.ReadString('\n')
 			confirm = strings.TrimSpace(strings.ToLower(confirm))
@@ -533,12 +573,35 @@ func runInteractiveMode(patch *utils.Patch, defaultTargetDir string, ignore1GB b
 			}
 
 		case "5":
+			// Specify custom key file
+			fmt.Print("\nEnter custom key file path (or press Enter to use default): ")
+			input, _ := reader.ReadString('\n')
+			input = strings.TrimSpace(input)
+			if input == "" {
+				customKeyFile = ""
+				fmt.Printf("Using default key file: %s\n", patch.FromKeyFile.Path)
+			} else {
+				// Validate the custom key file exists
+				testPath := input
+				if !strings.Contains(input, string(os.PathSeparator)) && !strings.Contains(input, "/") {
+					// Relative path - check in target directory
+					testPath = targetDir + string(os.PathSeparator) + input
+				}
+				if !utils.FileExists(testPath) {
+					fmt.Printf("Warning: File not found: %s\n", testPath)
+					fmt.Println("You can still proceed - verification will happen during patch application.")
+				}
+				customKeyFile = input
+				fmt.Printf("Custom key file set to: %s\n", customKeyFile)
+			}
+
+		case "6":
 			// Exit
 			fmt.Println("\nExiting...")
 			return
 
 		default:
-			fmt.Println("Invalid option. Please select 1-5.")
+			fmt.Println("Invalid option. Please select 1-6.")
 		}
 	}
 }
@@ -558,6 +621,7 @@ func printHelp() {
 	fmt.Println("\nOptions:")
 	fmt.Println("  --patch         Path to patch file (required)")
 	fmt.Println("  --current-dir   Directory containing current version (required)")
+	fmt.Println("  --key-file      Custom key file path (if renamed or moved)")
 	fmt.Println("  --dry-run       Simulate patch without making changes")
 	fmt.Println("  --verify        Verify file hashes before and after patching (default: true)")
 	fmt.Println("  --backup        Create backup before patching (default: true)")

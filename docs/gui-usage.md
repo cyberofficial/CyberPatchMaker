@@ -436,6 +436,32 @@ While the GUI can generate batch scripts for end users, patches can also be appl
 
 See [applier-guide.md](applier-guide.md) for detailed instructions on applying patches.
 
+### GUI Applier Custom Key File
+
+The GUI applier includes support for specifying custom key file paths when the key file has been renamed or moved:
+
+**Fields:**
+- **Patch File**: Select the `.patch` file to apply
+- **Current Dir**: Select the directory containing the current installation
+- **Custom Key**: (Optional) Specify custom key file path if renamed
+  - Leave empty to use the default key file from the patch
+  - Enter relative path (e.g., `app.exe`) or absolute path
+  - Click "Browse" to select the file with a file picker
+
+**Use Cases:**
+- Main executable was renamed (e.g., `program.exe` → `MyApp.exe`)
+- Key file moved to subdirectory (e.g., `program.exe` → `bin/program.exe`)
+- Testing scenarios with renamed files
+
+**Example:**
+```
+Patch File:    E:\patches\1.0.0-to-1.0.1.patch
+Current Dir:   E:\MyApp
+Custom Key:    MyApp.exe          ← Specify renamed key file
+```
+
+The custom key file will be used for version verification instead of the default key file path stored in the patch.
+
 ## Building the GUI
 
 The GUI requires CGO and a compatible GCC compiler:
