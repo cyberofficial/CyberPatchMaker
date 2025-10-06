@@ -1,0 +1,122 @@
+:: CyberPatchMaker Ignore Patterns
+:: Place this file in your source version directory to exclude files from patches
+:: Lines starting with :: are comments
+
+:: ============================================
+:: Sensitive Files (Security)
+:: ============================================
+:: Exclude private keys and certificates
+*.key
+*.pem
+*.crt
+*.pfx
+*.p12
+*.cert
+
+:: Exclude environment and secret files
+.env
+.env.local
+.env.production
+secrets.txt
+config/secrets.json
+config/private.conf
+
+
+:: ============================================
+:: Temporary & Cache Files
+:: ============================================
+:: Exclude temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+~*
+*.old
+
+:: Exclude log files
+*.log
+*.log.*
+logs/
+
+:: Exclude cache directories
+cache/
+.cache/
+temp/
+tmp/
+
+
+:: ============================================
+:: Development Files
+:: ============================================
+:: Exclude IDE and editor files
+.vscode/
+.idea/
+.vs/
+*.suo
+*.user
+*.sln.docstates
+*.sublime-*
+
+:: Exclude development assets
+*.psd
+*.blend
+*.max
+*.ai
+dev_assets/
+source_files/
+
+
+:: ============================================
+:: Build Artifacts
+:: ============================================
+:: Exclude build intermediates
+*.o
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+build/temp/
+build/intermediate/
+obj/
+bin/Debug/
+
+
+:: ============================================
+:: User Data (Don't Override User Files)
+:: ============================================
+:: Exclude user configurations
+user_config.xml
+user_settings.json
+recent_files.db
+
+:: Exclude user content
+saves/
+screenshots/
+user_data/
+player_profiles/
+
+
+:: ============================================
+:: Platform-Specific
+:: ============================================
+:: Windows
+Thumbs.db
+desktop.ini
+*.lnk
+
+:: macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+:: Linux
+*~
+.directory
+
+
+:: ============================================
+:: Custom Patterns
+:: ============================================
+:: Add your custom patterns below:
