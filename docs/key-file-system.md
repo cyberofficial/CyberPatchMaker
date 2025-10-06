@@ -157,22 +157,27 @@ func detectKeyFile(versionPath string) (KeyFileInfo, error) {
 
 ## Key File Verification Workflow
 
-### During Version Registration
+### During Version Registration (Automatic)
+
+Version registration happens automatically when you generate patches. The system:
 
 ```
-1. User: "Register version 1.0.3 at D:\releases\1.0.3"
-2. System: Scan D:\releases\1.0.3 for executables
-3. System: Detect candidate → "program.exe" (at root, 15MB)
-4. System: Calculate SHA-256 → "a1b2c3d4e5f6..."
-5. System: Store in manifest:
-   {
-     "key_file": {
-       "path": "program.exe",
-       "checksum": "a1b2c3d4e5f6...",
-       "size": 15728640
-     }
-   }
+1. User runs: patch-gen.exe --from-dir "D:\releases\1.0.0" --to-dir "D:\releases\1.0.3" --output "patches"
+
+2. System scans source directory (1.0.0):
+   - Scan D:\releases\1.0.0 for executables
+   - Detect candidate → "program.exe" (at root, 15MB)
+   - Calculate SHA-256 → "a1b2c3d4e5f6..."
+   
+3. System scans target directory (1.0.3):
+   - Scan D:\releases\1.0.3 for executables
+   - Detect candidate → "program.exe" (at root, 16MB)
+   - Calculate SHA-256 → "xyz789..."
+
+4. System embeds key file info in patch metadata
 ```
+
+**Note**: There is no separate "register" command. Versions are registered automatically during patch generation.
 
 ### During Patch Generation
 
@@ -266,23 +271,20 @@ MyApp/
     └── app           ← Linux key file
 ```
 
-**Solution**: Register separate versions per platform:
-```bash
-# Windows version
-patch-gen register --version 1.0.0-windows \
-                   --path ./windows \
-                   --key-file app.exe
+**Solution**: Generate separate patches per platform using `--from-dir` and `--to-dir`:
 
-# macOS version
-patch-gen register --version 1.0.0-macos \
-                   --path ./macos \
-                   --key-file app
+```powershell
+# Windows patches
+patch-gen.exe --from-dir "./1.0.0/windows" --to-dir "./1.0.1/windows" --output "./patches/windows"
 
-# Linux version
-patch-gen register --version 1.0.0-linux \
-                   --path ./linux \
-                   --key-file app
+# macOS patches
+patch-gen.exe --from-dir "./1.0.0/macos" --to-dir "./1.0.1/macos" --output "./patches/macos"
+
+# Linux patches
+patch-gen.exe --from-dir "./1.0.0/linux" --to-dir "./1.0.1/linux" --output "./patches/linux"
 ```
+
+**Note**: Each platform's patch will automatically use the appropriate key file (`app.exe` for Windows, `app` for macOS/Linux). The key file is detected automatically based on the directory structure.
 
 ### No Suitable Executable
 
