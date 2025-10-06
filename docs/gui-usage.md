@@ -323,7 +323,7 @@ echo.
 echo Applying patch...
 echo.
 
-applier.exe --patch "1.0.0-to-1.0.2.patch" --current-dir "%~dp0"
+patch-apply.exe --patch "1.0.0-to-1.0.2.patch" --current-dir "%~dp0"
 
 if %ERRORLEVEL% EQU 0 (
     echo.
@@ -360,7 +360,7 @@ pause
    MyApp_Update_1.0.2\
    ├── 1.0.0-to-1.0.2.patch
    ├── 1.0.1-to-1.0.2.patch
-   ├── applier.exe          ← Include the CLI applier
+   ├── patch-apply.exe          ← Include the CLI applier
    ├── apply_from_1.0.0.bat ← Batch script for 1.0.0 users
    └── apply_from_1.0.1.bat ← Batch script for 1.0.1 users
    ```
@@ -373,7 +373,7 @@ pause
    - Name them clearly: `apply_from_1.0.0.bat`, `apply_from_1.0.1.bat`
    - Users can easily identify which script to use
 
-2. **Include applier.exe**: Always package `applier.exe` with your batch scripts
+2. **Include patch-apply.exe**: Always package `patch-apply.exe` with your batch scripts
    - Batch script calls `applier.exe` from the same directory
    - Users don't need CyberPatchMaker installed
 

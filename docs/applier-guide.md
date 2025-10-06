@@ -13,7 +13,7 @@ The applier tool safely applies binary patches to existing installations. It ver
 **The recommended method** - apply patch with complete safety checks:
 
 ```bash
-applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --verify
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --verify
 ```
 
 This will:
@@ -74,7 +74,7 @@ Time elapsed: 12.3 seconds
 **Preview what would happen** without making any changes:
 
 ```bash
-applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --dry-run
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --dry-run
 ```
 
 This will:
@@ -347,7 +347,7 @@ Update production installation with full safety:
 
 ```bash
 # Always use --verify for production!
-applier --patch ./patches/1.0.2-to-1.0.3.patch --current-dir C:\Production\MyApp --verify
+patch-apply --patch ./patches/1.0.2-to-1.0.3.patch --current-dir C:\Production\MyApp --verify
 ```
 
 **What Happens:**
@@ -365,10 +365,10 @@ Preview changes before committing:
 
 ```bash
 # First: Dry-run to see what would change
-applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --dry-run
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --dry-run
 
 # If everything looks good, apply for real:
-applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --verify
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --verify
 ```
 
 ---
@@ -379,7 +379,7 @@ For testing environments where speed matters more than safety:
 
 ```bash
 # Skip verification and backup (FASTER but RISKY!)
-applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./test-app
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./test-app
 ```
 
 **WARNING:** Only use this for disposable test environments!
@@ -391,7 +391,7 @@ applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./test-app
 Applying patch to network-installed application:
 
 ```bash
-applier --patch ./patches/1.0.1-to-1.0.2.patch --current-dir \\server\share\MyApp --verify
+patch-apply --patch ./patches/1.0.1-to-1.0.2.patch --current-dir \\server\share\MyApp --verify
 ```
 
 **Note:** Backup will be at `\\server\share\MyApp.backup\`

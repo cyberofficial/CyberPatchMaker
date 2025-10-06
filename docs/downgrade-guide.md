@@ -19,12 +19,12 @@ CyberPatchMaker fully supports **bidirectional patching** - you can generate pat
 
 **Upgrade Patch:**
 ```bash
-generator --from 1.0.0 --to 1.0.1  # 1.0.0 → 1.0.1
+patch-gen --from 1.0.0 --to 1.0.1  # 1.0.0 → 1.0.1
 ```
 
 **Downgrade Patch:**
 ```bash
-generator --from 1.0.1 --to 1.0.0  # 1.0.1 → 1.0.0
+patch-gen --from 1.0.1 --to 1.0.0  # 1.0.1 → 1.0.0
 ```
 
 The generator creates a patch that transforms version 1.0.1 back to version 1.0.0, including:
@@ -43,7 +43,7 @@ The generator creates a patch that transforms version 1.0.1 back to version 1.0.
 **Scenario:** Generate patch to downgrade from 1.0.3 to 1.0.2
 
 ```bash
-generator --versions-dir ./versions \
+patch-gen --versions-dir ./versions \
           --from 1.0.3 \
           --to 1.0.2 \
           --output ./patches/downgrade
@@ -59,17 +59,17 @@ generator --versions-dir ./versions \
 
 ```bash
 # Downgrade to 1.0.2
-generator --from 1.0.3 --to 1.0.2 \
+patch-gen --from 1.0.3 --to 1.0.2 \
           --versions-dir ./versions \
           --output ./patches/downgrade
 
 # Downgrade to 1.0.1
-generator --from 1.0.3 --to 1.0.1 \
+patch-gen --from 1.0.3 --to 1.0.1 \
           --versions-dir ./versions \
           --output ./patches/downgrade
 
 # Downgrade to 1.0.0
-generator --from 1.0.3 --to 1.0.0 \
+patch-gen --from 1.0.3 --to 1.0.0 \
           --versions-dir ./versions \
           --output ./patches/downgrade
 ```
@@ -181,14 +181,14 @@ chmod +x generate-downgrades.sh
 
 **Test first (dry-run):**
 ```bash
-applier --patch ./patches/downgrade/1.0.3-to-1.0.2.patch \
+patch-apply --patch ./patches/downgrade/1.0.3-to-1.0.2.patch \
         --current-dir ./app \
         --dry-run
 ```
 
 **Apply downgrade:**
 ```bash
-applier --patch ./patches/downgrade/1.0.3-to-1.0.2.patch \
+patch-apply --patch ./patches/downgrade/1.0.3-to-1.0.2.patch \
         --current-dir ./app \
         --verify
 ```
@@ -201,7 +201,7 @@ applier --patch ./patches/downgrade/1.0.3-to-1.0.2.patch \
 
 ```bash
 # Downgrade safely with verification and selective backup
-applier --patch ./patches/downgrade/1.0.3-to-1.0.2.patch \
+patch-apply --patch ./patches/downgrade/1.0.3-to-1.0.2.patch \
         --current-dir C:\Production\MyApp \
         --verify
 ```
@@ -249,12 +249,12 @@ When releasing a new version, generate both upgrade and downgrade patches:
 
 ```bash
 # Upgrades
-generator --versions-dir ./versions --new-version 1.0.3 --output ./patches/upgrade
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches/upgrade
 
 # Downgrades (from 1.0.3 to all previous)
-generator --from 1.0.3 --to 1.0.2 --output ./patches/downgrade
-generator --from 1.0.3 --to 1.0.1 --output ./patches/downgrade
-generator --from 1.0.3 --to 1.0.0 --output ./patches/downgrade
+patch-gen --from 1.0.3 --to 1.0.2 --output ./patches/downgrade
+patch-gen --from 1.0.3 --to 1.0.1 --output ./patches/downgrade
+patch-gen --from 1.0.3 --to 1.0.0 --output ./patches/downgrade
 ```
 
 ---
@@ -266,10 +266,10 @@ generator --from 1.0.3 --to 1.0.0 --output ./patches/downgrade
 ```bash
 # Start with 1.0.0
 # Apply upgrade to 1.0.1
-applier --patch upgrade/1.0.0-to-1.0.1.patch --current-dir ./test --verify
+patch-apply --patch upgrade/1.0.0-to-1.0.1.patch --current-dir ./test --verify
 
 # Apply downgrade back to 1.0.0
-applier --patch downgrade/1.0.1-to-1.0.0.patch --current-dir ./test --verify
+patch-apply --patch downgrade/1.0.1-to-1.0.0.patch --current-dir ./test --verify
 
 # Verify result matches original 1.0.0
 ```
@@ -335,7 +335,7 @@ Downgrade patch (1.0.1 → 1.0.0): 10MB (same size!)
 
 ```bash
 # Users on 1.0.3 can downgrade to stable 1.0.2
-applier --patch https://myapp.com/patches/emergency/1.0.3-to-1.0.2.patch \
+patch-apply --patch https://myapp.com/patches/emergency/1.0.3-to-1.0.2.patch \
         --current-dir ./app \
         --verify
 ```
@@ -348,12 +348,12 @@ applier --patch https://myapp.com/patches/emergency/1.0.3-to-1.0.2.patch \
 
 ```bash
 # Upgrade to test version
-applier --patch upgrade/1.0.2-to-1.0.3.patch --current-dir ./app --verify
+patch-apply --patch upgrade/1.0.2-to-1.0.3.patch --current-dir ./app --verify
 
 # Test features...
 
 # If not satisfied, downgrade
-applier --patch downgrade/1.0.3-to-1.0.2.patch --current-dir ./app --verify
+patch-apply --patch downgrade/1.0.3-to-1.0.2.patch --current-dir ./app --verify
 ```
 
 ---
@@ -364,11 +364,11 @@ applier --patch downgrade/1.0.3-to-1.0.2.patch --current-dir ./app --verify
 
 ```bash
 # From 1.0.3 down to 1.0.1 (two steps)
-applier --patch downgrade/1.0.3-to-1.0.2.patch --current-dir ./app --verify
-applier --patch downgrade/1.0.2-to-1.0.1.patch --current-dir ./app --verify
+patch-apply --patch downgrade/1.0.3-to-1.0.2.patch --current-dir ./app --verify
+patch-apply --patch downgrade/1.0.2-to-1.0.1.patch --current-dir ./app --verify
 
 # Or direct downgrade (if patch exists)
-applier --patch downgrade/1.0.3-to-1.0.1.patch --current-dir ./app --verify
+patch-apply --patch downgrade/1.0.3-to-1.0.1.patch --current-dir ./app --verify
 ```
 
 ---
@@ -504,7 +504,7 @@ Error: Version mismatch
 
 ```bash
 # Apply 1.0.1→1.0.0 instead
-applier --patch downgrade/1.0.1-to-1.0.0.patch --current-dir ./app --verify
+patch-apply --patch downgrade/1.0.1-to-1.0.0.patch --current-dir ./app --verify
 ```
 
 ---
@@ -534,7 +534,7 @@ applier --patch downgrade/1.0.1-to-1.0.0.patch --current-dir ./app --verify
 **Solution:** Generate the needed downgrade patch
 
 ```bash
-generator --versions-dir ./versions \
+patch-gen --versions-dir ./versions \
           --from 1.0.3 \
           --to 1.0.2 \
           --output ./patches/downgrade

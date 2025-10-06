@@ -25,7 +25,7 @@ The generator tool creates efficient binary patches between software versions. I
 **The most common use case** - generate patches from all existing versions to your new release:
 
 ```bash
-generator --versions-dir ./versions --new-version 1.0.3 --output ./patches
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches
 ```
 
 This will:
@@ -74,7 +74,7 @@ Successfully generated 3 patches
 To create one patch between two specific versions:
 
 ```bash
-generator --from 1.0.0 --to 1.0.3 --output ./patches/custom-patch.patch
+patch-gen --from 1.0.0 --to 1.0.3 --output ./patches/custom-patch.patch
 ```
 
 This requires both versions to already be registered in the system.
@@ -170,7 +170,7 @@ This requires both versions to already be registered in the system.
 **Custom Path Example:**
 ```bash
 # Generate patch from arbitrary locations
-generator --from-dir D:\old\1.0.0 --to-dir C:\new\1.0.3 --output ./patch.patch
+patch-gen --from-dir D:\old\1.0.0 --to-dir C:\new\1.0.3 --output ./patch.patch
 ```
 
 **When to Use Custom Paths:**
@@ -307,7 +307,7 @@ mkdir versions\1.0.3
 xcopy /E C:\builds\v1.0.3\* versions\1.0.3\
 
 # Generate all patches
-generator --versions-dir ./versions --new-version 1.0.3 --output ./patches --verify
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --verify
 ```
 
 Result:
@@ -324,7 +324,7 @@ Upload these patches to your update server.
 Generate a specific patch with gzip compression:
 
 ```bash
-generator --from 1.0.0 --to 1.0.2 --output ./patches/legacy.patch --compression gzip --verify
+patch-gen --from 1.0.0 --to 1.0.2 --output ./patches/legacy.patch --compression gzip --verify
 ```
 
 ---
@@ -334,7 +334,7 @@ generator --from 1.0.0 --to 1.0.2 --output ./patches/legacy.patch --compression 
 Generate patches with maximum compression for slow internet users:
 
 ```bash
-generator --versions-dir ./versions --new-version 1.0.3 --output ./patches --compression zstd --level 4
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --compression zstd --level 4
 ```
 
 Note: Level 4 takes longer but creates smallest patches.
@@ -346,16 +346,16 @@ Note: Level 4 takes longer but creates smallest patches.
 **Generate downgrade patch to roll back from 1.0.3 to 1.0.2:**
 
 ```bash
-generator --from 1.0.3 --to 1.0.2 --versions-dir ./versions --output ./patches/downgrade --verify
+patch-gen --from 1.0.3 --to 1.0.2 --versions-dir ./versions --output ./patches/downgrade --verify
 ```
 
 **Generate all downgrade paths from current version:**
 
 ```bash
 # From 1.0.3 to each previous version
-generator --from 1.0.3 --to 1.0.2 --versions-dir ./versions --output ./patches/downgrade
-generator --from 1.0.3 --to 1.0.1 --versions-dir ./versions --output ./patches/downgrade
-generator --from 1.0.3 --to 1.0.0 --versions-dir ./versions --output ./patches/downgrade
+patch-gen --from 1.0.3 --to 1.0.2 --versions-dir ./versions --output ./patches/downgrade
+patch-gen --from 1.0.3 --to 1.0.1 --versions-dir ./versions --output ./patches/downgrade
+patch-gen --from 1.0.3 --to 1.0.0 --versions-dir ./versions --output ./patches/downgrade
 ```
 
 **Result:**
@@ -380,7 +380,7 @@ patches/downgrade/
 Generate patches quickly without compression for local testing:
 
 ```bash
-generator --versions-dir ./versions --new-version 1.0.3 --output ./patches --compression none
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --compression none
 ```
 
 ---
@@ -391,10 +391,10 @@ Create standalone executables with embedded patches for easy distribution:
 
 ```bash
 # Single patch with self-contained executable
-generator --from-dir "C:\releases\1.0.0" --to-dir "C:\releases\1.0.1" --output ./patches --create-exe
+patch-gen --from-dir "C:\releases\1.0.0" --to-dir "C:\releases\1.0.1" --output ./patches --create-exe
 
 # Batch mode with executables for all versions
-generator --versions-dir ./versions --new-version 1.0.3 --output ./patches --create-exe --verify
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --create-exe --verify
 ```
 
 **Result:**
