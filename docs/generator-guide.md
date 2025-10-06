@@ -139,6 +139,14 @@ This requires both versions to already be registered in the system.
 - Recommended for production patches
 - Adds time to generation process
 
+**`--create-exe`**
+- Create self-contained CLI executable
+- Embeds patch data into a standalone `.exe` file
+- Creates both `.patch` file and `.exe` file
+- Uses CLI applier (console interface) instead of GUI
+- See [Self-Contained Executables Guide](self-contained-executables.md) for details
+- Works with all generation modes (single, batch, custom paths)
+
 **`--help`**
 - Display usage information
 - Shows all available options
@@ -374,6 +382,40 @@ Generate patches quickly without compression for local testing:
 ```bash
 generator --versions-dir ./versions --new-version 1.0.3 --output ./patches --compression none
 ```
+
+---
+
+### Example 6: Self-Contained Executables (CLI)
+
+Create standalone executables with embedded patches for easy distribution:
+
+```bash
+# Single patch with self-contained executable
+generator --from-dir "C:\releases\1.0.0" --to-dir "C:\releases\1.0.1" --output ./patches --create-exe
+
+# Batch mode with executables for all versions
+generator --versions-dir ./versions --new-version 1.0.3 --output ./patches --create-exe --verify
+```
+
+**Result:**
+```
+patches/
+├── 1.0.0-to-1.0.3.patch     ← Standard patch file
+├── 1.0.0-to-1.0.3.exe       ← Self-contained CLI executable
+├── 1.0.1-to-1.0.3.patch
+├── 1.0.1-to-1.0.3.exe       ← Self-contained CLI executable
+├── 1.0.2-to-1.0.3.patch
+└── 1.0.2-to-1.0.3.exe       ← Self-contained CLI executable
+```
+
+**User Experience:**
+- Users download the `.exe` matching their version
+- Double-click to run - shows interactive console menu
+- Choose "Dry Run" to simulate, or "Apply Patch" to update
+- Can toggle 1GB bypass mode if needed
+- No need to download separate patch files or tools
+
+See [Self-Contained Executables Guide](self-contained-executables.md) for complete documentation.
 
 ---
 

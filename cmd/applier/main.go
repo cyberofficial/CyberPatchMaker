@@ -1,15 +1,37 @@
 package main
 
 import (
+	"bufio"
+	"bytes"
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
+	"strings"
 
 	"github.com/cyberofficial/cyberpatchmaker/internal/core/patcher"
 	"github.com/cyberofficial/cyberpatchmaker/internal/core/version"
 	"github.com/cyberofficial/cyberpatchmaker/pkg/utils"
 )
+
+const (
+	MAGIC_BYTES = "CPMPATCH"
+	HEADER_SIZE = 128
+)
+
+type EmbeddedPatchHeader struct {
+	Magic       [8]byte
+	Version     uint32
+	StubSize    uint64
+	DataOffset  uint64
+	DataSize    uint64
+	Compression [16]byte
+	Checksum    [32]byte
+	Reserved    [44]byte
+}
 
 func main() {
 	// Define flags
@@ -18,6 +40,7 @@ func main() {
 	dryRun := flag.Bool("dry-run", false, "Simulate patch without making changes")
 	verify := flag.Bool("verify", true, "Verify file hashes before and after patching")
 	backup := flag.Bool("backup", true, "Create backup before patching")
+	ignore1GB := flag.Bool("ignore1gb", false, "Bypass 1GB patch size limit (use with caution)")
 	versionFlag := flag.Bool("version", false, "Show version information")
 	help := flag.Bool("help", false, "Show help message")
 
@@ -34,7 +57,19 @@ func main() {
 		return
 	}
 
-	// Validate arguments
+	// Check if patch data is embedded in this executable
+	patch, targetDir, isEmbedded := checkEmbeddedPatch(*ignore1GB)
+
+	if isEmbedded && patch != nil {
+		// Interactive console mode for embedded patch
+		fmt.Println("==============================================")
+		fmt.Println("  CyberPatchMaker - Self-Contained Patch")
+		fmt.Println("==============================================")
+		runInteractiveMode(patch, targetDir, *ignore1GB)
+		return
+	}
+
+	// Standard mode - require arguments
 	if *patchFile == "" || *currentDir == "" {
 		fmt.Println("Error: --patch and --current-dir are required")
 		printHelp()
@@ -280,6 +315,246 @@ func copyDir(src, dst string) error {
 	return nil
 }
 
+// checkEmbeddedPatch checks if this executable contains an embedded patch
+func checkEmbeddedPatch(ignore1GB bool) (*utils.Patch, string, bool) {
+	// Get path to this executable
+	exePath, err := os.Executable()
+	if err != nil {
+		return nil, "", false
+	}
+
+	// Open executable for reading
+	file, err := os.Open(exePath)
+	if err != nil {
+		return nil, "", false
+	}
+	defer file.Close()
+
+	// Get file size
+	stat, err := file.Stat()
+	if err != nil {
+		return nil, "", false
+	}
+	fileSize := stat.Size()
+
+	// Check if file is large enough for header
+	if fileSize < HEADER_SIZE {
+		return nil, "", false
+	}
+
+	// Read header from end of file
+	headerOffset := fileSize - HEADER_SIZE
+	if _, err := file.Seek(headerOffset, io.SeekStart); err != nil {
+		return nil, "", false
+	}
+
+	headerBytes := make([]byte, HEADER_SIZE)
+	if _, err := io.ReadFull(file, headerBytes); err != nil {
+		return nil, "", false
+	}
+
+	// Parse header
+	var header EmbeddedPatchHeader
+	buf := bytes.NewReader(headerBytes)
+	if err := binary.Read(buf, binary.LittleEndian, &header); err != nil {
+		return nil, "", false
+	}
+
+	// Validate magic bytes
+	magic := string(bytes.TrimRight(header.Magic[:], "\x00"))
+	if magic != MAGIC_BYTES {
+		return nil, "", false
+	}
+
+	// Validate version
+	if header.Version != 1 {
+		return nil, "", false
+	}
+
+	// Validate structure
+	if header.DataOffset != header.StubSize {
+		return nil, "", false
+	}
+
+	expectedSize := header.StubSize + header.DataSize + HEADER_SIZE
+	if expectedSize != uint64(fileSize) {
+		return nil, "", false
+	}
+
+	// Check size limit (1GB)
+	const maxPatchSize = 1 << 30 // 1 GB
+	if !ignore1GB && header.DataSize > maxPatchSize {
+		fmt.Printf("Warning: Patch size (%d bytes) exceeds 1GB limit\n", header.DataSize)
+		fmt.Println("Use --ignore1gb flag if you want to proceed anyway")
+		return nil, "", false
+	}
+
+	// Read patch data
+	if _, err := file.Seek(int64(header.DataOffset), io.SeekStart); err != nil {
+		return nil, "", false
+	}
+
+	patchData := make([]byte, header.DataSize)
+	if _, err := io.ReadFull(file, patchData); err != nil {
+		return nil, "", false
+	}
+
+	// Verify checksum
+	actualChecksum := sha256.Sum256(patchData)
+	if !bytes.Equal(actualChecksum[:], header.Checksum[:]) {
+		return nil, "", false
+	}
+
+	// Decompress if needed
+	compression := string(bytes.TrimRight(header.Compression[:], "\x00"))
+	if compression != "none" && compression != "" {
+		decompressed, err := utils.DecompressData(patchData, compression)
+		if err != nil {
+			return nil, "", false
+		}
+		patchData = decompressed
+	}
+
+	// Parse JSON patch
+	var patch utils.Patch
+	if err := json.Unmarshal(patchData, &patch); err != nil {
+		return nil, "", false
+	}
+
+	// Get current directory as default target
+	targetDir, _ := os.Getwd()
+
+	return &patch, targetDir, true
+}
+
+// runInteractiveMode runs the interactive console interface for embedded patches
+func runInteractiveMode(patch *utils.Patch, defaultTargetDir string, ignore1GB bool) {
+	reader := bufio.NewReader(os.Stdin)
+
+	// Display patch information
+	fmt.Println()
+	displayPatchInfo(patch)
+
+	// Ask for target directory
+	fmt.Printf("\nTarget directory [%s]: ", defaultTargetDir)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+	targetDir := defaultTargetDir
+	if input != "" {
+		targetDir = input
+	}
+
+	// Check if directory exists
+	if !utils.FileExists(targetDir) {
+		fmt.Printf("Error: Directory not found: %s\n", targetDir)
+		fmt.Println("\nPress Enter to exit...")
+		reader.ReadString('\n')
+		os.Exit(1)
+	}
+
+	// Show menu
+	for {
+		fmt.Println("\n==============================================")
+		fmt.Println("Options:")
+		fmt.Println("  1. Dry Run (simulate without changes)")
+		fmt.Println("  2. Apply Patch")
+		fmt.Println("  3. Toggle 1GB Bypass Mode (currently: " + formatBoolState(ignore1GB) + ")")
+		fmt.Println("  4. Change Target Directory")
+		fmt.Println("  5. Exit")
+		fmt.Println("==============================================")
+		fmt.Print("Select option [1-5]: ")
+
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+
+		switch input {
+		case "1":
+			// Dry run
+			fmt.Println("\n=== DRY RUN MODE ===")
+			fmt.Println("Simulating patch application...")
+			performDryRun(patch, targetDir)
+			fmt.Println("\nPress Enter to continue...")
+			reader.ReadString('\n')
+
+		case "2":
+			// Apply patch
+			fmt.Println("\n=== APPLYING PATCH ===")
+			fmt.Printf("Target: %s\n", targetDir)
+			fmt.Print("Are you sure you want to apply this patch? (yes/no): ")
+			confirm, _ := reader.ReadString('\n')
+			confirm = strings.TrimSpace(strings.ToLower(confirm))
+
+			if confirm == "yes" || confirm == "y" {
+				fmt.Println("\nApplying patch...")
+				applier := patcher.NewApplier()
+				if err := applier.ApplyPatch(patch, targetDir, true, true, true); err != nil {
+					fmt.Printf("\nError: Patch application failed: %v\n", err)
+					// Try to restore backup
+					backupDir := targetDir + ".backup"
+					if utils.FileExists(backupDir) {
+						fmt.Println("Attempting to restore from backup...")
+						if restoreErr := restoreBackup(backupDir, targetDir); restoreErr != nil {
+							fmt.Printf("Error: Failed to restore backup: %v\n", restoreErr)
+						} else {
+							fmt.Println("Backup restored successfully")
+						}
+					}
+					fmt.Println("\nPress Enter to exit...")
+					reader.ReadString('\n')
+					os.Exit(1)
+				}
+
+				fmt.Println("\n=== SUCCESS ===")
+				fmt.Printf("Patch applied successfully!\n")
+				fmt.Printf("Version updated from %s to %s\n", patch.FromVersion, patch.ToVersion)
+				fmt.Println("\nPress Enter to exit...")
+				reader.ReadString('\n')
+				return
+			} else {
+				fmt.Println("Patch application cancelled")
+			}
+
+		case "3":
+			// Toggle 1GB bypass
+			ignore1GB = !ignore1GB
+			fmt.Printf("\n1GB Bypass Mode: %s\n", formatBoolState(ignore1GB))
+			if ignore1GB {
+				fmt.Println("Warning: Large patches may consume significant memory!")
+			}
+
+		case "4":
+			// Change target directory
+			fmt.Print("\nEnter new target directory: ")
+			input, _ := reader.ReadString('\n')
+			input = strings.TrimSpace(input)
+			if input != "" {
+				if !utils.FileExists(input) {
+					fmt.Printf("Error: Directory not found: %s\n", input)
+				} else {
+					targetDir = input
+					fmt.Printf("Target directory changed to: %s\n", targetDir)
+				}
+			}
+
+		case "5":
+			// Exit
+			fmt.Println("\nExiting...")
+			return
+
+		default:
+			fmt.Println("Invalid option. Please select 1-5.")
+		}
+	}
+}
+
+// formatBoolState formats a boolean as "Enabled" or "Disabled"
+func formatBoolState(enabled bool) string {
+	if enabled {
+		return "Enabled"
+	}
+	return "Disabled"
+}
+
 func printHelp() {
 	fmt.Printf("CyberPatchMaker - Patch Applier v%s\n", version.GetVersion())
 	fmt.Println("\nUsage:")
@@ -290,11 +565,17 @@ func printHelp() {
 	fmt.Println("  --dry-run       Simulate patch without making changes")
 	fmt.Println("  --verify        Verify file hashes before and after patching (default: true)")
 	fmt.Println("  --backup        Create backup before patching (default: true)")
+	fmt.Println("  --ignore1gb     Bypass 1GB patch size limit (use with caution)")
 	fmt.Println("  --version       Show version information")
 	fmt.Println("  --help          Show this help message")
+	fmt.Println("\nSelf-Contained Executable Mode:")
+	fmt.Println("  When run as a self-contained executable, an interactive console")
+	fmt.Println("  interface will guide you through the patch application process.")
 	fmt.Println("\nExamples:")
 	fmt.Println("  # Apply patch")
 	fmt.Println("  patch-apply --patch 1.0.0-to-1.0.3.patch --current-dir C:\\MyApp")
 	fmt.Println("\n  # Dry run (simulate only)")
 	fmt.Println("  patch-apply --patch 1.0.0-to-1.0.3.patch --current-dir C:\\MyApp --dry-run")
+	fmt.Println("\n  # Run self-contained executable with 1GB bypass")
+	fmt.Println("  1.0.0-to-1.0.1.exe --ignore1gb")
 }

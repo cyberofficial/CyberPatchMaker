@@ -482,6 +482,115 @@ All patches verified successfully
 
 ---
 
+### `--create-exe`
+
+**Purpose:** Create self-contained CLI executable with embedded patch data.
+
+**Type:** Boolean (optional, default: `false`)
+
+**Behavior:**
+- Creates both `.patch` file and `.exe` file
+- Embeds patch data into CLI applier executable
+- Results in standalone executable that users can run directly
+- Uses console interface (not GUI)
+- See [Self-Contained Executables Guide](self-contained-executables.md) for details
+
+#### Example 1: Single Patch with Executable
+```powershell
+generator.exe --from-dir "C:\releases\1.0.0" --to-dir "C:\releases\1.0.1" --output .\patches --create-exe
+```
+
+**Output:**
+```
+Generating patch from 1.0.0 to 1.0.1...
+Patch saved to: .\patches\1.0.0-to-1.0.1.patch
+✓ Created executable: .\patches\1.0.0-to-1.0.1.exe
+```
+
+**Result:**
+```
+patches/
+├── 1.0.0-to-1.0.1.patch     (2.3 MB - standard patch file)
+└── 1.0.0-to-1.0.1.exe       (52.8 MB - self-contained executable)
+```
+
+#### Example 2: Batch Mode with Executables
+```powershell
+generator.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches --create-exe
+```
+
+**Output:**
+```
+Generating patches for new version 1.0.3
+Processing version 1.0.0...
+  Patch saved: 1.0.0-to-1.0.3.patch
+  ✓ Created executable: 1.0.0-to-1.0.3.exe
+Processing version 1.0.1...
+  Patch saved: 1.0.1-to-1.0.3.patch
+  ✓ Created executable: 1.0.1-to-1.0.3.exe
+Processing version 1.0.2...
+  Patch saved: 1.0.2-to-1.0.3.patch
+  ✓ Created executable: 1.0.2-to-1.0.3.exe
+Successfully generated 3 patches and executables
+```
+
+#### Example 3: With Verification
+```powershell
+generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --create-exe --verify
+```
+
+**Verifies patch before creating executable**
+
+#### Example 4: Custom Compression with Executable
+```powershell
+generator.exe --from-dir "D:\v1" --to-dir "D:\v2" --output .\dist --compression zstd --level 4 --create-exe
+```
+
+**Creates highly compressed self-contained executable**
+
+**User Experience:**
+When users run the created `.exe` file:
+```
+==============================================
+  CyberPatchMaker - Self-Contained Patch
+==============================================
+
+=== Patch Information ===
+From Version:     1.0.0
+To Version:       1.0.1
+Key File:         program.exe
+Files Added:      5
+Files Modified:   12
+Files Deleted:    2
+
+Target directory [C:\Program Files\MyApp]:
+
+==============================================
+Options:
+  1. Dry Run (simulate without changes)
+  2. Apply Patch
+  3. Toggle 1GB Bypass Mode (currently: Disabled)
+  4. Change Target Directory
+  5. Exit
+==============================================
+Select option [1-5]:
+```
+
+**Benefits:**
+- ✅ Users only need one file
+- ✅ No separate tools required
+- ✅ Interactive console interface
+- ✅ Can't select wrong patch file
+- ✅ Includes dry-run option
+- ✅ 1GB bypass toggle available
+
+**Considerations:**
+- ⚠ Larger file size (~50 MB base + patch data)
+- ⚠ Higher bandwidth for distribution
+- ⚠ Requires `patch-apply.exe` in same directory as generator
+
+---
+
 ### `--help` (Generator)
 
 **Purpose:** Display usage information and available options.
@@ -867,6 +976,87 @@ You need to apply the 1.0.0-to-1.0.1 patch first.
   - All added files exist with correct hashes
   - All deleted files are removed
   - Final version matches patch target version
+
+---
+
+### `--ignore1gb`
+
+**Purpose:** Bypass 1GB patch size limit for self-contained executables.
+
+**Type:** Boolean (optional, default: `false`)
+
+**Behavior:**
+- Only applies to self-contained executables (created with `--create-exe`)
+- Allows loading patch data larger than 1GB into memory
+- Standard mode limits patch size to 1GB to prevent memory exhaustion
+- Use with caution on systems with limited RAM
+
+#### Example 1: Running Self-Contained Executable with 1GB Bypass
+```powershell
+# When patch is larger than 1GB
+.\1.0.0-to-1.0.1.exe --ignore1gb
+```
+
+**Output:**
+```
+==============================================
+  CyberPatchMaker - Self-Contained Patch
+==============================================
+
+=== Patch Information ===
+From Version:     1.0.0
+To Version:       1.0.1
+Patch Size:       1.8 GB
+Files Modified:   2,456
+
+Target directory [C:\MyApp]:
+
+==============================================
+Options:
+  1. Dry Run (simulate without changes)
+  2. Apply Patch
+  3. Toggle 1GB Bypass Mode (currently: Enabled)
+  4. Change Target Directory
+  5. Exit
+==============================================
+Select option [1-5]:
+```
+
+#### Example 2: Without Bypass (Default)
+```powershell
+.\large-patch-1.0.0-to-1.0.1.exe
+```
+
+**Output (if patch > 1GB):**
+```
+Warning: Patch size (1.8 GB) exceeds 1GB limit
+Use --ignore1gb flag if you want to proceed anyway
+Press any key to exit...
+```
+
+#### Example 3: Toggle in Interactive Menu
+Users can also toggle the 1GB bypass from within the interactive console:
+```
+Select option [1-5]: 3
+
+1GB Bypass Mode: Enabled
+Warning: Large patches may consume significant memory!
+```
+
+**When to Use:**
+- ✅ Large game updates with many assets
+- ✅ Systems with 8GB+ RAM
+- ✅ Deploying to known hardware configurations
+
+**When NOT to Use:**
+- ❌ Low-memory systems (< 4GB RAM)
+- ❌ Unknown target hardware
+- ❌ When patch can be split into smaller updates
+
+**Considerations:**
+- Large patches require significant RAM to decompress and process
+- On 32-bit systems, memory limitations are more severe
+- Consider splitting very large patches into incremental updates instead
 
 ---
 

@@ -49,7 +49,34 @@ User must:
 4. Click "Generate Patch"
 5. Both files are created:
    - `patch-1.0.0-to-1.0.1.patch` (standard patch file)
-   - `patch-1.0.0-to-1.0.1.exe` (self-contained executable)
+   - `patch-1.0.0-to-1.0.1.exe` (self-contained GUI executable)
+
+### Using the CLI Generator
+
+You can also create self-contained executables from the command line:
+
+```powershell
+# Generate a single patch with self-contained executable
+patch-gen --from-dir "C:\releases\1.0.0" --to-dir "C:\releases\1.0.1" --output patches --create-exe
+
+# Using versions directory
+patch-gen --versions-dir "C:\versions" --from "1.0.0" --to "1.0.1" --output patches --create-exe
+
+# Batch mode with executables
+patch-gen --versions-dir "C:\versions" --new-version "1.0.3" --output patches --create-exe
+```
+
+**CLI vs GUI Executables:**
+- GUI-created executables use `patch-apply-gui.exe` (graphical interface)
+- CLI-created executables use `patch-apply.exe` (console interface)
+- Both work identically for patching, but have different user interfaces
+
+**CLI Self-Contained Features:**
+- Interactive console menu with options
+- Dry-run simulation before applying
+- 1GB bypass toggle in the console
+- Manual target directory selection
+- Same patch format and verification as GUI version
 
 ### Batch Mode
 
@@ -191,6 +218,8 @@ Need help? Visit: https://support.mygame.com/updates
 
 ### What End Users See
 
+#### GUI Self-Contained Executable (Created by GUI)
+
 1. **Download**: One `.exe` file matching their version
 2. **Run**: Double-click the executable
 3. **GUI Opens**: Shows patch information automatically:
@@ -219,6 +248,45 @@ Need help? Visit: https://support.mygame.com/updates
    ```
 4. **Apply**: Click "Apply Patch" button
 5. **Done**: Patch applied successfully
+
+#### CLI Self-Contained Executable (Created by CLI)
+
+1. **Download**: One `.exe` file matching their version
+2. **Run**: Double-click the executable
+3. **Console Opens**: Shows interactive menu:
+   ```
+   ==============================================
+     CyberPatchMaker - Self-Contained Patch
+   ==============================================
+
+   === Patch Information ===
+   From Version:     1.0.0
+   To Version:       1.0.1
+   Key File:         program.exe
+   Required Hash:    a3f5b2c1d4e6f8...
+   Files Added:      15
+   Files Modified:   8
+   Files Deleted:    2
+
+   Target directory [D:\Games\MyGame]:
+
+   ==============================================
+   Options:
+     1. Dry Run (simulate without changes)
+     2. Apply Patch
+     3. Toggle 1GB Bypass Mode (currently: Disabled)
+     4. Change Target Directory
+     5. Exit
+   ==============================================
+   Select option [1-5]:
+   ```
+4. **Choose Option**: Select 1 for dry run or 2 to apply
+5. **Apply**: Confirm with "yes" when prompted
+6. **Done**: Patch applied successfully
+
+**Choosing Between GUI and CLI:**
+- **GUI** (`patch-gen-gui.exe --create-exe`): Best for non-technical users who prefer visual interfaces
+- **CLI** (`patch-gen.exe --create-exe`): Best for automation, scripting, or users comfortable with consoles
 
 ### User Benefits
 

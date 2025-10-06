@@ -53,8 +53,8 @@ type GeneratorWindow struct {
 	fromDirEntry       *widget.Entry // Custom from directory path
 	toDirEntry         *widget.Entry // Custom to directory path
 	customPathCheck    *widget.Check // Toggle for custom paths mode
-	fromKeyFileSelect  *widget.Select
-	toKeyFileSelect    *widget.Select
+	fromKeyFileEntry   *widget.Entry
+	toKeyFileEntry     *widget.Entry
 	fromVersionSelect  *widget.Select
 	toVersionSelect    *widget.Select
 	outputDirEntry     *widget.Entry
@@ -200,11 +200,11 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		if checked {
 			// In batch mode, from version is not used
 			gw.fromVersionSelect.Disable()
-			gw.fromKeyFileSelect.Disable()
+			gw.fromKeyFileEntry.Disable()
 		} else {
 			if !gw.useCustomPaths {
 				gw.fromVersionSelect.Enable()
-				gw.fromKeyFileSelect.Enable()
+				gw.fromKeyFileEntry.Enable()
 			}
 		}
 		gw.updateGenerateButton()
@@ -218,12 +218,13 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	})
 	gw.fromVersionSelect.PlaceHolder = "Select source version..."
 
-	// Create from key file selector
-	gw.fromKeyFileSelect = widget.NewSelect([]string{}, func(selected string) {
-		gw.fromKeyFile = selected
-	})
-	gw.fromKeyFileSelect.PlaceHolder = "Select key file..."
-	gw.fromKeyFileSelect.SetSelected(gw.fromKeyFile)
+	// Create from key file entry
+	gw.fromKeyFileEntry = widget.NewEntry()
+	gw.fromKeyFileEntry.SetPlaceHolder("Enter key file path (e.g., program.exe or cmd/main.go)...")
+	gw.fromKeyFileEntry.SetText(gw.fromKeyFile)
+	gw.fromKeyFileEntry.OnChanged = func(text string) {
+		gw.fromKeyFile = text
+	}
 
 	// Create to version selector
 	gw.toVersionSelect = widget.NewSelect([]string{}, func(selected string) {
@@ -233,21 +234,22 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	})
 	gw.toVersionSelect.PlaceHolder = "Select target version..."
 
-	// Create to key file selector
-	gw.toKeyFileSelect = widget.NewSelect([]string{}, func(selected string) {
-		gw.toKeyFile = selected
-	})
-	gw.toKeyFileSelect.PlaceHolder = "Select key file..."
-	gw.toKeyFileSelect.SetSelected(gw.toKeyFile)
+	// Create to key file entry
+	gw.toKeyFileEntry = widget.NewEntry()
+	gw.toKeyFileEntry.SetPlaceHolder("Enter key file path (e.g., program.exe or cmd/main.go)...")
+	gw.toKeyFileEntry.SetText(gw.toKeyFile)
+	gw.toKeyFileEntry.OnChanged = func(text string) {
+		gw.toKeyFile = text
+	}
 
 	// Left column: Version selection
 	leftColumn := container.NewVBox(
 		widget.NewLabel("Version Selection:"),
 		container.NewBorder(nil, nil, widget.NewLabel("From:"), nil, gw.fromVersionSelect),
-		container.NewBorder(nil, nil, widget.NewLabel("Key:"), nil, gw.fromKeyFileSelect),
+		container.NewBorder(nil, nil, widget.NewLabel("Key:"), nil, gw.fromKeyFileEntry),
 		widget.NewSeparator(),
 		container.NewBorder(nil, nil, widget.NewLabel("To:"), nil, gw.toVersionSelect),
-		container.NewBorder(nil, nil, widget.NewLabel("Key:"), nil, gw.toKeyFileSelect),
+		container.NewBorder(nil, nil, widget.NewLabel("Key:"), nil, gw.toKeyFileEntry),
 	)
 
 	// Create output directory selector
@@ -532,7 +534,7 @@ func (gw *GeneratorWindow) updateCompressionLabel() {
 	gw.compressionLabel.SetText(fmt.Sprintf("Level: %d", gw.compressionLevel))
 }
 
-// updateFromKeyFileOptions scans from version and populates key file options
+// updateFromKeyFileOptions updates the from key file entry with auto-detected file if available
 func (gw *GeneratorWindow) updateFromKeyFileOptions() {
 	if gw.fromVersion == "" || gw.versionsDir == "" {
 		return
@@ -540,17 +542,15 @@ func (gw *GeneratorWindow) updateFromKeyFileOptions() {
 
 	versionPath := filepath.Join(gw.versionsDir, gw.fromVersion)
 	files := gw.getFilesInDirectory(versionPath)
-	gw.fromKeyFileSelect.Options = files
-	gw.fromKeyFileSelect.Refresh()
 
-	// Auto-select if only one file found (works with any file type)
+	// Auto-populate if only one file found (works with any file type)
 	if len(files) == 1 {
-		gw.fromKeyFileSelect.SetSelected(files[0])
+		gw.fromKeyFileEntry.SetText(files[0])
 		gw.fromKeyFile = files[0]
 	}
 }
 
-// updateToKeyFileOptions scans to version and populates key file options
+// updateToKeyFileOptions updates the to key file entry with auto-detected file if available
 func (gw *GeneratorWindow) updateToKeyFileOptions() {
 	if gw.toVersion == "" || gw.versionsDir == "" {
 		return
@@ -558,17 +558,15 @@ func (gw *GeneratorWindow) updateToKeyFileOptions() {
 
 	versionPath := filepath.Join(gw.versionsDir, gw.toVersion)
 	files := gw.getFilesInDirectory(versionPath)
-	gw.toKeyFileSelect.Options = files
-	gw.toKeyFileSelect.Refresh()
 
-	// Auto-select if only one file found (works with any file type)
+	// Auto-populate if only one file found (works with any file type)
 	if len(files) == 1 {
-		gw.toKeyFileSelect.SetSelected(files[0])
+		gw.toKeyFileEntry.SetText(files[0])
 		gw.toKeyFile = files[0]
 	}
 }
 
-// updateFromKeyFileOptionsCustom scans from directory and populates key file options (custom paths mode)
+// updateFromKeyFileOptionsCustom updates the from key file entry with auto-detected file if available (custom paths mode)
 func (gw *GeneratorWindow) updateFromKeyFileOptionsCustom() {
 	if gw.fromDir == "" {
 		return
@@ -580,17 +578,15 @@ func (gw *GeneratorWindow) updateFromKeyFileOptionsCustom() {
 	}
 
 	files := gw.getFilesInDirectory(gw.fromDir)
-	gw.fromKeyFileSelect.Options = files
-	gw.fromKeyFileSelect.Refresh()
 
-	// Auto-select if only one file found (works with any file type)
+	// Auto-populate if only one file found (works with any file type)
 	if len(files) == 1 {
-		gw.fromKeyFileSelect.SetSelected(files[0])
+		gw.fromKeyFileEntry.SetText(files[0])
 		gw.fromKeyFile = files[0]
 	}
 }
 
-// updateToKeyFileOptionsCustom scans to directory and populates key file options (custom paths mode)
+// updateToKeyFileOptionsCustom updates the to key file entry with auto-detected file if available (custom paths mode)
 func (gw *GeneratorWindow) updateToKeyFileOptionsCustom() {
 	if gw.toDir == "" {
 		return
@@ -602,12 +598,10 @@ func (gw *GeneratorWindow) updateToKeyFileOptionsCustom() {
 	}
 
 	files := gw.getFilesInDirectory(gw.toDir)
-	gw.toKeyFileSelect.Options = files
-	gw.toKeyFileSelect.Refresh()
 
-	// Auto-select if only one file found (works with any file type)
+	// Auto-populate if only one file found (works with any file type)
 	if len(files) == 1 {
-		gw.toKeyFileSelect.SetSelected(files[0])
+		gw.toKeyFileEntry.SetText(files[0])
 		gw.toKeyFile = files[0]
 	}
 }

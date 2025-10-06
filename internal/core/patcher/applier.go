@@ -305,7 +305,7 @@ func (a *Applier) verifyPatchedFiles(targetDir string, operations []utils.PatchO
 	return nil
 }
 
-// createMirrorBackup creates a selective backup of only files that will be modified or deleted
+// createMirrorBackup creates a selective backup of only files/directories that will be modified or deleted
 // The backup mirrors the directory structure for easy manual rollback
 func (a *Applier) createMirrorBackup(targetDir, backupDir string, operations []utils.PatchOperation) error {
 	// Remove existing backup if it exists
@@ -320,35 +320,64 @@ func (a *Applier) createMirrorBackup(targetDir, backupDir string, operations []u
 		return fmt.Errorf("failed to create backup directory: %w", err)
 	}
 
-	// Backup only files that will be modified or deleted
-	backedUpCount := 0
+	// Backup only files and directories that will be modified or deleted
+	backedUpFileCount := 0
+	backedUpDirCount := 0
+
 	for _, op := range operations {
-		// Only backup files that will be modified or deleted
-		if op.Type != utils.OpModify && op.Type != utils.OpDelete {
-			continue
+		if op.Type == utils.OpModify || op.Type == utils.OpDelete {
+			// Backup individual files that will be modified or deleted
+			srcPath := filepath.Join(targetDir, op.FilePath)
+			dstPath := filepath.Join(backupDir, op.FilePath)
+
+			// Skip if source file doesn't exist (shouldn't happen, but be safe)
+			if !utils.FileExists(srcPath) {
+				continue
+			}
+
+			// Create parent directories in backup (mirror structure)
+			if err := utils.EnsureDir(filepath.Dir(dstPath)); err != nil {
+				return fmt.Errorf("failed to create backup subdirectory for %s: %w", op.FilePath, err)
+			}
+
+			// Copy the file to backup location
+			if err := utils.CopyFile(srcPath, dstPath); err != nil {
+				return fmt.Errorf("failed to backup file %s: %w", op.FilePath, err)
+			}
+
+			backedUpFileCount++
+
+		} else if op.Type == utils.OpDeleteDir {
+			// Backup entire directory that will be deleted (with all contents)
+			srcPath := filepath.Join(targetDir, op.FilePath)
+			dstPath := filepath.Join(backupDir, op.FilePath)
+
+			// Skip if source directory doesn't exist
+			if !utils.FileExists(srcPath) {
+				continue
+			}
+
+			// Copy entire directory tree to backup
+			if err := utils.CopyDir(srcPath, dstPath); err != nil {
+				return fmt.Errorf("failed to backup directory %s: %w", op.FilePath, err)
+			}
+
+			// Count files in backed up directory
+			fileCount, err := utils.CountFilesInDir(dstPath)
+			if err != nil {
+				return fmt.Errorf("failed to count files in backed up directory %s: %w", op.FilePath, err)
+			}
+
+			backedUpFileCount += fileCount
+			backedUpDirCount++
 		}
-
-		srcPath := filepath.Join(targetDir, op.FilePath)
-		dstPath := filepath.Join(backupDir, op.FilePath)
-
-		// Skip if source file doesn't exist (shouldn't happen, but be safe)
-		if !utils.FileExists(srcPath) {
-			continue
-		}
-
-		// Create parent directories in backup (mirror structure)
-		if err := utils.EnsureDir(filepath.Dir(dstPath)); err != nil {
-			return fmt.Errorf("failed to create backup subdirectory for %s: %w", op.FilePath, err)
-		}
-
-		// Copy the file to backup location
-		if err := utils.CopyFile(srcPath, dstPath); err != nil {
-			return fmt.Errorf("failed to backup file %s: %w", op.FilePath, err)
-		}
-
-		backedUpCount++
 	}
 
-	fmt.Printf("Backed up %d files\n", backedUpCount)
+	if backedUpDirCount > 0 {
+		fmt.Printf("Backed up %d files and %d directories\n", backedUpFileCount, backedUpDirCount)
+	} else {
+		fmt.Printf("Backed up %d files\n", backedUpFileCount)
+	}
+
 	return nil
 }
