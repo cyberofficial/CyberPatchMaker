@@ -106,7 +106,7 @@ foreach ($targetVersion in $allVersions) {
     $to = $targetVersion.Name
     Write-Host "`nGenerating: $FromVersion → $to"
     
-    & .\generator.exe `
+    & .\patch-gen.exe `
         --versions-dir $VersionsDir `
         --from $FromVersion `
         --to $to `
@@ -395,7 +395,7 @@ if (-not (Test-Path $patchFile)) {
 
 # Dry run first
 Write-Host "Testing rollback (dry-run)..."
-.\applier.exe --patch $patchFile --current-dir $AppDir --dry-run
+.\patch-apply.exe --patch $patchFile --current-dir $AppDir --dry-run
 
 if ($LASTEXITCODE -ne 0) {
     Write-Error "Dry-run failed"
@@ -404,7 +404,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # Apply rollback
 Write-Host "`nApplying rollback..."
-.\applier.exe --patch $patchFile --current-dir $AppDir --verify
+.\patch-apply.exe --patch $patchFile --current-dir $AppDir --verify
 
 if ($LASTEXITCODE -eq 0) {
     Write-Host "✓ Successfully rolled back to $TargetVersion"

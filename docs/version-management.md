@@ -476,7 +476,7 @@ net use Z: \\server\software-versions
 xcopy C:\versions Z:\versions /E /I
 
 # Update generator usage
-.\generator.exe --versions-dir Z:\versions `
+.\patch-gen.exe --versions-dir Z:\versions `
                 --new-version 1.0.3 `
                 --output Z:\patches
 ```

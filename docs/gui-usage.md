@@ -428,9 +428,9 @@ When "Include dry-run option" is checked:
 While the GUI can generate batch scripts for end users, patches can also be applied directly using the CLI tool:
 
 ```powershell
-.\dist\patch-apply.exe apply `
+.\patch-apply.exe `
     --patch "patches\1.0.0-to-1.0.2.patch" `
-    --target "C:\Program Files\MyApp" `
+    --current-dir "C:\Program Files\MyApp" `
     --verify
 ```
 

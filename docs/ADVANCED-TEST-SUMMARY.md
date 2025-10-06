@@ -69,8 +69,8 @@ testdata/versions/1.0.2/
 ### Build Tests (Tests 1-2)
 
 #### Test 1: Build Generator Tool
-**Purpose:** Verify generator.exe compiles successfully  
-**Command:** `go build -o generator.exe ./cmd/generator`
+**Purpose:** Verify patch-gen.exe compiles successfully  
+**Command:** `go build -o patch-gen.exe ./cmd/generator`
 
 **Expected Output:**
 ```
@@ -85,14 +85,14 @@ Testing: Build generator tool... ✓ PASSED
 
 **Success Criteria:**
 - Exit code 0
-- generator.exe file exists
+- patch-gen.exe file exists
 - File size > 0 bytes
 
 ---
 
 #### Test 2: Build Applier Tool
-**Purpose:** Verify applier.exe compiles successfully  
-**Command:** `go build -o applier.exe ./cmd/applier`
+**Purpose:** Verify patch-apply.exe compiles successfully  
+**Command:** `go build -o patch-apply.exe ./cmd/applier`
 
 **Expected Output:**
 ```
@@ -106,7 +106,7 @@ Testing: Build applier tool... ✓ PASSED
 
 **Success Criteria:**
 - Exit code 0
-- applier.exe file exists
+- patch-apply.exe file exists
 - File size > 0 bytes
 
 ---
@@ -144,14 +144,14 @@ Testing: Verify test versions exist
 
 **Command-Line:**
 ```
-Command: generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches --compression zstd
+Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches --compression zstd
 ```
 
 **Expected Output:**
 ```
 Testing: Generate complex patch (1.0.1 → 1.0.2) with zstd
   Generating patch from 1.0.1 to 1.0.2 with zstd compression...
-  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches --compression zstd
+  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches --compression zstd
   Patch generated (zstd): 1627 bytes
   Operations detected: Add=7, Modify=4, Delete=0
 ✓ PASSED: Generate complex patch (1.0.1 → 1.0.2) with zstd
@@ -191,14 +191,14 @@ Testing: Generate complex patch (1.0.1 → 1.0.2) with zstd
 
 **Command-Line:**
 ```
-Command: generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-gzip --compression gzip
+Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-gzip --compression gzip
 ```
 
 **Expected Output:**
 ```
 Testing: Generate same patch with gzip compression
   Generating patch with gzip compression...
-  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-gzip --compression gzip
+  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-gzip --compression gzip
   Patch generated (gzip): 1612 bytes
 ✓ PASSED: Generate same patch with gzip compression
 ```
@@ -220,14 +220,14 @@ Testing: Generate same patch with gzip compression
 
 **Command-Line:**
 ```
-Command: generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-none --compression none
+Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-none --compression none
 ```
 
 **Expected Output:**
 ```
 Testing: Generate same patch with no compression
   Generating patch with no compression...
-  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-none --compression none
+  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-none --compression none
   Patch generated (none): 4712 bytes
 ✓ PASSED: Generate same patch with no compression
 ```
@@ -280,14 +280,14 @@ Testing: Compare compression efficiency
 
 **Command-Line:**
 ```
-Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\versions\1.0.1 --dry-run
+Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\versions\1.0.1 --dry-run
 ```
 
 **Expected Output:**
 ```
 Testing: Dry-run complex patch application
   Running applier in dry-run mode...
-  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\versions\1.0.1 --dry-run
+  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\versions\1.0.1 --dry-run
   Dry-run completed successfully (exit code 0)
 ✓ PASSED: Dry-run complex patch application
 ```
@@ -313,7 +313,7 @@ Testing: Dry-run complex patch application
 
 **Command-Line:**
 ```
-Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-zstd --verify
+Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-zstd --verify
 ```
 
 **Expected Output:**
@@ -321,7 +321,7 @@ Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.p
 Testing: Apply zstd patch to complex directory structure
   Copying version 1.0.1 to test-zstd...
   Applying zstd patch...
-  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-zstd --verify
+  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-zstd --verify
   Zstd patch applied successfully
 ✓ PASSED: Apply zstd patch to complex directory structure
 ```
@@ -346,7 +346,7 @@ Testing: Apply zstd patch to complex directory structure
 
 **Command-Line:**
 ```
-Command: applier.exe --patch .\testdata\advanced-output\patches-gzip\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-gzip --verify
+Command: patch-apply.exe --patch .\testdata\advanced-output\patches-gzip\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-gzip --verify
 ```
 
 **Expected Output:**
@@ -354,7 +354,7 @@ Command: applier.exe --patch .\testdata\advanced-output\patches-gzip\1.0.1-to-1.
 Testing: Apply gzip patch to complex directory structure
   Copying version 1.0.1 to test-gzip...
   Applying gzip patch...
-  Command: applier.exe --patch .\testdata\advanced-output\patches-gzip\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-gzip --verify
+  Command: patch-apply.exe --patch .\testdata\advanced-output\patches-gzip\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-gzip --verify
   Gzip patch applied successfully
 ✓ PASSED: Apply gzip patch to complex directory structure
 ```
@@ -371,7 +371,7 @@ Testing: Apply gzip patch to complex directory structure
 
 **Command-Line:**
 ```
-Command: applier.exe --patch .\testdata\advanced-output\patches-none\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-none --verify
+Command: patch-apply.exe --patch .\testdata\advanced-output\patches-none\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-none --verify
 ```
 
 **Expected Output:**
@@ -379,7 +379,7 @@ Command: applier.exe --patch .\testdata\advanced-output\patches-none\1.0.1-to-1.
 Testing: Apply uncompressed patch to complex directory structure
   Copying version 1.0.1 to test-none...
   Applying uncompressed patch...
-  Command: applier.exe --patch .\testdata\advanced-output\patches-none\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-none --verify
+  Command: patch-apply.exe --patch .\testdata\advanced-output\patches-none\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-none --verify
   Uncompressed patch applied successfully
 ✓ PASSED: Apply uncompressed patch to complex directory structure
 ```
@@ -521,25 +521,25 @@ This proves that compression is a transport/storage optimization and doesn't aff
 **Command-Line Sequence:**
 ```
 1. Generate 1.0.0→1.0.1 patch:
-   Command: generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches
+   Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches
 
 2. Apply first patch:
-   Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.1.patch --current-dir .\testdata\advanced-output\multi-hop --verify
+   Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.1.patch --current-dir .\testdata\advanced-output\multi-hop --verify
 
 3. Apply second patch:
-   Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\multi-hop --verify
+   Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\multi-hop --verify
 ```
 
 **Expected Output:**
 ```
 Testing: Test multi-hop patching scenario
   Testing 1.0.0 → 1.0.1 → 1.0.2 patch chain...
-  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches
+  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches
   Starting from version 1.0.0...
   Applying first patch (1.0.0 → 1.0.1)...
-  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.1.patch --current-dir .\testdata\advanced-output\multi-hop --verify
+  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.1.patch --current-dir .\testdata\advanced-output\multi-hop --verify
   Applying second patch (1.0.1 → 1.0.2)...
-  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\multi-hop --verify
+  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\multi-hop --verify
   Multi-hop patching successful: 1.0.0 → 1.0.1 → 1.0.2
 ✓ PASSED: Test multi-hop patching scenario
 ```
@@ -568,14 +568,14 @@ After applying both patches sequentially, the test compares the final `program.e
 
 **Command-Line:**
 ```
-Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\wrong-version --verify
+Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\wrong-version --verify
 ```
 
 **Expected Output:**
 ```
 Testing: Verify patch rejection for wrong source version
   Testing patch rejection (applying 1.0.1→1.0.2 to 1.0.0)...
-  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\wrong-version --verify
+  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\wrong-version --verify
   Patch correctly rejected for wrong source version
 ✓ PASSED: Verify patch rejection for wrong source version
 ```
@@ -607,7 +607,7 @@ Prevents catastrophic failures from applying wrong patches. Without this check, 
 
 **Command-Line:**
 ```
-Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\corrupted --verify
+Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\corrupted --verify
 ```
 
 **Expected Output:**
@@ -615,7 +615,7 @@ Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.p
 Testing: Verify detection of corrupted files in source
   Testing corrupted file detection...
   Corrupting libs/core.dll...
-  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\corrupted --verify
+  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\corrupted --verify
   Corrupted file correctly detected
 ✓ PASSED: Verify detection of corrupted files in source
 ```
@@ -654,14 +654,14 @@ Ensures patches are only applied to pristine installations. Prevents:
 
 **Command-Line:**
 ```
-Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\backup-test --verify
+Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\backup-test --verify
 ```
 
 **Expected Output:**
 ```
 Testing: Verify backup system works correctly
   Testing backup and rollback functionality...
-  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\backup-test --verify
+  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\backup-test --verify
   Backup was created during patch application
   Backup system verified
 ✓ PASSED: Verify backup system works correctly
@@ -695,14 +695,14 @@ Testing: Verify backup system works correctly
 
 **Command-Line:**
 ```
-Command: generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches
+Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches
 ```
 
 **Expected Output:**
 ```
 Testing: Verify patch generation performance
   Measuring patch generation time...
-  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches
+  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches
   Patch generation completed in 0.03 seconds
   Performance is acceptable
 ✓ PASSED: Verify patch generation performance
@@ -755,18 +755,18 @@ For production use with larger applications (GBs):
 
 **Test Actions:**
 ```powershell
-# Generator should handle empty dirs in version structure
-generator.exe --scan-version .\testdata\versions\1.0.0
+# Generator handles empty directories automatically during patch generation
+patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\patches
 ```
 
 **Expected Results:**
-- ✓ Empty directories are recorded in manifest
+- ✓ Empty directories are recorded in patch manifest
 - ✓ Directory structure is preserved
-- ✓ No errors during manifest generation
+- ✓ No errors during patch generation
 - ✓ Empty directories can be recreated during patching
 
 **Validation:**
-- Manifest contains directory entries with no files
+- Patch manifest contains directory entries
 - Directory hierarchy is accurate
 - Empty directory paths are preserved
 
@@ -783,10 +783,10 @@ generator.exe --scan-version .\testdata\versions\1.0.0
 **Test Actions:**
 ```powershell
 # Apply first patch
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir .\test-incremental --verify
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir .\test-incremental --verify
 
 # Apply second patch  
-applier.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir .\test-incremental --verify
+patch-apply.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir .\test-incremental --verify
 ```
 
 **Expected Results:**
@@ -814,7 +814,7 @@ applier.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir .\test-incremen
 
 **Test Actions:**
 ```powershell
-applier.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir .\test-backup --verify
+patch-apply.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir .\test-backup --verify
 ```
 
 **Expected Results:**
@@ -844,7 +844,7 @@ The applier automatically creates a backup directory before making any changes. 
 
 **Test Actions:**
 ```powershell
-applier.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir .\test-backup --verify
+patch-apply.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir .\test-backup --verify
 
 # After successful patch, check backup
 Test-Path .\test-backup\backup.cyberpatcher
@@ -881,7 +881,7 @@ Backups are preserved after successful patches because:
 
 **Test Actions:**
 ```powershell
-applier.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir .\test-backup --verify
+patch-apply.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir .\test-backup --verify
 
 # Check backup contents
 Get-ChildItem -Recurse .\test-backup\backup.cyberpatcher
@@ -967,7 +967,7 @@ The mirror structure means users can intuitively find backed-up files without co
 
 **Test Actions:**
 ```powershell
-applier.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir .\test-backup --verify
+patch-apply.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir .\test-backup --verify
 
 # Check directory hierarchy
 Get-ChildItem -Recurse .\test-backup\backup.cyberpatcher | Select-Object FullName
@@ -1018,7 +1018,7 @@ test-backup/
 ```powershell
 # Measure patch application with backup creation
 Measure-Command {
-    applier.exe --patch .\patches\1.0.0-to-1.0.2.patch --current-dir .\test-performance --verify
+    patch-apply.exe --patch .\patches\1.0.0-to-1.0.2.patch --current-dir .\test-performance --verify
 }
 ```
 
@@ -1115,7 +1115,7 @@ Measure-Command {
 
 ### Generator Command Pattern
 ```powershell
-generator.exe --versions-dir <path> --from <version> --to <version> --output <path> [--compression <type>]
+patch-gen.exe --versions-dir <path> --from <version> --to <version> --output <path> [--compression <type>]
 ```
 
 **Options:**
@@ -1127,14 +1127,14 @@ generator.exe --versions-dir <path> --from <version> --to <version> --output <pa
 
 **Example:**
 ```powershell
-generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\patches --compression zstd
+patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\patches --compression zstd
 ```
 
 ---
 
 ### Applier Command Pattern
 ```powershell
-applier.exe --patch <patch-file> --current-dir <directory> [--verify] [--dry-run]
+patch-apply.exe --patch <patch-file> --current-dir <directory> [--verify] [--dry-run]
 ```
 
 **Options:**
@@ -1145,7 +1145,7 @@ applier.exe --patch <patch-file> --current-dir <directory> [--verify] [--dry-run
 
 **Example:**
 ```powershell
-applier.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir .\app --verify
+patch-apply.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir .\app --verify
 ```
 
 ---
@@ -1185,7 +1185,7 @@ This allows you to inspect test results without permanently accumulating test da
 **Symptoms:**
 ```
 Testing: Build generator tool... ✗ FAILED
-  Generator compilation failed
+  patch-gen.exe compilation failed
 ```
 
 **Common Causes:**

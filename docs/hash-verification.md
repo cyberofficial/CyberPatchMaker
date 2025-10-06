@@ -677,7 +677,7 @@ This patch requires version 1.0.0
 4. Anti-virus modified executable
 
 **Solutions**:
-1. Verify version: `patch-apply info --target ./app/`
+1. Run dry-run to identify issues: `patch-apply --patch patch.patch --current-dir ./app/ --dry-run`
 2. Re-download clean version from official source
 3. Check anti-virus logs for quarantine/restoration
 4. Use SHA-256 utility to verify key file independently

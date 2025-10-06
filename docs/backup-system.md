@@ -70,10 +70,10 @@ To rollback a patch manually:
 
 ```bash
 # Apply patch with backup (default)
-.\patch-apply.exe --patch patch.patch --target C:\MyApp --verify-before --verify-after --create-backup
+.\patch-apply.exe --patch patch.patch --current-dir C:\MyApp --verify
 
-# Apply patch without backup
-.\patch-apply.exe --patch patch.patch --target C:\MyApp --verify-before --verify-after --no-backup
+# Apply patch without backup (NOT recommended)
+.\patch-apply.exe --patch patch.patch --current-dir C:\MyApp --verify --backup=false
 ```
 
 ## GUI Usage

@@ -14,14 +14,19 @@ patch-gen [options]
 
 | Option | Required | Description |
 |--------|----------|-------------|
-| `--versions-dir <path>` | Yes (batch) | Directory containing version folders |
-| `--new-version <version>` | Yes (batch) | New version number to generate patches for |
-| `--from <version>` | Yes (single) | Source version number |
-| `--to <version>` | Yes (single) | Target version number |
-| `--output <path>` | Yes | Output directory for patches |
+| `--versions-dir <path>` | Mode 1 | Directory containing version folders |
+| `--new-version <version>` | Mode 1 | New version number to generate patches for |
+| `--from <version>` | Mode 2 | Source version number (with --versions-dir) |
+| `--to <version>` | Mode 2 | Target version number (with --versions-dir) |
+| `--from-dir <path>` | Mode 3 | Full path to source version directory |
+| `--to-dir <path>` | Mode 3 | Full path to target version directory |
+| `--output <path>` | Yes | Output directory for patches (default: patches) |
+| `--key-file <name>` | No | Specific key file to use (e.g., app_name.exe) |
 | `--compression <type>` | No | Compression: `zstd` (default), `gzip`, `none` |
-| `--level <n>` | No | Compression level: 1-4 (default: 3) |
-| `--verify` | No | Verify patches after creation |
+| `--level <n>` | No | Compression level (default: 3) |
+| `--verify` | No | Verify patches after creation (default: true) |
+| `--create-exe` | No | Create self-contained CLI executable |
+| `--version` | No | Show version information |
 | `--help` | No | Display help information |
 
 ### Exit Codes
@@ -39,14 +44,19 @@ patch-gen [options]
 
 ### Examples
 
-**Batch Mode** (generate all patches to new version):
+**Mode 1: Batch Mode** (generate all patches to new version):
 ```bash
 patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches
 ```
 
-**Single Patch Mode**:
+**Mode 2: Single Patch** (versions in same directory):
 ```bash
 patch-gen --from 1.0.1 --to 1.0.3 --versions-dir ./versions --output ./patches
+```
+
+**Mode 3: Custom Paths** (different drives/locations):
+```bash
+patch-gen --from-dir C:\releases\1.0.0 --to-dir D:\builds\1.0.1 --output ./patches
 ```
 
 **With Compression**:
@@ -76,15 +86,16 @@ patch-apply [options]
 | `--patch <path>` | Yes | Path to patch file |
 | `--current-dir <path>` | Yes | Directory containing current installation |
 | `--key-file <path>` | No | Custom key file path (if renamed or moved) |
-| `--verify` | No | Enable full verification (recommended!) |
-| `--dry-run` | No | Preview changes without applying |
-| `--create-backup` | No | Create selective backup before patching (default: `true`) |
-| `--no-backup` | No | Disable backup creation (NOT recommended for production!) |
-| `--help` | No | Display help information |
+| `--dry-run` | No | Simulate patch without making changes |
+| `--verify` | No | Verify file hashes before and after patching (default: true) |
+| `--backup` | No | Create backup before patching (default: true) |
+| `--ignore1gb` | No | Bypass 1GB patch size limit (use with caution) |
+| `--version` | No | Show version information |
+| `--help` | No | Show this help message |
 
 #### Backup Flag Details
 
-**`--create-backup` (default: `true`)**
+**`--backup` (default: `true`)**
 - **Strategy**: Selective backup of only modified/deleted files (NOT new files)
 - **Location**: `backup.cyberpatcher` folder created inside `--current-dir`
 - **Structure**: Mirror directory hierarchy preserving exact original paths
@@ -95,7 +106,7 @@ patch-apply [options]
   - Intuitive rollback (mirror structure = drag-and-drop restore)
   - Transparent about changes (shows exactly what was backed up)
 
-**`--no-backup`**
+**`--backup=false`**
 - **Disables**: Backup creation entirely
 - **Risk**: Cannot automatically rollback on failure
 - **Use Case**: Testing environments, CI/CD pipelines with external backups
@@ -140,19 +151,9 @@ patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --verif
 patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --dry-run
 ```
 
-**Quick Application** (no verification - RISKY!):
-```bash
-patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp
-```
-
 **Without Backup** (for testing only - NOT recommended!):
 ```bash
-patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --no-backup
-```
-
-**Explicit Backup** (default behavior):
-```bash
-patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --create-backup --verify
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --backup=false
 ```
 
 **Custom Key File** (if the key file was renamed):

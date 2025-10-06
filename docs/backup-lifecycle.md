@@ -253,7 +253,7 @@ if createBackup {
 ## Best Practices
 
 ### For Users
-1. **Always use --create-backup flag** (default: enabled): Enables selective backup for safety
+1. **Keep backup enabled** (default behavior): Backup is enabled by default for safety
 2. **Ensure sufficient disk space**: Backup requires space for changed files only (much less than full installation)
 3. **Don't modify backup.cyberpatcher directory**: Let the system manage it during patching
 4. **Cleanup when safe**: Delete `backup.cyberpatcher` folder after confirming patch success
@@ -278,7 +278,7 @@ if createBackup {
 **Not enough disk space for backup:**
 - Free up space for changed files (much less than full installation)
 - Check patch metadata to see how many files will be backed up
-- Or use `--no-backup` flag (not recommended - disables rollback safety)
+- Or use `--backup=false` flag (not recommended - disables rollback safety)
 
 **Need to manually rollback:**
 1. Files in `backup.cyberpatcher` mirror the original structure

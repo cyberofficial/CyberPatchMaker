@@ -147,7 +147,7 @@ Check your test-app directory - it should now be version 1.0.1!
 - Learn more about [Generator Tool](generator-guide.md)
 - Learn more about [Applier Tool](applier-guide.md)
 - Understand [How It Works](how-it-works.md)
-- Read about [Safety Features](backup-rollback.md)
+- Read about [Backup System](backup-system.md)
 
 ## Common Issues
 

@@ -321,7 +321,7 @@ Available: 200 MB
 2. Disable automatic backup (RISKY!):
    ```bash
    # Only for testing - NOT recommended!
-   ./applier --patch patch.patch --current-dir ./app --no-backup
+   ./applier --patch patch.patch --current-dir ./app --backup=false
    ```
    **WARNING:** Without backup, you cannot automatically rollback on failure!
 
@@ -346,7 +346,7 @@ Error: failed to create backup directory: ./myapp/backup.cyberpatcher
 Windows:
 ```powershell
 # Run as administrator
-Start-Process -FilePath ".\applier.exe" -ArgumentList "--patch",".\patch.patch","--current-dir",".\myapp","--verify" -Verb RunAs
+Start-Process -FilePath ".\patch-apply.exe" -ArgumentList "--patch",".\patch.patch","--current-dir",".\myapp","--verify" -Verb RunAs
 ```
 
 Linux:
@@ -440,9 +440,9 @@ Error: restoration failed - backup may be corrupted
 - Copy back to network
 
 **Verification overhead:**
-- Full verification scans twice (pre + post)
-- Use `--verify post` for faster patching (no pre-verification)
-- Only if you're confident installation is valid
+- Verification uses SHA-256 to check file hashes before and after patching
+- Use `--verify=false` to skip verification for faster patching
+- Only disable verification if you're confident installation is valid
 
 **Antivirus scanning:**
 - Antivirus may scan every modified file
@@ -451,9 +451,8 @@ Error: restoration failed - backup may be corrupted
 
 Performance comparison:
 ```
---verify full:  Safest,  Slowest  (pre + post verification)
---verify post:  Safe,    Medium   (post verification only) - DEFAULT
---verify none:  Risky,   Fastest  (no verification)
+--verify (default: true):  Safe,    Standard (SHA-256 verification)
+--verify=false:            Risky,   Faster   (no verification, not recommended)
 ```
 
 ---
@@ -472,7 +471,7 @@ Error: failed to write file: Access is denied
    - Right-click executable → "Run as administrator"
    - Or use PowerShell:
    ```powershell
-   Start-Process -FilePath ".\applier.exe" -Verb RunAs -ArgumentList "--patch",".\patch.patch","--current-dir",".\myapp","--verify"
+   Start-Process -FilePath ".\patch-apply.exe" -Verb RunAs -ArgumentList "--patch",".\patch.patch","--current-dir",".\myapp","--verify"
    ```
 2. **Check file/folder permissions**:
    - Right-click → Properties → Security
@@ -651,7 +650,7 @@ syntax error: unexpected newline, expecting comma or }
 2. **Avoid special characters**: No `<>:"|?*` in paths
 3. **Use quotes**: Wrap paths in quotes if they contain spaces
    ```powershell
-   .\applier.exe --patch ".\patches\my patch.patch" --current-dir ".\My App" --verify
+   .\patch-apply.exe --patch ".\patches\my patch.patch" --current-dir ".\My App" --verify
    ```
 
 ---
@@ -666,10 +665,10 @@ syntax error: unexpected newline, expecting comma or }
 net use Z: \\server\share
 
 # Use mapped drive
-.\applier.exe --patch Z:\patches\patch.patch --current-dir Z:\app --verify
+.\patch-apply.exe --patch Z:\patches\patch.patch --current-dir Z:\app --verify
 
 # Or use UNC path (may be slower)
-.\applier.exe --patch \\server\share\patches\patch.patch --current-dir \\server\share\app --verify
+.\patch-apply.exe --patch \\server\share\patches\patch.patch --current-dir \\server\share\app --verify
 ```
 
 ---
@@ -740,7 +739,7 @@ Example:
 ```
 Platform: Windows 11
 Go version: go1.21.3 windows/amd64
-Command: .\applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir .\myapp --verify
+Command: .\patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir .\myapp --verify
 Error: Pre-verification failed: key file checksum mismatch
 Test results: 20/20 passing
 Sizes: Version 1.0.0 = 5.2GB, Version 1.0.1 = 5.3GB, Patch = 50MB
@@ -755,7 +754,7 @@ To save output to a file:
 
 Windows:
 ```powershell
-.\applier.exe --patch .\patch.patch --current-dir .\app --verify 2>&1 | Tee-Object -FilePath log.txt
+.\patch-apply.exe --patch .\patch.patch --current-dir .\app --verify 2>&1 | Tee-Object -FilePath log.txt
 ```
 
 Linux:

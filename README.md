@@ -39,8 +39,8 @@ Perfect for:
 # Clone and build
 git clone https://github.com/cyberofficial/CyberPatchMaker.git
 cd CyberPatchMaker
-go build ./cmd/generator
-go build ./cmd/applier
+go build -o patch-gen ./cmd/generator
+go build -o patch-apply ./cmd/applier
 ```
 
 📖 **Detailed setup:** See [Development Setup Guide](docs/development-setup.md)
@@ -52,7 +52,7 @@ go build ./cmd/applier
 Generate patches for a new version of your software:
 
 ```bash
-generator --versions-dir ./versions --new-version 1.0.3 --output ./patches
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches
 ```
 
 This automatically creates patch files from all previous versions to version 1.0.3.
@@ -63,10 +63,10 @@ Update your application with a patch file:
 
 ```bash
 # Test first (dry-run)
-applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./app --dry-run
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./app --dry-run
 
 # Apply the update
-applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./app --verify
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./app --verify
 ```
 
 The `--verify` flag ensures everything is checked before and after patching, with automatic rollback if anything goes wrong.
@@ -84,10 +84,10 @@ Need to rollback to a previous version? CyberPatchMaker supports bidirectional p
 
 ```bash
 # Generate downgrade patch
-generator --from 1.0.3 --to 1.0.2 --versions-dir ./versions --output ./patches/downgrade
+patch-gen --from 1.0.3 --to 1.0.2 --versions-dir ./versions --output ./patches/downgrade
 
 # Apply downgrade to rollback
-applier --patch ./patches/downgrade/1.0.3-to-1.0.2.patch --current-dir ./app --verify
+patch-apply --patch ./patches/downgrade/1.0.3-to-1.0.2.patch --current-dir ./app --verify
 ```
 
 This allows users to safely revert to an earlier version if needed.
@@ -126,7 +126,7 @@ mkdir versions/1.0.2
 # (copy your new version files into versions/1.0.2/)
 
 # 2. Generate patch files
-generator --versions-dir ./versions --new-version 1.0.2 --output ./patches
+patch-gen --versions-dir ./versions --new-version 1.0.2 --output ./patches
 # Creates: patches/1.0.0-to-1.0.2.patch
 #          patches/1.0.1-to-1.0.2.patch
 
@@ -134,10 +134,10 @@ generator --versions-dir ./versions --new-version 1.0.2 --output ./patches
 # (upload to your website, CDN, etc.)
 
 # 4. Users test the patch first (optional but recommended)
-applier --patch 1.0.0-to-1.0.2.patch --current-dir ./myapp --dry-run
+patch-apply --patch 1.0.0-to-1.0.2.patch --current-dir ./myapp --dry-run
 
 # 5. Users apply the patch
-applier --patch 1.0.0-to-1.0.2.patch --current-dir ./myapp --verify
+patch-apply --patch 1.0.0-to-1.0.2.patch --current-dir ./myapp --verify
 # Done! Their version 1.0.0 is now version 1.0.2
 ```
 
@@ -146,8 +146,8 @@ applier --patch 1.0.0-to-1.0.2.patch --current-dir ./myapp --verify
 ## What's Included
 
 ✅ **Production-Ready CLI Tools**
-- **Patch Generator** (`generator.exe` / `generator`) - Create update files
-- **Patch Applier** (`applier.exe` / `applier`) - Install updates
+- **Patch Generator** (`patch-gen.exe` / `patch-gen`) - Create update files
+- **Patch Applier** (`patch-apply.exe` / `patch-apply`) - Install updates
 - Comprehensive verification and automatic rollback
 - Tested with complex directory structures
 - Handles files from 1KB to 5GB+
