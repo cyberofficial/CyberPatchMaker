@@ -1,6 +1,8 @@
 package gui
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"image/color"
@@ -42,6 +44,7 @@ type GeneratorWindow struct {
 	verifyAfter      bool
 	skipIdentical    bool
 	batchMode        bool
+	createExecutable bool
 	fromKeyFile      string
 	toKeyFile        string
 
@@ -60,6 +63,7 @@ type GeneratorWindow struct {
 	verifyCheck        *widget.Check
 	skipIdenticalCheck *widget.Check
 	batchModeCheck     *widget.Check
+	createExeCheck     *widget.Check
 	generateBtn        *widget.Button
 	statusLabel        *widget.Label
 	logText            *widget.Entry
@@ -316,6 +320,11 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	})
 	gw.skipIdenticalCheck.SetChecked(true)
 
+	gw.createExeCheck = widget.NewCheck("Create self-contained executable", func(checked bool) {
+		gw.createExecutable = checked
+	})
+	gw.createExeCheck.SetChecked(false)
+
 	// Right column: Options
 	rightColumn := container.NewVBox(
 		widget.NewLabel("Compression:"),
@@ -324,6 +333,7 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		widget.NewLabel("Options:"),
 		gw.verifyCheck,
 		gw.skipIdenticalCheck,
+		gw.createExeCheck,
 	)
 
 	// Create two-column layout for version/options
@@ -801,13 +811,33 @@ func (gw *GeneratorWindow) generatePatch() {
 
 	gw.setStatus("Patch generated successfully!")
 	gw.appendLog("SUCCESS: Patch generated successfully")
+
+	// Create self-contained executable if requested
+	if gw.createExecutable {
+		exePath := strings.TrimSuffix(outputPath, ".patch") + ".exe"
+		gw.appendLog("Creating self-contained executable...")
+		if err := gw.createStandaloneExe(outputPath, exePath); err != nil {
+			gw.appendLog("ERROR: Failed to create executable: " + err.Error())
+		} else {
+			info, err := os.Stat(exePath)
+			if err == nil {
+				sizeMB := float64(info.Size()) / (1024.0 * 1024.0)
+				gw.appendLog(fmt.Sprintf("Executable size: %.2f MB", sizeMB))
+			}
+			gw.appendLog(fmt.Sprintf("✓ Created: %s", exePath))
+		}
+	}
+
 	gw.generateBtn.Enable()
 
 	// Show success dialog
 	if gw.window != nil {
-		dialog.ShowInformation("Success",
-			fmt.Sprintf("Patch generated successfully!\n\nOutput: %s", outputPath),
-			gw.window)
+		successMsg := fmt.Sprintf("Patch generated successfully!\n\nOutput: %s", outputPath)
+		if gw.createExecutable {
+			exePath := strings.TrimSuffix(outputPath, ".patch") + ".exe"
+			successMsg += fmt.Sprintf("\nExecutable: %s", exePath)
+		}
+		dialog.ShowInformation("Success", successMsg, gw.window)
 	}
 }
 
@@ -1011,6 +1041,82 @@ func (gw *GeneratorWindow) savePatch(patch *utils.Patch, filename string, option
 	// Write to file
 	if err := os.WriteFile(filename, data, 0644); err != nil {
 		return fmt.Errorf("failed to write patch file: %w", err)
+	}
+
+	return nil
+}
+
+// createStandaloneExe creates a self-contained executable by appending patch data to applier-gui.exe
+func (gw *GeneratorWindow) createStandaloneExe(patchPath, exePath string) error {
+	// Get path to patch-apply-gui.exe (same directory as patch-gen-gui.exe)
+	genExe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get executable path: %w", err)
+	}
+
+	applierPath := filepath.Join(filepath.Dir(genExe), "patch-apply-gui.exe")
+
+	// Read the applier GUI executable
+	applierData, err := os.ReadFile(applierPath)
+	if err != nil {
+		return fmt.Errorf("failed to read applier executable: %w", err)
+	}
+
+	// Read the patch file
+	patchData, err := os.ReadFile(patchPath)
+	if err != nil {
+		return fmt.Errorf("failed to read patch file: %w", err)
+	}
+
+	// Calculate checksum of patch data
+	checksum := sha256.Sum256(patchData)
+
+	// Create 128-byte header
+	header := make([]byte, 128)
+
+	// Magic bytes "CPMPATCH" (8 bytes)
+	copy(header[0:8], []byte("CPMPATCH"))
+
+	// Version (4 bytes, uint32)
+	binary.LittleEndian.PutUint32(header[8:12], 1)
+
+	// Stub size (8 bytes, uint64) - size of applier exe
+	binary.LittleEndian.PutUint64(header[12:20], uint64(len(applierData)))
+
+	// Data offset (8 bytes, uint64) - right after stub
+	binary.LittleEndian.PutUint64(header[20:28], uint64(len(applierData)))
+
+	// Data size (8 bytes, uint64)
+	binary.LittleEndian.PutUint64(header[28:36], uint64(len(patchData)))
+
+	// Compression type (16 bytes)
+	compressionBytes := make([]byte, 16)
+	copy(compressionBytes, []byte(gw.compression))
+	copy(header[36:52], compressionBytes)
+
+	// Checksum (32 bytes, SHA-256)
+	copy(header[52:84], checksum[:])
+
+	// Reserved (44 bytes) - already zeroed
+
+	// Create output file
+	outFile, err := os.Create(exePath)
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+	defer outFile.Close()
+
+	// Write: applier.exe + patch data + header
+	if _, err := outFile.Write(applierData); err != nil {
+		return fmt.Errorf("failed to write applier data: %w", err)
+	}
+
+	if _, err := outFile.Write(patchData); err != nil {
+		return fmt.Errorf("failed to write patch data: %w", err)
+	}
+
+	if _, err := outFile.Write(header); err != nil {
+		return fmt.Errorf("failed to write header: %w", err)
 	}
 
 	return nil

@@ -712,3 +712,107 @@ func (aw *ApplierWindow) appendLog(message string) {
 	// Auto-scroll to bottom
 	aw.logText.Refresh()
 }
+
+// LoadEmbeddedPatch loads an embedded patch (called from main when self-contained exe detected)
+func (aw *ApplierWindow) LoadEmbeddedPatch(patch *utils.Patch, targetDir string) {
+	aw.loadedPatch = patch
+	aw.currentDir = targetDir
+
+	// Set the current directory in UI
+	if aw.currentDirEntry != nil {
+		aw.currentDirEntry.SetText(targetDir)
+	}
+
+	// Disable patch file selection (not needed for embedded)
+	if aw.patchFileEntry != nil {
+		aw.patchFileEntry.SetText("[Embedded Patch Data]")
+		aw.patchFileEntry.Disable()
+	}
+
+	// Update UI with patch information
+	if aw.fromVersionLabel != nil {
+		aw.fromVersionLabel.SetText(patch.FromVersion)
+	}
+	if aw.toVersionLabel != nil {
+		aw.toVersionLabel.SetText(patch.ToVersion)
+	}
+	if aw.keyFileLabel != nil {
+		aw.keyFileLabel.SetText(patch.FromKeyFile.Path)
+	}
+
+	if aw.hashLabel != nil {
+		hashStr := patch.FromKeyFile.Checksum
+		if len(hashStr) > 16 {
+			hashStr = hashStr[:16] + "..."
+		}
+		aw.hashLabel.SetText(hashStr)
+	}
+
+	if aw.sizeLabel != nil {
+		sizeKB := float64(patch.Header.PatchSize) / 1024.0
+		sizeMB := sizeKB / 1024.0
+		if sizeMB >= 1.0 {
+			aw.sizeLabel.SetText(fmt.Sprintf("%.2f MB", sizeMB))
+		} else {
+			aw.sizeLabel.SetText(fmt.Sprintf("%.2f KB", sizeKB))
+		}
+	}
+
+	if aw.compressionLabel != nil {
+		aw.compressionLabel.SetText(patch.Header.Compression)
+	}
+	if aw.createdLabel != nil {
+		aw.createdLabel.SetText(patch.Header.CreatedAt.Format("2006-01-02 15:04:05"))
+	}
+
+	// Count operations
+	addCount := 0
+	modifyCount := 0
+	deleteCount := 0
+	addDirCount := 0
+	deleteDirCount := 0
+
+	for _, op := range patch.Operations {
+		switch op.Type {
+		case utils.OpAdd:
+			addCount++
+		case utils.OpModify:
+			modifyCount++
+		case utils.OpDelete:
+			deleteCount++
+		case utils.OpAddDir:
+			addDirCount++
+		case utils.OpDeleteDir:
+			deleteDirCount++
+		}
+	}
+
+	if aw.addedLabel != nil {
+		aw.addedLabel.SetText(fmt.Sprintf("%d", addCount))
+	}
+	if aw.modifiedLabel != nil {
+		aw.modifiedLabel.SetText(fmt.Sprintf("%d", modifyCount))
+	}
+	if aw.deletedLabel != nil {
+		aw.deletedLabel.SetText(fmt.Sprintf("%d", deleteCount))
+	}
+	if aw.addDirsLabel != nil {
+		aw.addDirsLabel.SetText(fmt.Sprintf("%d", addDirCount))
+	}
+	if aw.deleteDirsLabel != nil {
+		aw.deleteDirsLabel.SetText(fmt.Sprintf("%d", deleteDirCount))
+	}
+	if aw.requiredLabel != nil {
+		aw.requiredLabel.SetText(fmt.Sprintf("%d (must match exact hashes)", len(patch.RequiredFiles)))
+	}
+
+	aw.setStatus("Embedded patch loaded - ready to apply")
+	aw.appendLog("✓ Self-contained patch loaded successfully")
+	aw.appendLog(fmt.Sprintf("From version: %s", patch.FromVersion))
+	aw.appendLog(fmt.Sprintf("To version: %s", patch.ToVersion))
+	aw.appendLog(fmt.Sprintf("Target directory: %s", targetDir))
+	aw.appendLog("")
+	aw.appendLog("Click 'Apply Patch' when ready...")
+
+	aw.updateApplyButton()
+}
