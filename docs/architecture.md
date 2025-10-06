@@ -587,23 +587,38 @@ When a self-contained executable runs:
 
 1. **Open self**: Executable opens itself for reading
 2. **Seek to header**: Reads last 128 bytes
-3. **Validate magic**: Checks for "CPMPATCH" bytes
-4. **Extract metadata**: Parses header fields
-5. **Read patch data**: Seeks to `DataOffset`, reads `DataSize` bytes
-6. **Verify checksum**: Validates SHA-256 hash
-7. **Decompress**: Decompresses based on `Compression` field
-8. **Parse JSON**: Decodes patch manifest
-9. **Load UI**: Populates GUI with patch information automatically
+3. **Parse header**: Decodes binary header structure
+4. **Validate version**: Checks format version (currently only v1 supported)
+5. **Validate magic**: Checks for "CPMPATCH" bytes
+6. **Bounds validation**:
+   - Verify `DataOffset == StubSize` (data starts right after applier)
+   - Verify `StubSize + DataSize + HEADER_SIZE == fileSize` (no gaps or overruns)
+   - Check offsets are within file bounds
+   - Prevent excessive allocation (max 1 GB patch data)
+7. **Read patch data**: Seeks to `DataOffset`, reads `DataSize` bytes
+8. **Verify checksum**: Validates SHA-256 hash of patch data
+9. **Decompress**: Decompresses based on `Compression` field
+10. **Parse JSON**: Decodes patch manifest
+11. **Load UI**: Populates GUI with patch information automatically
 
-**Detection Code Location:** `cmd/applier-gui/main.go` (lines 82-167)
+**Detection Code Location:** `cmd/applier-gui/main.go` (lines 82-198)
 
 ### Security
 
 - **Magic bytes**: Prevents false positives from non-patch executables
-- **Version field**: Allows future format changes while maintaining compatibility
-- **Checksum**: SHA-256 verification ensures data integrity
-- **Size validation**: Header contains exact sizes for bounds checking
+- **Version validation**: Strictly checks format version (only v1 accepted), fails fast on unknown formats
+- **Bounds validation**: 
+  - Validates `DataOffset == StubSize` to prevent gaps or manipulation
+  - Verifies `StubSize + DataSize + HEADER_SIZE == fileSize` for exact structure match
+  - Ensures all offsets are within file bounds before reading
+  - Prevents buffer overruns and out-of-range seeks
+- **Allocation protection**: Maximum 1 GB patch size limit prevents memory exhaustion attacks
+  - Can be bypassed with explicit user consent via `--ignore1gb` CLI flag or GUI checkbox
+  - When bypassed, user assumes responsibility for sufficient memory availability
+- **Checksum verification**: SHA-256 hash ensures data integrity and detects tampering
+- **Size validation**: Header contains exact sizes validated before allocation
 - **No execution**: Patch data is never executed, only parsed as JSON
+- **Fail-safe design**: All validations return false on failure, preventing partial application
 
 ### Advantages
 

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io"
 	"os"
@@ -23,6 +24,11 @@ const (
 	HEADER_SIZE = 128
 )
 
+var (
+	ignore1GBFlag = flag.Bool("ignore1gb", false, "Bypass the 1GB patch size limit (use with caution)")
+	ignore1GB     = false // Global setting, can be set by CLI flag or GUI checkbox
+)
+
 type EmbeddedPatchHeader struct {
 	Magic       [8]byte
 	Version     uint32
@@ -35,6 +41,14 @@ type EmbeddedPatchHeader struct {
 }
 
 func main() {
+	// Parse command-line flags
+	flag.Parse()
+
+	// Set global ignore1GB from CLI flag
+	if *ignore1GBFlag {
+		ignore1GB = true
+	}
+
 	// Check if patch data is embedded in this executable
 	patch, targetDir, isEmbedded := checkEmbeddedPatch()
 
@@ -48,6 +62,9 @@ func main() {
 
 		applierUI := gui.NewApplierWindow()
 		applierUI.SetWindow(myWindow)
+		applierUI.SetIgnore1GBCallback(func(enabled bool) {
+			ignore1GB = enabled
+		})
 
 		content := container.NewVBox(
 			widget.NewLabel(fmt.Sprintf("Self-Contained Patch: %s → %s", patch.FromVersion, patch.ToVersion)),
@@ -68,6 +85,9 @@ func main() {
 
 		applierUI := gui.NewApplierWindow()
 		applierUI.SetWindow(myWindow)
+		applierUI.SetIgnore1GBCallback(func(enabled bool) {
+			ignore1GB = enabled
+		})
 
 		content := container.NewVBox(
 			widget.NewLabel("CyberPatchMaker - Patch Applier"),
@@ -124,9 +144,39 @@ func checkEmbeddedPatch() (*utils.Patch, string, bool) {
 		return nil, "", false
 	}
 
+	// Validate version (currently only version 1 is supported)
+	if header.Version != 1 {
+		return nil, "", false
+	}
+
 	// Validate magic bytes
 	magic := string(bytes.TrimRight(header.Magic[:], "\x00"))
-	if magic != MAGIC_BYTES {
+	if magic != "CPMPATCH" {
+		return nil, "", false
+	}
+
+	// Validate header offsets and sizes against file size
+	// DataOffset should equal StubSize (applier exe size)
+	if header.DataOffset != header.StubSize {
+		return nil, "", false
+	}
+
+	// Verify the file structure: StubSize + DataSize + HEADER_SIZE should equal fileSize
+	expectedSize := header.StubSize + header.DataSize + HEADER_SIZE
+	if expectedSize != uint64(fileSize) {
+		return nil, "", false
+	}
+
+	// Ensure offsets are within file bounds
+	if header.DataOffset >= uint64(fileSize) || header.DataOffset+header.DataSize > uint64(fileSize)-HEADER_SIZE {
+		return nil, "", false
+	}
+
+	// Prevent excessive memory allocation (sanity check: max 1 GB patch data)
+	// Can be bypassed with --ignore1gb CLI flag or "Ignore 1GB limit" GUI checkbox
+	// if user is aware of the risks (e.g., large game updates)
+	const maxPatchSize = 1 << 30 // 1 GB
+	if !ignore1GB && header.DataSize > maxPatchSize {
 		return nil, "", false
 	}
 

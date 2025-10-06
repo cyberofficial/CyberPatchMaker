@@ -45,6 +45,7 @@ type GeneratorWindow struct {
 	skipIdentical    bool
 	batchMode        bool
 	createExecutable bool
+	ignore1GB        bool
 	fromKeyFile      string
 	toKeyFile        string
 
@@ -64,6 +65,7 @@ type GeneratorWindow struct {
 	skipIdenticalCheck *widget.Check
 	batchModeCheck     *widget.Check
 	createExeCheck     *widget.Check
+	ignore1GBCheck     *widget.Check
 	generateBtn        *widget.Button
 	statusLabel        *widget.Label
 	logText            *widget.Entry
@@ -325,6 +327,11 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	})
 	gw.createExeCheck.SetChecked(false)
 
+	gw.ignore1GBCheck = widget.NewCheck("Ignore 1GB limit (use with caution)", func(checked bool) {
+		gw.ignore1GB = checked
+	})
+	gw.ignore1GBCheck.SetChecked(false)
+
 	// Right column: Options
 	rightColumn := container.NewVBox(
 		widget.NewLabel("Compression:"),
@@ -334,6 +341,7 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		gw.verifyCheck,
 		gw.skipIdenticalCheck,
 		gw.createExeCheck,
+		gw.ignore1GBCheck,
 	)
 
 	// Create two-column layout for version/options

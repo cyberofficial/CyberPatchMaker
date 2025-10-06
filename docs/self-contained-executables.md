@@ -106,13 +106,20 @@ Located at the end of the file:
 
 When `patch-apply-gui.exe` starts:
 1. Reads last 128 bytes of itself
-2. Checks for magic bytes "CPMPATCH"
-3. If found:
-   - Validates checksum
-   - Extracts patch data
+2. Parses header structure
+3. **Security validations** (fail-safe design):
+   - Validates format version (only v1 supported)
+   - Checks for magic bytes "CPMPATCH"
+   - Verifies `DataOffset == StubSize` (no gaps)
+   - Validates `StubSize + DataSize + HEADER_SIZE == fileSize` (exact match)
+   - Ensures offsets are within file bounds
+   - Limits patch size to max 1 GB (prevents memory exhaustion)
+4. If all validations pass:
+   - Extracts patch data from validated offset
+   - Verifies SHA-256 checksum
    - Decompresses if needed
    - Loads patch into GUI automatically
-4. If not found:
+5. If any validation fails:
    - Runs in normal mode (browse for .patch file)
 
 ## File Sizes
@@ -283,6 +290,16 @@ Need help? Visit: https://support.mygame.com/updates
 - Verify file isn't corrupted (check file size)
 - Try running from command line to see error messages
 - Ensure user has execution permissions
+
+### "Patch size exceeds 1GB limit"
+
+**Problem**: Self-contained executable fails to load because patch data is over 1GB
+
+**Solution**:
+- Use CLI flag: Run executable with `patch-1.0.0-to-1.0.1.exe --ignore1gb`
+- Or: Enable "Ignore 1GB limit" checkbox in the GUI before applying
+- Note: Requires sufficient RAM to load large patch into memory
+- Consider: If patch is very large, traditional separate .patch file may be better
 
 ### "Checksum mismatch (data corrupted)"
 

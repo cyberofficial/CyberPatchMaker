@@ -31,6 +31,10 @@ type ApplierWindow struct {
 	verifyAfter  bool
 	createBackup bool
 	autoDetect   bool
+	ignore1GB    bool
+
+	// Callback for when ignore1GB changes (to update global flag)
+	onIgnore1GBChanged func(bool)
 
 	patchFileEntry    *widget.Entry
 	currentDirEntry   *widget.Entry
@@ -39,6 +43,7 @@ type ApplierWindow struct {
 	verifyAfterCheck  *widget.Check
 	backupCheck       *widget.Check
 	autoDetectCheck   *widget.Check
+	ignore1GBCheck    *widget.Check
 	applyBtn          *widget.Button
 	statusLabel       *widget.Label
 	logText           *widget.Entry
@@ -84,6 +89,11 @@ func (aw *ApplierWindow) CreateRenderer() fyne.WidgetRenderer {
 // SetWindow sets the parent window (needed for dialogs)
 func (aw *ApplierWindow) SetWindow(window fyne.Window) {
 	aw.window = window
+}
+
+// SetIgnore1GBCallback sets the callback for when the ignore1GB checkbox changes
+func (aw *ApplierWindow) SetIgnore1GBCallback(callback func(bool)) {
+	aw.onIgnore1GBChanged = callback
 }
 
 // buildUI builds the complete UI layout
@@ -224,15 +234,26 @@ func (aw *ApplierWindow) buildUI() fyne.CanvasObject {
 	})
 	aw.autoDetectCheck.SetChecked(true)
 
+	aw.ignore1GBCheck = widget.NewCheck("Ignore 1GB limit (use with caution)", func(checked bool) {
+		aw.ignore1GB = checked
+		// Notify callback if set (updates global flag in main.go)
+		if aw.onIgnore1GBChanged != nil {
+			aw.onIgnore1GBChanged(checked)
+		}
+	})
+	aw.ignore1GBCheck.SetChecked(false)
+
 	// Options in horizontal layout to save space
 	optionsRow1 := container.NewGridWithColumns(2, aw.verifyBeforeCheck, aw.verifyAfterCheck)
 	optionsRow2 := container.NewGridWithColumns(2, aw.backupCheck, aw.autoDetectCheck)
+	optionsRow3 := container.NewGridWithColumns(1, aw.ignore1GBCheck)
 
 	optionsContainer := container.NewVBox(
 		widget.NewLabel("Options:"),
 		aw.dryRunCheck,
 		optionsRow1,
 		optionsRow2,
+		optionsRow3,
 	)
 
 	// Create apply button

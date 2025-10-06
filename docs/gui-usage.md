@@ -52,6 +52,11 @@ The Patch Generator GUI provides a user-friendly interface for creating binary p
   - Improves performance by avoiding unnecessary diffs
   - Reduces patch size for files that haven't changed
   - Default: Enabled
+- **Ignore 1GB limit (use with caution)**: Bypass the 1GB patch size safety limit
+  - Allows creating self-contained executables with patches larger than 1GB
+  - Use only when necessary (e.g., very large updates)
+  - End users may need to use CLI flag `--ignore1gb` or enable checkbox when applying
+  - Default: Disabled
 - **Create self-contained executable**: Generate standalone `.exe` with embedded patch data
   - Creates both `.patch` file and self-contained `.exe` file
   - End users get single file that includes applier + patch data
@@ -242,6 +247,10 @@ The Batch Script Generator tab provides a tool for creating Windows batch script
 - **Disable backup (--backup=false)**: Skip backup creation
   - Saves disk space
   - Not recommended for production use
+- **Ignore 1GB limit (use with caution)**: Bypass the 1GB patch size safety limit
+  - Allows self-contained executables with patches larger than 1GB
+  - Use only when necessary (e.g., large game updates)
+  - Increases memory usage during patch loading
 
 #### Custom Instructions
 - Add custom messages for end users
