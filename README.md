@@ -144,21 +144,18 @@ applier --patch 1.0.0-to-1.0.2.patch --current-dir ./myapp --verify
 
 ## What's Included
 
-✅ **Fully Functional CLI Tools**
-- Patch generator for creating update files
-- Patch applier for installing updates
-- Comprehensive verification and safety features
-
-✅ **Production-Ready**
+✅ **Production-Ready CLI Tools**
+- **Patch Generator** (`generator.exe` / `generator`) - Create update files
+- **Patch Applier** (`applier.exe` / `applier`) - Install updates
+- Comprehensive verification and automatic rollback
 - Tested with complex directory structures
 - Handles files from 1KB to 5GB+
-- Automatic backup and rollback
-- Multiple compression formats
+- Multiple compression formats (zstd, gzip)
 
-� **Coming Soon**
-- GUI application for visual management
-- Web-based patch server
-- Additional compression options
+🧪 **Experimental GUI (In Development)**
+- Basic graphical interface available for patch generation
+- Not yet recommended for production use
+- CLI tools are the primary, supported interface
 
 📖 **Documentation:** [Full Documentation Index](docs/README.md)
 

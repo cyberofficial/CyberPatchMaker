@@ -68,9 +68,15 @@ func CreateRadioGroup(label string, options []string, onChange func(string)) *fy
 	)
 }
 
-// CreateProgressDialog creates a progress dialog
-func CreateProgressDialog(title, message string, window fyne.Window) *dialog.ProgressDialog {
-	progress := dialog.NewProgress(title, message, window)
+// CreateProgressDialog creates a progress dialog using the new Fyne API
+func CreateProgressDialog(title, message string, window fyne.Window) *dialog.CustomDialog {
+	progressBar := widget.NewProgressBarInfinite()
+	content := container.NewVBox(
+		widget.NewLabel(message),
+		progressBar,
+	)
+
+	progress := dialog.NewCustomWithoutButtons(title, content, window)
 	return progress
 }
 

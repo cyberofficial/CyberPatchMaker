@@ -131,6 +131,34 @@ This requires both versions to already be registered in the system.
 - Display usage information
 - Shows all available options
 
+### Custom Path Options
+
+**`--from-dir <path>`**
+- Full path to source version directory
+- Overrides `--versions-dir` and `--from`
+- Use when source version is not in versions directory
+- Example: `D:\builds\old-version`
+- Cannot be used with `--versions-dir`
+
+**`--to-dir <path>`**
+- Full path to target version directory
+- Overrides `--versions-dir` and `--to`
+- Use when target version is not in versions directory
+- Example: `C:\projects\new-release`
+- Cannot be used with `--versions-dir`
+
+**Custom Path Example:**
+```bash
+# Generate patch from arbitrary locations
+generator --from-dir D:\old\1.0.0 --to-dir C:\new\1.0.3 --output ./patch.patch
+```
+
+**When to Use Custom Paths:**
+- Versions stored on different drives
+- Network shares or external storage
+- Build output directories
+- Testing without copying files
+
 ---
 
 ## Version Directory Structure
@@ -370,9 +398,8 @@ For a 5GB application:
 ### For Large Applications (5GB+)
 
 1. **Use Default Settings**: zstd level 3 is well-optimized
-2. **Enable Parallel Processing**: (coming in future version)
-3. **Sufficient RAM**: Generation uses ~500MB max
-4. **Fast Storage**: SSD recommended for large version folders
+2. **Sufficient RAM**: Generation uses ~500MB max
+3. **Fast Storage**: SSD recommended for large version folders
 
 ### For Many Versions
 

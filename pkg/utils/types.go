@@ -100,7 +100,6 @@ type PatchOptions struct {
 	VerifyAfter       bool   // Verify patch after creation
 	GenerateSignature bool   // Create digital signature
 	ParallelWorkers   int    // Number of parallel workers
-	DiffThresholdKB   int    // Skip diff for files smaller than this
 	SkipIdentical     bool   // Skip binary-identical files
 }
 
@@ -111,7 +110,6 @@ type Config struct {
 	TempDirectory      string              // Temp file location
 	WorkerThreads      int                 // Parallel workers
 	EnableParallel     bool                // Use parallel processing
-	DiffThresholdKB    int                 // Skip files smaller than this
 	SkipIdentical      bool                // Skip binary-identical files
 	PreservePerms      bool                // Preserve file permissions
 	VerifySignatures   bool                // Verify patch signatures

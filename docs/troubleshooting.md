@@ -749,29 +749,7 @@ Disk space: 100GB free on C: drive
 
 ---
 
-### Debug Mode
-
-**Enable verbose output:**
-```bash
-# Generator (future enhancement)
-./generator --debug --versions-dir ./versions --new-version 1.0.1 --output ./patches
-
-# Applier (future enhancement)
-./applier --debug --patch ./patch.patch --current-dir ./app --verify
-```
-
-Debug output shows:
-- Detailed progress
-- File operations
-- Checksum calculations
-- Verification results
-- Timing information
-
----
-
 ### Collecting Logs
-
-**Future enhancement:** Currently no log files are created. All output goes to stdout/stderr.
 
 To save output to a file:
 

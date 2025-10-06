@@ -134,52 +134,31 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 			return nil, fmt.Errorf("source file not found: %s", file.Path)
 		}
 
-		// Check threshold
+		// Skip identical files if option is enabled
 		if options.SkipIdentical && sourceFile.Checksum == file.Checksum {
 			continue
 		}
 
-		// Check size threshold
-		if options.DiffThresholdKB > 0 && file.Size < int64(options.DiffThresholdKB*1024) {
-			// For small files, just include the whole file
-			fullPath := filepath.Join(toVersion.Location, file.Path)
-			fileData, err := os.ReadFile(fullPath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read file %s: %w", file.Path, err)
-			}
+		// Always generate binary diff for modified files
+		oldPath := filepath.Join(fromVersion.Location, file.Path)
+		newPath := filepath.Join(toVersion.Location, file.Path)
 
-			patch.Operations = append(patch.Operations, utils.PatchOperation{
-				Type:        utils.OpModify,
-				FilePath:    file.Path,
-				NewFile:     fileData,
-				OldChecksum: sourceFile.Checksum,
-				NewChecksum: file.Checksum,
-				Size:        file.Size,
-			})
-
-			fmt.Printf("  Modify (full): %s (%d bytes)\n", file.Path, file.Size)
-		} else {
-			// Generate binary diff
-			oldPath := filepath.Join(fromVersion.Location, file.Path)
-			newPath := filepath.Join(toVersion.Location, file.Path)
-
-			diffData, err := g.differ.GenerateDiff(oldPath, newPath)
-			if err != nil {
-				return nil, fmt.Errorf("failed to generate diff for %s: %w", file.Path, err)
-			}
-
-			patch.Operations = append(patch.Operations, utils.PatchOperation{
-				Type:        utils.OpModify,
-				FilePath:    file.Path,
-				BinaryDiff:  diffData,
-				OldChecksum: sourceFile.Checksum,
-				NewChecksum: file.Checksum,
-				Size:        int64(len(diffData)),
-			})
-
-			fmt.Printf("  Modify (diff): %s (diff: %d bytes, orig: %d bytes, new: %d bytes)\n",
-				file.Path, len(diffData), sourceFile.Size, file.Size)
+		diffData, err := g.differ.GenerateDiff(oldPath, newPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate diff for %s: %w", file.Path, err)
 		}
+
+		patch.Operations = append(patch.Operations, utils.PatchOperation{
+			Type:        utils.OpModify,
+			FilePath:    file.Path,
+			BinaryDiff:  diffData,
+			OldChecksum: sourceFile.Checksum,
+			NewChecksum: file.Checksum,
+			Size:        int64(len(diffData)),
+		})
+
+		fmt.Printf("  Modify (diff): %s (diff: %d bytes, orig: %d bytes, new: %d bytes)\n",
+			file.Path, len(diffData), sourceFile.Size, file.Size)
 	}
 
 	// Create patch header

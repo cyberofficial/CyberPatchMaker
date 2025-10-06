@@ -32,11 +32,12 @@ Key files solve these problems by using a designated executable's SHA-256 hash a
 
 ### What is a Key File?
 
-A **key file** is a designated executable file (typically the main program) that serves as the version's fingerprint. Properties:
+A **key file** is any designated file (typically the main program or a critical component) that serves as the version's fingerprint. Properties:
 
-- **Path**: Relative path from version root (e.g., `program.exe`, `bin/app.exe`)
+- **Path**: Relative path from version root (e.g., `program.exe`, `bin/app.exe`, `core.dll`, `data.bin`)
 - **Checksum**: SHA-256 hash of the file's binary content
 - **Size**: File size in bytes (secondary verification)
+- **File Type**: Can be any file type - executables, libraries, data files, configuration files, etc.
 
 ### Version Identification
 
@@ -54,31 +55,31 @@ Even if the filename is identical (`program.exe`), the **hash uniquely identifie
 
 ## Key File Detection Algorithm
 
-### Automatic Detection Process
+### Manual Selection Process
 
-When registering a new version, CyberPatchMaker automatically detects the key file using this 5-step algorithm:
+In the GUI, when registering a version or generating patches, you manually select the key file:
 
-#### Step 1: Scan for Executables
-
-```
-Recursively scan version directory for executable files:
-- Windows: *.exe, *.com, *.bat
-- macOS: Files with +x permission, *.app bundles
-- Linux: Files with +x permission, ELF binaries
-```
-
-#### Step 2: Filter by Location
+#### File Selection
 
 ```
-Prioritize executables by location:
-1. Root directory executables (highest priority)
-2. bin/ directory executables
-3. Executables in other directories (lower priority)
+The GUI displays all files in the version directory:
+- All file types are shown (not just executables)
+- Files listed from root directory (non-recursive for key file selection)
+- You can choose any file: .exe, .dll, .so, .bin, .dat, .ini, etc.
 ```
 
-**Rationale**: Main program is typically at root or in `bin/`
+#### Auto-Selection Logic
 
-#### Step 3: Apply Naming Priority
+```
+If only one file exists in the directory:
+- That file is automatically selected as the key file
+- Works with any file type
+- Saves time for simple version structures
+```
+
+**Rationale**: Key file should be a stable identifier that exists across all versions
+
+#### Best Practices for Key File Selection
 
 ```
 Priority order (case-insensitive):
@@ -250,14 +251,6 @@ Application/
 
 **Solution**: Detection algorithm checks `bin/` directory with high priority.
 
-**Manual Override** (future feature):
-```bash
-# Specify custom key file during registration
-patch-gen register --version 1.0.0 \
-                   --path ./app \
-                   --key-file bin/main.exe
-```
-
 ### Platform-Specific Key Files
 
 **Problem**: Cross-platform application with different executables per platform
@@ -303,18 +296,7 @@ ScriptApp/
 └── modules/
 ```
 
-**Workaround 1** - Designate entry script as key file (future feature):
-```bash
-patch-gen register --version 1.0.0 \
-                   --path ./app \
-                   --key-file main.py
-```
-
-**Workaround 2** - Use manifest checksum as version identifier:
-- Fall back to overall manifest checksum
-- Less precise but workable for script-only apps
-
-**Current Limitation**: CyberPatchMaker requires at least one executable. Script-only apps need wrapper executable or future enhancement.
+**Current Limitation**: CyberPatchMaker requires at least one executable file. Script-only apps need a wrapper executable.
 
 ## Edge Cases and Troubleshooting
 
@@ -330,7 +312,6 @@ patch-gen register --version 1.0.0 \
 **Solutions**:
 1. Verify executable exists and is accessible
 2. Check file permissions (Unix: `chmod +x`)
-3. Manually specify key file path (future feature)
 
 ### Case 2: Multiple Suitable Candidates
 
@@ -347,7 +328,6 @@ MyApp/
 **Solutions**:
 1. Review detection ranking - usually picks largest/primary
 2. Manually select during registration (current UI)
-3. Use `--key-file` flag to specify (future CLI feature)
 
 ### Case 3: Key File Modified
 
@@ -363,7 +343,6 @@ MyApp/
 1. Re-download clean version
 2. Verify with original installer
 3. Check anti-virus logs
-4. Use `--force` flag only if absolutely certain (future feature, not recommended)
 
 ### Case 4: Renamed Key File
 
@@ -453,75 +432,6 @@ Patch Check:
 - Even if attacker matches source hash, target hash must also match
 
 **Mitigation**: Users should obtain patches only from trusted sources.
-
-## Future Enhancements
-
-### 1. Multiple Key Files
-
-**Use Case**: Applications with multiple critical executables
-
-**Proposed Design**:
-```json
-{
-  "key_files": [
-    {
-      "path": "game.exe",
-      "checksum": "abc123...",
-      "priority": 1
-    },
-    {
-      "path": "server.exe",
-      "checksum": "def456...",
-      "priority": 2
-    }
-  ]
-}
-```
-
-**Verification**: ALL key files must match required hashes.
-
-### 2. Custom Detection Priority
-
-**Use Case**: Override automatic detection for specific applications
-
-**Proposed CLI**:
-```bash
-patch-gen config --priority-list "main.exe,app.exe,program.exe"
-```
-
-### 3. Key File Metadata
-
-**Use Case**: Include version info embedded in executable
-
-**Proposed Enhancement**:
-- Extract PE version info (Windows)
-- Extract Mach-O version (macOS)
-- Parse ELF version section (Linux)
-- Validate against expected version string
-
-### 4. Signature Verification
-
-**Use Case**: Verify executable is signed by trusted publisher
-
-**Proposed Enhancement**:
-- Check code signature (Windows Authenticode, macOS codesign)
-- Validate certificate chain
-- Require valid signature for key file acceptance
-
-### 5. Key File Rotation
-
-**Use Case**: Application changes main executable filename between versions
-
-**Example**:
-```
-Version 1.0.0: oldname.exe
-Version 1.0.1: newname.exe
-```
-
-**Proposed Solution**:
-- Allow patch to specify key file change
-- Verify both old and new key files during patch
-- Update manifest with new key file info
 
 ## Best Practices
 

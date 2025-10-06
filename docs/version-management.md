@@ -93,18 +93,6 @@ Key file selected: game.exe (priority 2)
 
 ---
 
-### Custom Key Files
-
-If automatic detection doesn't work, you can specify a custom key file:
-
-```bash
-# Future enhancement - not yet implemented
-./generator --versions-dir ./versions \
-            --new-version 1.0.1 \
-            --output ./patches \
-            --key-file myapp.exe
-```
-
 ---
 
 ## Version Naming
@@ -285,23 +273,7 @@ When generating patches, versions are automatically registered:
 
 ---
 
-### Manual Registration (Future)
 
-**Future enhancement** - explicit registration:
-
-```bash
-# Register a version
-./generator --register-version 1.0.0 \
-            --location C:\releases\1.0.0
-
-# List registered versions
-./generator --list-versions
-
-# Unregister a version
-./generator --unregister-version 1.0.0
-```
-
----
 
 ## Version Detection Process
 
@@ -559,11 +531,6 @@ Comparing versions 1.0.0 → 1.0.1:
   Files modified: 12
   Files deleted:  3
   Total changes:  20
-```
-
-**To see details (future enhancement):**
-```bash
-./generator --compare 1.0.0 1.0.1 --verbose
 ```
 
 ---
