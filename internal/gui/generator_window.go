@@ -31,6 +31,9 @@ type GeneratorWindow struct {
 	versionsDir      string
 	fromVersion      string
 	toVersion        string
+	fromDir          string // Custom path for from version (different drive support)
+	toDir            string // Custom path for to version (different drive support)
+	useCustomPaths   bool   // Toggle between legacy mode and custom paths mode
 	outputDir        string
 	compression      string
 	compressionLevel int
@@ -42,6 +45,9 @@ type GeneratorWindow struct {
 	toKeyFile        string
 
 	versionsDirEntry   *widget.Entry
+	fromDirEntry       *widget.Entry // Custom from directory path
+	toDirEntry         *widget.Entry // Custom to directory path
+	customPathCheck    *widget.Check // Toggle for custom paths mode
 	fromKeyFileSelect  *widget.Select
 	toKeyFileSelect    *widget.Select
 	fromVersionSelect  *widget.Select
@@ -112,6 +118,77 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		gw.versionsDirEntry,
 	)
 
+	// Create custom paths checkbox
+	gw.customPathCheck = widget.NewCheck("Use Custom Paths (different drives/locations)", func(checked bool) {
+		gw.useCustomPaths = checked
+		if checked {
+			// Enable custom path entries, disable legacy version selects and batch mode
+			gw.fromDirEntry.Enable()
+			gw.toDirEntry.Enable()
+			gw.versionsDirEntry.Disable()
+			gw.fromVersionSelect.Disable()
+			gw.toVersionSelect.Disable()
+			gw.batchModeCheck.Disable()
+			gw.batchModeCheck.SetChecked(false)
+			gw.batchMode = false
+		} else {
+			// Disable custom path entries, enable legacy version selects and batch mode
+			gw.fromDirEntry.Disable()
+			gw.toDirEntry.Disable()
+			gw.versionsDirEntry.Enable()
+			gw.fromVersionSelect.Enable()
+			gw.toVersionSelect.Enable()
+			gw.batchModeCheck.Enable()
+		}
+		gw.updateGenerateButton()
+	})
+
+	// Create custom from directory selector
+	gw.fromDirEntry = widget.NewEntry()
+	gw.fromDirEntry.SetPlaceHolder("Select source version directory...")
+	gw.fromDirEntry.OnSubmitted = func(text string) {
+		if text != "" {
+			gw.fromDir = text
+			gw.updateFromKeyFileOptionsCustom()
+			gw.updateGenerateButton()
+		}
+	}
+	gw.fromDirEntry.Disable() // Start disabled
+
+	fromDirBrowse := widget.NewButton("Browse", func() {
+		gw.selectFromDirectory()
+	})
+
+	fromDirContainer := container.NewBorder(
+		nil, nil,
+		widget.NewLabel("From Directory:"),
+		fromDirBrowse,
+		gw.fromDirEntry,
+	)
+
+	// Create custom to directory selector
+	gw.toDirEntry = widget.NewEntry()
+	gw.toDirEntry.SetPlaceHolder("Select target version directory...")
+	gw.toDirEntry.OnSubmitted = func(text string) {
+		if text != "" {
+			gw.toDir = text
+			gw.updateToKeyFileOptionsCustom()
+			gw.updateGenerateButton()
+		}
+	}
+	gw.toDirEntry.Disable() // Start disabled
+
+	toDirBrowse := widget.NewButton("Browse", func() {
+		gw.selectToDirectory()
+	})
+
+	toDirContainer := container.NewBorder(
+		nil, nil,
+		widget.NewLabel("To Directory:"),
+		toDirBrowse,
+		gw.toDirEntry,
+	)
+
 	// Create batch mode checkbox
 	gw.batchModeCheck = widget.NewCheck("Batch Mode: Generate patches from ALL versions to target", func(checked bool) {
 		gw.batchMode = checked
@@ -120,8 +197,10 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 			gw.fromVersionSelect.Disable()
 			gw.fromKeyFileSelect.Disable()
 		} else {
-			gw.fromVersionSelect.Enable()
-			gw.fromKeyFileSelect.Enable()
+			if !gw.useCustomPaths {
+				gw.fromVersionSelect.Enable()
+				gw.fromKeyFileSelect.Enable()
+			}
 		}
 		gw.updateGenerateButton()
 	})
@@ -289,7 +368,14 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 
 	// Assemble the UI with compact layout
 	return container.NewVBox(
+		gw.customPathCheck,
+		widget.NewSeparator(),
+		// Legacy mode (single versions directory)
 		versionsDirContainer,
+		// Custom paths mode (different drives/locations)
+		fromDirContainer,
+		toDirContainer,
+		widget.NewSeparator(),
 		gw.batchModeCheck,
 		widget.NewSeparator(),
 		twoColumnLayout,
@@ -327,6 +413,40 @@ func (gw *GeneratorWindow) selectOutputDirectory() {
 			path := dir.Path()
 			gw.outputDirEntry.SetText(path)
 			gw.outputDir = path
+			gw.updateGenerateButton()
+		}
+	}, gw.window)
+}
+
+// selectFromDirectory opens a folder dialog for selecting source version directory
+func (gw *GeneratorWindow) selectFromDirectory() {
+	if gw.window == nil {
+		return
+	}
+
+	dialog.ShowFolderOpen(func(dir fyne.ListableURI, err error) {
+		if err == nil && dir != nil {
+			path := dir.Path()
+			gw.fromDirEntry.SetText(path)
+			gw.fromDir = path
+			gw.updateFromKeyFileOptionsCustom()
+			gw.updateGenerateButton()
+		}
+	}, gw.window)
+}
+
+// selectToDirectory opens a folder dialog for selecting target version directory
+func (gw *GeneratorWindow) selectToDirectory() {
+	if gw.window == nil {
+		return
+	}
+
+	dialog.ShowFolderOpen(func(dir fyne.ListableURI, err error) {
+		if err == nil && dir != nil {
+			path := dir.Path()
+			gw.toDirEntry.SetText(path)
+			gw.toDir = path
+			gw.updateToKeyFileOptionsCustom()
 			gw.updateGenerateButton()
 		}
 	}, gw.window)
@@ -377,20 +497,26 @@ func (gw *GeneratorWindow) scanVersions() {
 
 // updateGenerateButton enables/disables generate button based on selections
 func (gw *GeneratorWindow) updateGenerateButton() {
-	if gw.batchMode {
-		// In batch mode, only need to version and output dir
-		if gw.toVersion != "" && gw.outputDir != "" {
-			gw.generateBtn.Enable()
-		} else {
-			gw.generateBtn.Disable()
-		}
+	var canGenerate bool
+
+	if gw.useCustomPaths {
+		// Custom paths mode: need fromDir, toDir, and outputDir
+		canGenerate = gw.fromDir != "" && gw.toDir != "" && gw.outputDir != ""
 	} else {
-		// In normal mode, need both from and to versions
-		if gw.fromVersion != "" && gw.toVersion != "" && gw.outputDir != "" {
-			gw.generateBtn.Enable()
+		// Legacy mode
+		if gw.batchMode {
+			// In batch mode, only need to version and output dir
+			canGenerate = gw.toVersion != "" && gw.outputDir != ""
 		} else {
-			gw.generateBtn.Disable()
+			// In normal mode, need both from and to versions
+			canGenerate = gw.fromVersion != "" && gw.toVersion != "" && gw.outputDir != ""
 		}
+	}
+
+	if canGenerate {
+		gw.generateBtn.Enable()
+	} else {
+		gw.generateBtn.Disable()
 	}
 }
 
@@ -445,6 +571,60 @@ func (gw *GeneratorWindow) updateToKeyFileOptions() {
 	}
 }
 
+// updateFromKeyFileOptionsCustom scans from directory and populates key file options (custom paths mode)
+func (gw *GeneratorWindow) updateFromKeyFileOptionsCustom() {
+	if gw.fromDir == "" {
+		return
+	}
+
+	// Check if directory exists
+	if _, err := os.Stat(gw.fromDir); os.IsNotExist(err) {
+		return
+	}
+
+	files := gw.getFilesInDirectory(gw.fromDir)
+	gw.fromKeyFileSelect.Options = files
+	gw.fromKeyFileSelect.Refresh()
+
+	// Auto-select if only one executable found
+	if len(files) > 0 {
+		for _, file := range files {
+			if strings.HasSuffix(strings.ToLower(file), ".exe") {
+				gw.fromKeyFileSelect.SetSelected(file)
+				gw.fromKeyFile = file
+				break
+			}
+		}
+	}
+}
+
+// updateToKeyFileOptionsCustom scans to directory and populates key file options (custom paths mode)
+func (gw *GeneratorWindow) updateToKeyFileOptionsCustom() {
+	if gw.toDir == "" {
+		return
+	}
+
+	// Check if directory exists
+	if _, err := os.Stat(gw.toDir); os.IsNotExist(err) {
+		return
+	}
+
+	files := gw.getFilesInDirectory(gw.toDir)
+	gw.toKeyFileSelect.Options = files
+	gw.toKeyFileSelect.Refresh()
+
+	// Auto-select if only one executable found
+	if len(files) > 0 {
+		for _, file := range files {
+			if strings.HasSuffix(strings.ToLower(file), ".exe") {
+				gw.toKeyFileSelect.SetSelected(file)
+				gw.toKeyFile = file
+				break
+			}
+		}
+	}
+}
+
 // getFilesInDirectory returns a list of all files in the directory (not recursive)
 func (gw *GeneratorWindow) getFilesInDirectory(dirPath string) []string {
 	files := []string{}
@@ -473,21 +653,40 @@ func (gw *GeneratorWindow) generatePatch() {
 		return
 	}
 
+	// Determine paths and version numbers based on mode
+	var fromPath, toPath, fromVersion, toVersion string
+
+	if gw.useCustomPaths {
+		// Custom paths mode: use full directory paths and extract version numbers
+		fromPath = gw.fromDir
+		toPath = gw.toDir
+		fromVersion = filepath.Base(fromPath)
+		toVersion = filepath.Base(toPath)
+		gw.appendLog("=== CUSTOM PATHS MODE ===")
+		gw.appendLog(fmt.Sprintf("From: %s (version: %s)", fromPath, fromVersion))
+		gw.appendLog(fmt.Sprintf("To: %s (version: %s)", toPath, toVersion))
+	} else {
+		// Legacy mode: construct paths from versions directory and version names
+		fromPath = filepath.Join(gw.versionsDir, gw.fromVersion)
+		toPath = filepath.Join(gw.versionsDir, gw.toVersion)
+		fromVersion = gw.fromVersion
+		toVersion = gw.toVersion
+		gw.appendLog("=== LEGACY MODE ===")
+		gw.appendLog(fmt.Sprintf("From: %s", fromPath))
+		gw.appendLog(fmt.Sprintf("To: %s", toPath))
+	}
+
 	// Validate selections
-	if gw.fromVersion == gw.toVersion {
+	if fromVersion == toVersion {
 		gw.setStatus("Error: From and To versions must be different")
 		gw.appendLog("ERROR: Cannot generate patch from same version to same version")
 		gw.generateBtn.Enable()
 		return
 	}
 
-	// Build paths
-	fromPath := filepath.Join(gw.versionsDir, gw.fromVersion)
-	toPath := filepath.Join(gw.versionsDir, gw.toVersion)
-	outputPath := filepath.Join(gw.outputDir, fmt.Sprintf("%s-to-%s.patch", gw.fromVersion, gw.toVersion))
+	// Build output path using version numbers
+	outputPath := filepath.Join(gw.outputDir, fmt.Sprintf("%s-to-%s.patch", fromVersion, toVersion))
 
-	gw.appendLog(fmt.Sprintf("From: %s", fromPath))
-	gw.appendLog(fmt.Sprintf("To: %s", toPath))
 	gw.appendLog(fmt.Sprintf("Output: %s", outputPath))
 	gw.appendLog(fmt.Sprintf("Compression: %s", gw.compression))
 
@@ -498,7 +697,7 @@ func (gw *GeneratorWindow) generatePatch() {
 	// Register and scan source version
 	gw.appendLog("Scanning source version...")
 	gw.appendLog(fmt.Sprintf("Using from key file: %s", gw.fromKeyFile))
-	fromVer, err := versionMgr.RegisterVersion(gw.fromVersion, fromPath, gw.fromKeyFile)
+	fromVer, err := versionMgr.RegisterVersion(fromVersion, fromPath, gw.fromKeyFile)
 	if err != nil {
 		gw.setStatus("Error: Failed to register source version")
 		gw.appendLog("ERROR: " + err.Error())
@@ -522,13 +721,13 @@ func (gw *GeneratorWindow) generatePatch() {
 	}
 	fromVer.Manifest.Files = fromFiles
 	fromVer.Manifest.Directories = fromDirs
-	fromVer.Manifest.Version = gw.fromVersion
+	fromVer.Manifest.Version = fromVersion
 	gw.appendLog(fmt.Sprintf("Source version: %d files, %d directories", len(fromFiles), len(fromDirs)))
 
 	// Register and scan target version
 	gw.appendLog("Scanning target version...")
 	gw.appendLog(fmt.Sprintf("Using to key file: %s", gw.toKeyFile))
-	toVer, err := versionMgr.RegisterVersion(gw.toVersion, toPath, gw.toKeyFile)
+	toVer, err := versionMgr.RegisterVersion(toVersion, toPath, gw.toKeyFile)
 	if err != nil {
 		gw.setStatus("Error: Failed to register target version")
 		gw.appendLog("ERROR: " + err.Error())
@@ -552,7 +751,7 @@ func (gw *GeneratorWindow) generatePatch() {
 	}
 	toVer.Manifest.Files = toFiles
 	toVer.Manifest.Directories = toDirs
-	toVer.Manifest.Version = gw.toVersion
+	toVer.Manifest.Version = toVersion
 	gw.appendLog(fmt.Sprintf("Target version: %d files, %d directories", len(toFiles), len(toDirs))) // Generate patch
 	gw.appendLog("Generating patch operations...")
 	compressionStr := "zstd"

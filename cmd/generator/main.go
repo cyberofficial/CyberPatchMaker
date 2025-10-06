@@ -19,6 +19,8 @@ func main() {
 	newVersion := flag.String("new-version", "", "New version number to generate patches for")
 	from := flag.String("from", "", "Source version number (for single patch)")
 	to := flag.String("to", "", "Target version number (for single patch)")
+	fromDir := flag.String("from-dir", "", "Full path to source version directory (overrides --versions-dir/--from)")
+	toDir := flag.String("to-dir", "", "Full path to target version directory (overrides --versions-dir/--to)")
 	output := flag.String("output", "", "Output directory for patches")
 	compression := flag.String("compression", "zstd", "Compression algorithm (zstd, gzip, none)")
 	level := flag.Int("level", 3, "Compression level (1-4 for zstd, 1-9 for gzip)")
@@ -61,8 +63,11 @@ func main() {
 	if *newVersion != "" && *versionsDir != "" {
 		// Generate patches from all existing versions to new version
 		generateAllPatches(versionMgr, *versionsDir, *newVersion, outputDir, *compression, *level, *verify)
+	} else if *fromDir != "" && *toDir != "" {
+		// Generate single patch using custom directory paths
+		generateSinglePatchCustomPaths(versionMgr, *fromDir, *toDir, outputDir, *compression, *level, *verify)
 	} else if *from != "" && *to != "" && *versionsDir != "" {
-		// Generate single patch
+		// Generate single patch using versions-dir
 		generateSinglePatch(versionMgr, *versionsDir, *from, *to, outputDir, *compression, *level, *verify)
 	} else {
 		fmt.Println("Error: insufficient arguments")
@@ -183,6 +188,63 @@ func generateSinglePatch(versionMgr *version.Manager, versionsDir, from, to, out
 	fmt.Println("Patch generated successfully")
 }
 
+// generateSinglePatchCustomPaths generates a patch using custom directory paths
+// This allows versions to be on different drives or network locations
+func generateSinglePatchCustomPaths(versionMgr *version.Manager, fromPath, toPath, outputDir, compression string, level int, verify bool) {
+	// Extract version numbers from directory names
+	fromVersion := extractVersionFromPath(fromPath)
+	toVersion := extractVersionFromPath(toPath)
+
+	fmt.Printf("Generating patch from %s (%s) to %s (%s)...\n", fromVersion, fromPath, toVersion, toPath)
+
+	// Find key file in source directory
+	keyFiles := []string{"program.exe", "game.exe", "app.exe", "main.exe"}
+	var keyFile string
+	for _, kf := range keyFiles {
+		if utils.FileExists(filepath.Join(fromPath, kf)) {
+			keyFile = kf
+			break
+		}
+	}
+	if keyFile == "" {
+		fmt.Println("Error: could not find key file in source directory")
+		os.Exit(1)
+	}
+
+	// Register source version
+	fmt.Printf("Registering source version %s...\n", fromVersion)
+	fromVer, err := versionMgr.RegisterVersion(fromVersion, fromPath, keyFile)
+	if err != nil {
+		fmt.Printf("Error: failed to register source version: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Register target version (should use same key file)
+	fmt.Printf("Registering target version %s...\n", toVersion)
+	toVer, err := versionMgr.RegisterVersion(toVersion, toPath, keyFile)
+	if err != nil {
+		fmt.Printf("Error: failed to register target version: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Generate patch
+	patchFile := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.patch", fromVersion, toVersion))
+	if err := generatePatch(fromVer, toVer, patchFile, compression, level, verify); err != nil {
+		fmt.Printf("Error: failed to generate patch: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Printf("✓ Patch generated successfully: %s\n", patchFile)
+}
+
+// extractVersionFromPath extracts the version number from a directory path
+// Example: "C:\\releases\\1.0.0" -> "1.0.0"
+// Example: "/mnt/versions/v2.1.5" -> "v2.1.5"
+func extractVersionFromPath(path string) string {
+	// Get the directory name (last component of the path)
+	return filepath.Base(path)
+}
+
 func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string, level int, verify bool) error {
 	// Create patch options
 	options := &utils.PatchOptions{
@@ -247,16 +309,25 @@ func printHelp() {
 	fmt.Println("\nUsage:")
 	fmt.Println("  Generate patches from all versions to new version:")
 	fmt.Println("    patch-gen --versions-dir <dir> --new-version <version>")
-	fmt.Println("\n  Generate single patch:")
+	fmt.Println("\n  Generate single patch (versions in same directory):")
 	fmt.Println("    patch-gen --versions-dir <dir> --from <version> --to <version>")
+	fmt.Println("\n  Generate single patch (custom paths, different drives/locations):")
+	fmt.Println("    patch-gen --from-dir <path> --to-dir <path>")
 	fmt.Println("\nOptions:")
 	fmt.Println("  --versions-dir    Directory containing version folders")
 	fmt.Println("  --new-version     New version number to generate patches for")
-	fmt.Println("  --from            Source version number")
-	fmt.Println("  --to              Target version number")
+	fmt.Println("  --from            Source version number (with --versions-dir)")
+	fmt.Println("  --to              Target version number (with --versions-dir)")
+	fmt.Println("  --from-dir        Full path to source version directory")
+	fmt.Println("  --to-dir          Full path to target version directory")
 	fmt.Println("  --output          Output directory for patches (default: patches)")
 	fmt.Println("  --compression     Compression algorithm: zstd, gzip, none (default: zstd)")
 	fmt.Println("  --level           Compression level (default: 3)")
 	fmt.Println("  --verify          Verify patches after creation (default: true)")
 	fmt.Println("  --help            Show this help message")
+	fmt.Println("\nExamples:")
+	fmt.Println("  # Versions on different drives")
+	fmt.Println("  patch-gen --from-dir C:\\releases\\1.0.0 --to-dir D:\\builds\\1.0.1 --output patches")
+	fmt.Println("\n  # Versions on different network locations")
+	fmt.Println("  patch-gen --from-dir \\\\server1\\app\\v1 --to-dir \\\\server2\\app\\v2 --output .")
 }

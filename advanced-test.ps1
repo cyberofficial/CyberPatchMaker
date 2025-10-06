@@ -962,6 +962,291 @@ Test-Step "Verify patch generation performance" {
     }
 }
 
+# Test 28: Custom Paths Mode - Different Directories (Same Drive)
+Test-Step "Test custom paths mode with different directories" {
+    Write-Host "  Testing custom paths mode (--from-dir and --to-dir)..." -ForegroundColor Gray
+    
+    # Create separate directory locations
+    New-Item -ItemType Directory -Force -Path "testdata/custom-paths/release-1.0.0" | Out-Null
+    New-Item -ItemType Directory -Force -Path "testdata/custom-paths/build-1.0.1" | Out-Null
+    New-Item -ItemType Directory -Force -Path "testdata/custom-paths/patches" | Out-Null
+    
+    # Copy versions to different paths
+    Get-ChildItem -Path "testdata/versions/1.0.0" -Recurse | Copy-Item -Destination {
+        $dest = Join-Path "testdata/custom-paths/release-1.0.0" $_.FullName.Substring((Resolve-Path "testdata/versions/1.0.0").Path.Length)
+        $destDir = Split-Path $dest
+        if (-not (Test-Path $destDir)) { New-Item -Path $destDir -ItemType Directory -Force | Out-Null }
+        $dest
+    } -Force
+    
+    Get-ChildItem -Path "testdata/versions/1.0.1" -Recurse | Copy-Item -Destination {
+        $dest = Join-Path "testdata/custom-paths/build-1.0.1" $_.FullName.Substring((Resolve-Path "testdata/versions/1.0.1").Path.Length)
+        $destDir = Split-Path $dest
+        if (-not (Test-Path $destDir)) { New-Item -Path $destDir -ItemType Directory -Force | Out-Null }
+        $dest
+    } -Force
+    
+    Write-Host "  Command: generator.exe --from-dir .\testdata\custom-paths\release-1.0.0 --to-dir .\testdata\custom-paths\build-1.0.1 --output .\testdata\custom-paths\patches" -ForegroundColor Cyan
+    $output = .\generator.exe --from-dir .\testdata\custom-paths\release-1.0.0 --to-dir .\testdata\custom-paths\build-1.0.1 --output .\testdata\custom-paths\patches 2>&1
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Custom paths patch generation failed with exit code $LASTEXITCODE"
+    }
+    
+    # Verify patch was created with correct naming (uses directory names as versions)
+    if (-not (Test-Path "testdata/custom-paths/patches/release-1.0.0-to-build-1.0.1.patch")) {
+        throw "Custom paths patch file not created with expected name"
+    }
+    
+    $patchSize = (Get-Item "testdata/custom-paths/patches/release-1.0.0-to-build-1.0.1.patch").Length
+    Write-Host "  Custom paths patch generated: $patchSize bytes" -ForegroundColor Gray
+    Write-Host "  Patch name: release-1.0.0-to-build-1.0.1.patch" -ForegroundColor Gray
+}
+
+# Test 29: Apply Custom Paths Patch
+Test-Step "Apply patch generated with custom paths mode" {
+    Write-Host "  Applying custom paths patch..." -ForegroundColor Gray
+    
+    # Copy source version to apply-test directory
+    New-Item -Path "testdata/custom-paths/apply-test" -ItemType Directory -Force | Out-Null
+    Get-ChildItem -Path "testdata/custom-paths/release-1.0.0" -Recurse | Copy-Item -Destination {
+        $dest = Join-Path "testdata/custom-paths/apply-test" $_.FullName.Substring((Resolve-Path "testdata/custom-paths/release-1.0.0").Path.Length)
+        $destDir = Split-Path $dest
+        if (-not (Test-Path $destDir)) { New-Item -Path $destDir -ItemType Directory -Force | Out-Null }
+        $dest
+    } -Force
+    
+    Write-Host "  Command: applier.exe --patch .\testdata\custom-paths\patches\release-1.0.0-to-build-1.0.1.patch --current-dir .\testdata\custom-paths\apply-test --verify" -ForegroundColor Cyan
+    $output = .\applier.exe --patch .\testdata\custom-paths\patches\release-1.0.0-to-build-1.0.1.patch --current-dir .\testdata\custom-paths\apply-test --verify 2>&1
+    
+    if ($LASTEXITCODE -ne 0) {
+        $outputStr = $output -join "`n"
+        throw "Custom paths patch application failed: $outputStr"
+    }
+    
+    # Verify result matches expected version
+    $diff = Compare-Object (Get-Content "testdata/custom-paths/apply-test/program.exe") (Get-Content "testdata/versions/1.0.1/program.exe")
+    if ($diff) {
+        throw "Applied version does not match expected version 1.0.1"
+    }
+    
+    Write-Host "  Custom paths patch applied successfully" -ForegroundColor Gray
+}
+
+# Test 30: Custom Paths with Complex Nested Structure
+Test-Step "Test custom paths with complex nested directories" {
+    Write-Host "  Testing custom paths with complex structure (1.0.1 → 1.0.2)..." -ForegroundColor Gray
+    
+    # Create complex structure in different locations
+    New-Item -ItemType Directory -Force -Path "testdata/custom-paths/app-v101" | Out-Null
+    New-Item -ItemType Directory -Force -Path "testdata/custom-paths/app-v102" | Out-Null
+    
+    Get-ChildItem -Path "testdata/versions/1.0.1" -Recurse | Copy-Item -Destination {
+        $dest = Join-Path "testdata/custom-paths/app-v101" $_.FullName.Substring((Resolve-Path "testdata/versions/1.0.1").Path.Length)
+        $destDir = Split-Path $dest
+        if (-not (Test-Path $destDir)) { New-Item -Path $destDir -ItemType Directory -Force | Out-Null }
+        $dest
+    } -Force
+    
+    Get-ChildItem -Path "testdata/versions/1.0.2" -Recurse | Copy-Item -Destination {
+        $dest = Join-Path "testdata/custom-paths/app-v102" $_.FullName.Substring((Resolve-Path "testdata/versions/1.0.2").Path.Length)
+        $destDir = Split-Path $dest
+        if (-not (Test-Path $destDir)) { New-Item -Path $destDir -ItemType Directory -Force | Out-Null }
+        $dest
+    } -Force
+    
+    Write-Host "  Command: generator.exe --from-dir .\testdata\custom-paths\app-v101 --to-dir .\testdata\custom-paths\app-v102 --output .\testdata\custom-paths\patches --compression zstd" -ForegroundColor Cyan
+    $output = .\generator.exe --from-dir .\testdata\custom-paths\app-v101 --to-dir .\testdata\custom-paths\app-v102 --output .\testdata\custom-paths\patches --compression zstd 2>&1
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Complex custom paths patch generation failed"
+    }
+    
+    if (-not (Test-Path "testdata/custom-paths/patches/app-v101-to-app-v102.patch")) {
+        throw "Complex patch file not created"
+    }
+    
+    $patchSize = (Get-Item "testdata/custom-paths/patches/app-v101-to-app-v102.patch").Length
+    Write-Host "  Complex custom paths patch: $patchSize bytes" -ForegroundColor Gray
+    
+    # Apply the complex patch
+    New-Item -Path "testdata/custom-paths/complex-apply" -ItemType Directory -Force | Out-Null
+    Get-ChildItem -Path "testdata/custom-paths/app-v101" -Recurse | Copy-Item -Destination {
+        $dest = Join-Path "testdata/custom-paths/complex-apply" $_.FullName.Substring((Resolve-Path "testdata/custom-paths/app-v101").Path.Length)
+        $destDir = Split-Path $dest
+        if (-not (Test-Path $destDir)) { New-Item -Path $destDir -ItemType Directory -Force | Out-Null }
+        $dest
+    } -Force
+    
+    Write-Host "  Command: applier.exe --patch .\testdata\custom-paths\patches\app-v101-to-app-v102.patch --current-dir .\testdata\custom-paths\complex-apply --verify" -ForegroundColor Cyan
+    $output = .\applier.exe --patch .\testdata\custom-paths\patches\app-v101-to-app-v102.patch --current-dir .\testdata\custom-paths\complex-apply --verify 2>&1
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Complex patch application failed"
+    }
+    
+    # Verify nested directories were created
+    if (-not (Test-Path "testdata/custom-paths/complex-apply/data/assets/images")) {
+        throw "Nested directories not created with custom paths"
+    }
+    
+    if (-not (Test-Path "testdata/custom-paths/complex-apply/plugins/sample.json")) {
+        throw "New files in deep paths not added"
+    }
+    
+    Write-Host "  Complex custom paths patch verified" -ForegroundColor Gray
+}
+
+# Test 31: Custom Paths - Version Number Extraction
+Test-Step "Verify version number extraction from directory names" {
+    Write-Host "  Testing version extraction from various path formats..." -ForegroundColor Gray
+    
+    # Test Case A: Simple version numbers
+    New-Item -ItemType Directory -Force -Path "testdata/custom-paths/1.0.0" | Out-Null
+    New-Item -ItemType Directory -Force -Path "testdata/custom-paths/1.0.1" | Out-Null
+    
+    Get-ChildItem -Path "testdata/versions/1.0.0" -Recurse | Copy-Item -Destination {
+        $dest = Join-Path "testdata/custom-paths/1.0.0" $_.FullName.Substring((Resolve-Path "testdata/versions/1.0.0").Path.Length)
+        $destDir = Split-Path $dest
+        if (-not (Test-Path $destDir)) { New-Item -Path $destDir -ItemType Directory -Force | Out-Null }
+        $dest
+    } -Force
+    
+    Get-ChildItem -Path "testdata/versions/1.0.1" -Recurse | Copy-Item -Destination {
+        $dest = Join-Path "testdata/custom-paths/1.0.1" $_.FullName.Substring((Resolve-Path "testdata/versions/1.0.1").Path.Length)
+        $destDir = Split-Path $dest
+        if (-not (Test-Path $destDir)) { New-Item -Path $destDir -ItemType Directory -Force | Out-Null }
+        $dest
+    } -Force
+    
+    Write-Host "  Case A: Simple version numbers (1.0.0, 1.0.1)..." -ForegroundColor Gray
+    Write-Host "  Command: generator.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches" -ForegroundColor Cyan
+    $output = .\generator.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches 2>&1
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Version extraction failed for simple numbers"
+    }
+    
+    if (-not (Test-Path "testdata/custom-paths/patches/1.0.0-to-1.0.1.patch")) {
+        throw "Patch name incorrect for simple version numbers"
+    }
+    Write-Host "  ✓ Simple version numbers extracted correctly" -ForegroundColor Green
+    
+    # Test Case B: Prefixed version numbers
+    New-Item -ItemType Directory -Force -Path "testdata/custom-paths/v1.0.0" | Out-Null
+    New-Item -ItemType Directory -Force -Path "testdata/custom-paths/v1.0.1" | Out-Null
+    
+    Get-ChildItem -Path "testdata/versions/1.0.0" -Recurse | Copy-Item -Destination {
+        $dest = Join-Path "testdata/custom-paths/v1.0.0" $_.FullName.Substring((Resolve-Path "testdata/versions/1.0.0").Path.Length)
+        $destDir = Split-Path $dest
+        if (-not (Test-Path $destDir)) { New-Item -Path $destDir -ItemType Directory -Force | Out-Null }
+        $dest
+    } -Force
+    
+    Get-ChildItem -Path "testdata/versions/1.0.1" -Recurse | Copy-Item -Destination {
+        $dest = Join-Path "testdata/custom-paths/v1.0.1" $_.FullName.Substring((Resolve-Path "testdata/versions/1.0.1").Path.Length)
+        $destDir = Split-Path $dest
+        if (-not (Test-Path $destDir)) { New-Item -Path $destDir -ItemType Directory -Force | Out-Null }
+        $dest
+    } -Force
+    
+    Write-Host "  Case B: Prefixed version numbers (v1.0.0, v1.0.1)..." -ForegroundColor Gray
+    Write-Host "  Command: generator.exe --from-dir .\testdata\custom-paths\v1.0.0 --to-dir .\testdata\custom-paths\v1.0.1 --output .\testdata\custom-paths\patches" -ForegroundColor Cyan
+    $output = .\generator.exe --from-dir .\testdata\custom-paths\v1.0.0 --to-dir .\testdata\custom-paths\v1.0.1 --output .\testdata\custom-paths\patches 2>&1
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Version extraction failed for prefixed versions"
+    }
+    
+    if (-not (Test-Path "testdata/custom-paths/patches/v1.0.0-to-v1.0.1.patch")) {
+        throw "Patch name incorrect for prefixed versions"
+    }
+    Write-Host "  ✓ Prefixed version numbers extracted correctly" -ForegroundColor Green
+    
+    Write-Host "  Version extraction from paths verified" -ForegroundColor Gray
+}
+
+# Test 32: Custom Paths - Compression Options
+Test-Step "Test compression options with custom paths" {
+    Write-Host "  Testing all compression methods with custom paths..." -ForegroundColor Gray
+    
+    # Test zstd
+    Write-Host "  Testing zstd compression..." -ForegroundColor Gray
+    Write-Host "  Command: generator.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches --compression zstd" -ForegroundColor Cyan
+    $output = .\generator.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches --compression zstd 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "Custom paths with zstd failed"
+    }
+    $zstdSize = (Get-Item "testdata/custom-paths/patches/1.0.0-to-1.0.1.patch").Length
+    Write-Host "  ✓ zstd: $zstdSize bytes" -ForegroundColor Green
+    
+    # Test gzip
+    Write-Host "  Testing gzip compression..." -ForegroundColor Gray
+    Write-Host "  Command: generator.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches-gzip --compression gzip" -ForegroundColor Cyan
+    New-Item -ItemType Directory -Force -Path "testdata/custom-paths/patches-gzip" | Out-Null
+    $output = .\generator.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches-gzip --compression gzip 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "Custom paths with gzip failed"
+    }
+    $gzipSize = (Get-Item "testdata/custom-paths/patches-gzip/1.0.0-to-1.0.1.patch").Length
+    Write-Host "  ✓ gzip: $gzipSize bytes" -ForegroundColor Green
+    
+    # Test none
+    Write-Host "  Testing no compression..." -ForegroundColor Gray
+    Write-Host "  Command: generator.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches-none --compression none" -ForegroundColor Cyan
+    New-Item -ItemType Directory -Force -Path "testdata/custom-paths/patches-none" | Out-Null
+    $output = .\generator.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches-none --compression none 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "Custom paths with no compression failed"
+    }
+    $noneSize = (Get-Item "testdata/custom-paths/patches-none/1.0.0-to-1.0.1.patch").Length
+    Write-Host "  ✓ none: $noneSize bytes" -ForegroundColor Green
+    
+    Write-Host "  All compression methods work with custom paths" -ForegroundColor Gray
+}
+
+# Test 33: Custom Paths - Error Handling (Non-existent Directory)
+Test-Step "Test error handling for non-existent directories" {
+    Write-Host "  Testing error handling with invalid paths..." -ForegroundColor Gray
+    
+    # Test non-existent from directory
+    Write-Host "  Testing non-existent from directory..." -ForegroundColor Gray
+    Write-Host "  Command: generator.exe --from-dir .\testdata\custom-paths\does-not-exist --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches" -ForegroundColor Cyan
+    $output = .\generator.exe --from-dir .\testdata\custom-paths\does-not-exist --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches 2>&1
+    
+    if ($LASTEXITCODE -eq 0) {
+        throw "Generator should have failed for non-existent from directory"
+    }
+    
+    $outputStr = $output -join "`n"
+    if ($outputStr -notmatch "does not exist|not found|cannot find") {
+        Write-Host "  Warning: Error message could be clearer" -ForegroundColor Yellow
+    } else {
+        Write-Host "  ✓ Clear error message for missing directory" -ForegroundColor Green
+    }
+    
+    Write-Host "  Error handling for invalid paths verified" -ForegroundColor Gray
+}
+
+# Test 34: Backward Compatibility - Legacy Mode Still Works
+Test-Step "Verify backward compatibility with legacy --versions-dir mode" {
+    Write-Host "  Testing that legacy mode still works alongside custom paths..." -ForegroundColor Gray
+    
+    Write-Host "  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\custom-paths\patches" -ForegroundColor Cyan
+    $output = .\generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\custom-paths\patches 2>&1
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Legacy mode broken after custom paths implementation"
+    }
+    
+    if (-not (Test-Path "testdata/custom-paths/patches/1.0.0-to-1.0.1.patch")) {
+        throw "Legacy mode patch not created"
+    }
+    
+    Write-Host "  ✓ Legacy --versions-dir mode still works" -ForegroundColor Green
+    Write-Host "  Backward compatibility verified" -ForegroundColor Gray
+}
+
 # Final summary
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
@@ -989,6 +1274,12 @@ if ($failed -eq 0) {
     Write-Host "  • Manual rollback from backup" -ForegroundColor Gray
     Write-Host "  • Backup with complex nested paths" -ForegroundColor Gray
     Write-Host "  • Deep file path operations" -ForegroundColor Gray
+    Write-Host "  • Custom paths mode (--from-dir, --to-dir)" -ForegroundColor Gray
+    Write-Host "  • Version extraction from directory names" -ForegroundColor Gray
+    Write-Host "  • Custom paths with complex nested structures" -ForegroundColor Gray
+    Write-Host "  • All compression formats with custom paths" -ForegroundColor Gray
+    Write-Host "  • Error handling for invalid custom paths" -ForegroundColor Gray
+    Write-Host "  • Backward compatibility with legacy mode" -ForegroundColor Gray
     Write-Host ""
     Write-Host "CyberPatchMaker advanced functionality verified!" -ForegroundColor Green
     
