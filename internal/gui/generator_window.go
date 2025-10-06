@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"image/color"
+	"io/fs"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"fyne.io/fyne/v2"
@@ -38,7 +40,6 @@ type GeneratorWindow struct {
 	compression      string
 	compressionLevel int
 	verifyAfter      bool
-	diffThresholdKB  int
 	skipIdentical    bool
 	batchMode        bool
 	fromKeyFile      string
@@ -57,7 +58,6 @@ type GeneratorWindow struct {
 	compressionSlider  *widget.Slider
 	compressionLabel   *widget.Label
 	verifyCheck        *widget.Check
-	diffThresholdEntry *widget.Entry
 	skipIdenticalCheck *widget.Check
 	batchModeCheck     *widget.Check
 	generateBtn        *widget.Button
@@ -75,7 +75,6 @@ func NewGeneratorWindow() *GeneratorWindow {
 		compression:      "zstd",
 		compressionLevel: 3,
 		verifyAfter:      true,
-		diffThresholdKB:  1,
 		skipIdentical:    true,
 		batchMode:        false,
 		fromKeyFile:      "program.exe",
@@ -317,16 +316,6 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	})
 	gw.skipIdenticalCheck.SetChecked(true)
 
-	gw.diffThresholdEntry = widget.NewEntry()
-	gw.diffThresholdEntry.SetText("1")
-	gw.diffThresholdEntry.OnChanged = func(text string) {
-		var threshold int
-		fmt.Sscanf(text, "%d", &threshold)
-		if threshold > 0 {
-			gw.diffThresholdKB = threshold
-		}
-	}
-
 	// Right column: Options
 	rightColumn := container.NewVBox(
 		widget.NewLabel("Compression:"),
@@ -335,7 +324,6 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		widget.NewLabel("Options:"),
 		gw.verifyCheck,
 		gw.skipIdenticalCheck,
-		container.NewBorder(nil, nil, widget.NewLabel("Diff Threshold (KB):"), nil, gw.diffThresholdEntry),
 	)
 
 	// Create two-column layout for version/options
@@ -537,15 +525,10 @@ func (gw *GeneratorWindow) updateFromKeyFileOptions() {
 	gw.fromKeyFileSelect.Options = files
 	gw.fromKeyFileSelect.Refresh()
 
-	// Auto-select if only one executable found
-	if len(files) > 0 {
-		for _, file := range files {
-			if strings.HasSuffix(strings.ToLower(file), ".exe") {
-				gw.fromKeyFileSelect.SetSelected(file)
-				gw.fromKeyFile = file
-				break
-			}
-		}
+	// Auto-select if only one file found (works with any file type)
+	if len(files) == 1 {
+		gw.fromKeyFileSelect.SetSelected(files[0])
+		gw.fromKeyFile = files[0]
 	}
 }
 
@@ -560,15 +543,10 @@ func (gw *GeneratorWindow) updateToKeyFileOptions() {
 	gw.toKeyFileSelect.Options = files
 	gw.toKeyFileSelect.Refresh()
 
-	// Auto-select if only one executable found
-	if len(files) > 0 {
-		for _, file := range files {
-			if strings.HasSuffix(strings.ToLower(file), ".exe") {
-				gw.toKeyFileSelect.SetSelected(file)
-				gw.toKeyFile = file
-				break
-			}
-		}
+	// Auto-select if only one file found (works with any file type)
+	if len(files) == 1 {
+		gw.toKeyFileSelect.SetSelected(files[0])
+		gw.toKeyFile = files[0]
 	}
 }
 
@@ -587,15 +565,10 @@ func (gw *GeneratorWindow) updateFromKeyFileOptionsCustom() {
 	gw.fromKeyFileSelect.Options = files
 	gw.fromKeyFileSelect.Refresh()
 
-	// Auto-select if only one executable found
-	if len(files) > 0 {
-		for _, file := range files {
-			if strings.HasSuffix(strings.ToLower(file), ".exe") {
-				gw.fromKeyFileSelect.SetSelected(file)
-				gw.fromKeyFile = file
-				break
-			}
-		}
+	// Auto-select if only one file found (works with any file type)
+	if len(files) == 1 {
+		gw.fromKeyFileSelect.SetSelected(files[0])
+		gw.fromKeyFile = files[0]
 	}
 }
 
@@ -614,32 +587,50 @@ func (gw *GeneratorWindow) updateToKeyFileOptionsCustom() {
 	gw.toKeyFileSelect.Options = files
 	gw.toKeyFileSelect.Refresh()
 
-	// Auto-select if only one executable found
-	if len(files) > 0 {
-		for _, file := range files {
-			if strings.HasSuffix(strings.ToLower(file), ".exe") {
-				gw.toKeyFileSelect.SetSelected(file)
-				gw.toKeyFile = file
-				break
-			}
-		}
+	// Auto-select if only one file found (works with any file type)
+	if len(files) == 1 {
+		gw.toKeyFileSelect.SetSelected(files[0])
+		gw.toKeyFile = files[0]
 	}
 }
 
-// getFilesInDirectory returns a list of all files in the directory (not recursive)
+// getFilesInDirectory returns a list of all files in the directory tree (recursive)
+// Returns relative paths from the root directory (e.g., "cmd/applier/main.go")
 func (gw *GeneratorWindow) getFilesInDirectory(dirPath string) []string {
 	files := []string{}
 
-	entries, err := os.ReadDir(dirPath)
+	err := filepath.WalkDir(dirPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			// Skip directories/files that cause errors but continue walking
+			return nil
+		}
+
+		// Skip directories, only include files
+		if d.IsDir() {
+			return nil
+		}
+
+		// Calculate relative path from root
+		relPath, err := filepath.Rel(dirPath, path)
+		if err != nil {
+			// If we can't get relative path, skip this file
+			return nil
+		}
+
+		// Normalize path separators to forward slashes for consistency
+		relPath = filepath.ToSlash(relPath)
+
+		files = append(files, relPath)
+		return nil
+	})
+
 	if err != nil {
-		return files
+		// If walk fails completely, return empty slice
+		return []string{}
 	}
 
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			files = append(files, entry.Name())
-		}
-	}
+	// Sort files alphabetically for better UX
+	sort.Strings(files)
 
 	return files
 }
@@ -767,7 +758,6 @@ func (gw *GeneratorWindow) generatePatch() {
 		Compression:      compressionStr,
 		CompressionLevel: gw.compressionLevel,
 		VerifyAfter:      gw.verifyAfter,
-		DiffThresholdKB:  gw.diffThresholdKB,
 		SkipIdentical:    gw.skipIdentical,
 	}
 
@@ -919,7 +909,6 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 			Compression:      compressionStr,
 			CompressionLevel: gw.compressionLevel,
 			VerifyAfter:      gw.verifyAfter,
-			DiffThresholdKB:  gw.diffThresholdKB,
 			SkipIdentical:    gw.skipIdentical,
 		}
 

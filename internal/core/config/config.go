@@ -103,10 +103,6 @@ func (m *Manager) UpdateConfig(updates map[string]interface{}) error {
 			if v, ok := value.(bool); ok {
 				m.config.EnableParallel = v
 			}
-		case "diff_threshold_kb":
-			if v, ok := value.(int); ok {
-				m.config.DiffThresholdKB = v
-			}
 		case "skip_identical":
 			if v, ok := value.(bool); ok {
 				m.config.SkipIdentical = v
@@ -176,7 +172,6 @@ func getDefaultConfig() *utils.Config {
 		TempDirectory:      tempDir,
 		WorkerThreads:      runtime.NumCPU(),
 		EnableParallel:     true,
-		DiffThresholdKB:    1,
 		SkipIdentical:      true,
 		PreservePerms:      true,
 		VerifySignatures:   false,
@@ -188,10 +183,6 @@ func getDefaultConfig() *utils.Config {
 func (m *Manager) ValidateConfig() error {
 	if m.config.WorkerThreads < 1 {
 		return fmt.Errorf("worker_threads must be at least 1")
-	}
-
-	if m.config.DiffThresholdKB < 0 {
-		return fmt.Errorf("diff_threshold_kb must be non-negative")
 	}
 
 	// Validate paths exist or can be created

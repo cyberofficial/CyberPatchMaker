@@ -21,12 +21,13 @@ The Patch Generator GUI provides a user-friendly interface for creating binary p
   - When enabled: Only target version needs to be selected
   - When disabled: Both source and target versions are required
   - Automatically discovers and processes all version folders
-- **Key Files**: Specify the main executable files for version verification
-  - **From Key File**: Key file name in source versions (default: `program.exe`)
-  - **To Key File**: Key file name in target version (default: `program.exe`)
-  - Can be different if executable was renamed between versions
+- **Key Files**: Specify any file for version verification (doesn't have to be executable)
+  - **From Key File**: Key file name in source versions (e.g., `program.exe`, `main.dll`, `config.ini`)
+  - **To Key File**: Key file name in target version (e.g., `program.exe`, `main.dll`, `config.ini`)
+  - Can be different if the key file was renamed between versions
   - Used to verify patch is being applied to correct version
-  - Common examples: `app.exe`, `game.exe`, `program.exe`
+  - Can be any file type: executables (.exe), libraries (.dll), data files, etc.
+  - Common examples: `app.exe`, `game.exe`, `core.dll`, `launcher.bin`
 - **From Version**: Select the source version to patch from (disabled in batch mode)
 - **To Version**: Select the target version to patch to
 
@@ -51,30 +52,27 @@ The Patch Generator GUI provides a user-friendly interface for creating binary p
   - Improves performance by avoiding unnecessary diffs
   - Reduces patch size for files that haven't changed
   - Default: Enabled
-- **Diff Threshold (KB)**: Minimum file size for binary diff generation
-  - Files smaller than this are included as full files
-  - Default: 1 KB
-  - Increase for faster generation of small file changes
 
 #### Patch Generation
 
 **Normal Mode (Single Patch):**
 1. Select your versions directory (containing subdirectories like `1.0.0`, `1.0.1`, etc.)
 2. Ensure "Batch Mode" is **unchecked**
-3. Enter the key file names for source and target versions (e.g., `program.exe`)
-4. Choose source version from the "From Version" dropdown
+3. Choose source version from the "From Version" dropdown
+4. Select the key file for source version (can be any file: .exe, .dll, .bin, etc.)
 5. Choose target version from the "To Version" dropdown
+6. Select the key file for target version (can be any file type)
 6. Select output directory for the patch file
 7. Choose compression method and level
-8. Configure advanced options (verify, skip identical, diff threshold)
+8. Configure advanced options (verify, skip identical)
 9. Click "Generate Patch"
 10. Monitor progress in the log output
 
 **Batch Mode (Multiple Patches):**
 1. Select your versions directory (containing subdirectories like `1.0.0`, `1.0.1`, etc.)
 2. **Check** the "Batch Mode" checkbox
-3. Enter the key file names (From Key File will be used for all source versions)
-4. Choose only the target version from "To Version" dropdown
+3. Choose only the target version from "To Version" dropdown
+4. Select key files (From Key File will be used for all source versions, can be any file type)
 5. Select output directory for patch files
 6. Choose compression method and level
 7. Configure advanced options
@@ -111,7 +109,7 @@ Steps:
 6. To Version: 1.0.2
 7. Output Directory: E:\MyApp\patches
 8. Compression: zstd, Level: 3
-9. Advanced Options: All defaults (verify ✓, skip identical ✓, threshold: 1)
+9. Advanced Options: All defaults (verify ✓, skip identical ✓)
 10. Click "Generate Patch"
 
 Result: E:\MyApp\patches\1.0.0-to-1.0.2.patch
@@ -149,7 +147,8 @@ The key file is critical for patch safety:
 - **Must be at the same relative path** in both versions
 - Used to verify patch is applied to correct version
 - Prevents applying wrong patches to wrong applications
-- Typically the main executable (`.exe`, `.bin`, etc.)
+- **Can be any file type**: executables (`.exe`, `.bin`), libraries (`.dll`, `.so`), data files (`.dat`, `.ini`), etc.
+- Just needs to be a stable identifier file that exists in all versions
 
 ### Log Output
 
@@ -180,7 +179,6 @@ The log area shows detailed information:
 7. **Advanced options**:
    - Keep "Verify" enabled for production patches (catches errors early)
    - "Skip identical" improves performance (recommended)
-   - Adjust diff threshold for small vs large file updates
 8. **Batch mode benefits**:
    - Generate all upgrade paths at once
    - Consistent compression settings across all patches

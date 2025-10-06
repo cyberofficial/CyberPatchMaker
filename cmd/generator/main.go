@@ -258,7 +258,6 @@ func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string
 		Compression:      compression,
 		CompressionLevel: level,
 		VerifyAfter:      verify,
-		DiffThresholdKB:  1,
 		SkipIdentical:    true,
 	}
 

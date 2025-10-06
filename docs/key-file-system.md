@@ -32,11 +32,12 @@ Key files solve these problems by using a designated executable's SHA-256 hash a
 
 ### What is a Key File?
 
-A **key file** is a designated executable file (typically the main program) that serves as the version's fingerprint. Properties:
+A **key file** is any designated file (typically the main program or a critical component) that serves as the version's fingerprint. Properties:
 
-- **Path**: Relative path from version root (e.g., `program.exe`, `bin/app.exe`)
+- **Path**: Relative path from version root (e.g., `program.exe`, `bin/app.exe`, `core.dll`, `data.bin`)
 - **Checksum**: SHA-256 hash of the file's binary content
 - **Size**: File size in bytes (secondary verification)
+- **File Type**: Can be any file type - executables, libraries, data files, configuration files, etc.
 
 ### Version Identification
 
@@ -54,31 +55,31 @@ Even if the filename is identical (`program.exe`), the **hash uniquely identifie
 
 ## Key File Detection Algorithm
 
-### Automatic Detection Process
+### Manual Selection Process
 
-When registering a new version, CyberPatchMaker automatically detects the key file using this 5-step algorithm:
+In the GUI, when registering a version or generating patches, you manually select the key file:
 
-#### Step 1: Scan for Executables
-
-```
-Recursively scan version directory for executable files:
-- Windows: *.exe, *.com, *.bat
-- macOS: Files with +x permission, *.app bundles
-- Linux: Files with +x permission, ELF binaries
-```
-
-#### Step 2: Filter by Location
+#### File Selection
 
 ```
-Prioritize executables by location:
-1. Root directory executables (highest priority)
-2. bin/ directory executables
-3. Executables in other directories (lower priority)
+The GUI displays all files in the version directory:
+- All file types are shown (not just executables)
+- Files listed from root directory (non-recursive for key file selection)
+- You can choose any file: .exe, .dll, .so, .bin, .dat, .ini, etc.
 ```
 
-**Rationale**: Main program is typically at root or in `bin/`
+#### Auto-Selection Logic
 
-#### Step 3: Apply Naming Priority
+```
+If only one file exists in the directory:
+- That file is automatically selected as the key file
+- Works with any file type
+- Saves time for simple version structures
+```
+
+**Rationale**: Key file should be a stable identifier that exists across all versions
+
+#### Best Practices for Key File Selection
 
 ```
 Priority order (case-insensitive):
