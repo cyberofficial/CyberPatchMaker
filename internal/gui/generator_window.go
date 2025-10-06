@@ -281,15 +281,16 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	gw.compressionRadio = widget.NewRadioGroup([]string{"zstd", "gzip", "none"}, func(selected string) {
 		gw.compression = selected
 		// Update slider range based on compression type
-		if selected == "zstd" {
+		switch selected {
+		case "zstd":
 			gw.compressionSlider.Max = 4
 			if gw.compressionLevel > 4 {
 				gw.compressionLevel = 3
 				gw.compressionSlider.Value = 3
 			}
-		} else if selected == "gzip" {
+		case "gzip":
 			gw.compressionSlider.Max = 9
-		} else {
+		case "none":
 			gw.compressionSlider.Disable()
 			return
 		}
