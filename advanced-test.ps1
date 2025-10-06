@@ -1709,6 +1709,138 @@ Test-Step "Verify backup.cyberpatcher directories are excluded" {
     Write-Host "    • Prevents infinite loops and patch bloat" -ForegroundColor Gray
 }
 
+# Test 41: .cyberignore File Support
+Test-Step "Verify .cyberignore file pattern matching" {
+    Write-Host "  Testing .cyberignore file functionality..." -ForegroundColor Gray
+    
+    # Create test structure with various file types
+    $testBasePath = "testdata/advanced-output/cyberignore-test"
+    
+    # Version 1.0.0 with .cyberignore file
+    $v1Path = "$testBasePath/1.0.0"
+    New-Item -ItemType Directory -Force -Path "$v1Path/config" | Out-Null
+    New-Item -ItemType Directory -Force -Path "$v1Path/logs" | Out-Null
+    New-Item -ItemType Directory -Force -Path "$v1Path/temp" | Out-Null
+    
+    # Create .cyberignore file
+    $ignoreContent = @"
+:: Test ignore patterns
+:: This is a comment
+
+:: Ignore sensitive files
+*.key
+*.secret
+
+:: Ignore logs
+*.log
+logs/
+
+:: Ignore temporary files
+*.tmp
+temp/
+
+:: Ignore specific config
+config/secrets.json
+"@
+    Set-Content -Path "$v1Path/.cyberignore" -Value $ignoreContent
+    
+    # Create various test files
+    Set-Content -Path "$v1Path/app.exe" -Value "Application v1.0.0"
+    Set-Content -Path "$v1Path/data.txt" -Value "Data v1.0.0"
+    Set-Content -Path "$v1Path/api.key" -Value "SECRET_KEY_12345"
+    Set-Content -Path "$v1Path/password.secret" -Value "PASSWORD_SECRET"
+    Set-Content -Path "$v1Path/debug.log" -Value "Debug log content"
+    Set-Content -Path "$v1Path/cache.tmp" -Value "Temp cache"
+    Set-Content -Path "$v1Path/config/settings.json" -Value '{"setting":"value"}'
+    Set-Content -Path "$v1Path/config/secrets.json" -Value '{"api_key":"secret"}'
+    Set-Content -Path "$v1Path/logs/app.log" -Value "Application log"
+    Set-Content -Path "$v1Path/logs/error.log" -Value "Error log"
+    Set-Content -Path "$v1Path/temp/data.tmp" -Value "Temp data"
+    
+    Write-Host "  Created test structure with 11 files + .cyberignore" -ForegroundColor Gray
+    Write-Host "    Files that SHOULD be scanned: app.exe, data.txt, config/settings.json (3 files)" -ForegroundColor Gray
+    Write-Host "    Files that SHOULD be ignored: 8 files (.cyberignore, *.key, *.secret, *.log, *.tmp, logs/, temp/, config/secrets.json)" -ForegroundColor Gray
+    
+    # Version 1.0.1 - same structure with changes
+    $v2Path = "$testBasePath/1.0.1"
+    Copy-Item -Path "$v1Path" -Destination "$v2Path" -Recurse -Force
+    Set-Content -Path "$v2Path/app.exe" -Value "Application v1.0.1 UPDATED"
+    Set-Content -Path "$v2Path/data.txt" -Value "Data v1.0.1 UPDATED"
+    
+    # Generate patch (should only scan 3 files)
+    Write-Host "  Generating patch with .cyberignore active..." -ForegroundColor Gray
+    
+    $output = & .\patch-gen.exe --from-dir "$v1Path" --to-dir "$v2Path" `
+        --output "$testBasePath/patches" --compression none 2>&1 | Out-String
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Patch generation failed: $output"
+    }
+    
+    Write-Host "  Patch generation output:" -ForegroundColor Gray
+    Write-Host "$output" -ForegroundColor DarkGray
+    
+    # Verify only 3 files were scanned
+    if ($output -match "Version 1\.0\.0 registered:\s+(\d+)\s+files") {
+        $filesScanned = [int]$matches[1]
+        
+        if ($filesScanned -eq 3) {
+            Write-Host "  ✓ Correctly scanned 3 files (8 files + .cyberignore ignored)" -ForegroundColor Green
+        } else {
+            throw "Expected 3 files scanned, got $filesScanned (ignore patterns not working?)"
+        }
+    } else {
+        throw "Could not parse scan output"
+    }
+    
+    # Verify ignored patterns are not in output
+    $ignoredPatterns = @("api.key", "password.secret", "debug.log", "cache.tmp", "secrets.json", "logs/app.log")
+    $foundIgnored = @()
+    
+    foreach ($pattern in $ignoredPatterns) {
+        if ($output -match [regex]::Escape($pattern)) {
+            $foundIgnored += $pattern
+        }
+    }
+    
+    if ($foundIgnored.Count -eq 0) {
+        Write-Host "  ✓ No ignored files referenced in patch output" -ForegroundColor Green
+    } else {
+        throw "Found ignored files in output: $($foundIgnored -join ', ')"
+    }
+    
+    # Verify specific patterns
+    Write-Host "  Verifying pattern types..." -ForegroundColor Gray
+    
+    # Test wildcard pattern (*.key)
+    if ($output -notmatch "api\.key") {
+        Write-Host "    ✓ Wildcard pattern (*.key) working" -ForegroundColor Gray
+    } else {
+        throw "Wildcard pattern (*.key) failed"
+    }
+    
+    # Test directory pattern (logs/)
+    if ($output -notmatch "logs/") {
+        Write-Host "    ✓ Directory pattern (logs/) working" -ForegroundColor Gray
+    } else {
+        throw "Directory pattern (logs/) failed"
+    }
+    
+    # Test exact path (config/secrets.json) - should be ignored, config/settings.json should be present
+    if ($output -notmatch "secrets\.json") {
+        Write-Host "    ✓ Exact path pattern (config/secrets.json) working" -ForegroundColor Gray
+    } else {
+        throw "Exact path pattern failed - secrets.json should be ignored"
+    }
+    
+    Write-Host "  ✓ .cyberignore file functionality verified!" -ForegroundColor Green
+    Write-Host "    • Wildcard patterns (*.ext) working" -ForegroundColor Gray
+    Write-Host "    • Directory patterns (dir/) working" -ForegroundColor Gray
+    Write-Host "    • Exact path patterns working" -ForegroundColor Gray
+    Write-Host "    • Comment lines (::) properly ignored" -ForegroundColor Gray
+    Write-Host "    • .cyberignore itself automatically excluded" -ForegroundColor Gray
+}
+
 # Final summary
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
@@ -1719,7 +1851,7 @@ Write-Host "Failed: $failed" -ForegroundColor Red
 Write-Host ""
 
 if ($failed -eq 0) {
-    $totalTests = if ($1gbtest) { 41 } else { 40 }
+    $totalTests = if ($1gbtest) { 42 } else { 41 }
     Write-Host "✓ All $totalTests advanced tests passed!" -ForegroundColor Green
     Write-Host ""
     Write-Host "Advanced Features Verified:" -ForegroundColor Cyan
@@ -1749,6 +1881,7 @@ if ($failed -eq 0) {
     Write-Host "  • Batch mode with executable creation" -ForegroundColor Gray
     Write-Host "  • CLI applier verification (not GUI)" -ForegroundColor Gray
     Write-Host "  • Backup directory exclusion (backup.cyberpatcher ignored)" -ForegroundColor Gray
+    Write-Host "  • .cyberignore file support (wildcard, directory, exact path patterns)" -ForegroundColor Gray
     if ($1gbtest) {
         Write-Host "  • 1GB bypass mode with large patches (>1GB)" -ForegroundColor Gray
     }

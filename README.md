@@ -27,7 +27,8 @@ Perfect for:
 ✅ **Cross-Platform** - Works on Windows, macOS, and Linux  
 ✅ **Developer-Friendly** - Simple command-line tools  
 ✅ **Production-Ready** - Built-in backup and recovery systems  
-✨ **Self-Contained Executables** - Create standalone `.exe` files for easy end-user distribution **(New!)**
+✨ **Self-Contained Executables** - Create standalone `.exe` files for easy end-user distribution **(New!)**  
+✨ **Smart File Exclusion** - Use `.cyberignore` to exclude sensitive files and reduce patch size **(New!)**
 
 ## Quick Start
 
@@ -77,6 +78,33 @@ The `--verify` flag ensures everything is checked before and after patching, wit
 - [CLI Reference](docs/cli-reference.md) - Complete command reference
 - [CLI Examples](docs/CLI-EXAMPLES.md) - Common usage patterns
 - [Downgrade Guide](docs/downgrade-guide.md) - Rollback to previous versions
+
+### Excluding Files with .cyberignore ✨ New!
+
+Control which files are included in patches using a `.cyberignore` file (similar to `.gitignore`):
+
+```
+:: Place in your version directory
+:: Lines starting with :: are comments
+
+:: Ignore sensitive files
+*.key
+*.crt
+config/secrets.json
+
+:: Ignore logs and temporary files
+*.log
+*.tmp
+logs/
+
+:: Ignore user data
+saves/
+user_config.json
+```
+
+The generator automatically excludes matching files from patches. Perfect for keeping API keys, certificates, and user data out of updates!
+
+📖 **Complete guide:** [.cyberignore File Guide](docs/cyberignore-guide.md)
 
 ### Downgrade Patches (Rolling Back)
 

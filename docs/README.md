@@ -23,6 +23,8 @@ Welcome to the CyberPatchMaker documentation wiki. This comprehensive guide cove
 - [System Architecture](architecture.md) - Overall system design
 - [Backup System](backup-system.md) - Selective backup and rollback mechanisms
 - [Backup Lifecycle](backup-lifecycle.md) - Detailed backup timing and lifecycle
+- [Backup Directory Exclusion](backup-exclusion.md) - Automatic exclusion safeguard ✨
+- ✨ [.cyberignore File Guide](cyberignore-guide.md) - Exclude files from patches **(New!)**
 
 ### Technical Deep-Dives
 - [Key File System](key-file-system.md) - Automatic key file detection and version identification

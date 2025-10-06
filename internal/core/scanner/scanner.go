@@ -11,13 +11,19 @@ import (
 
 // Scanner handles recursive directory scanning
 type Scanner struct {
-	rootPath string
+	rootPath       string
+	ignorePatterns *IgnorePatterns
 }
 
 // NewScanner creates a new scanner for the given root path
 func NewScanner(rootPath string) *Scanner {
+	ignorePatterns := NewIgnorePatterns()
+	// Try to load .cyberignore file (silently fail if not present)
+	ignorePatterns.LoadFromFile(rootPath)
+
 	return &Scanner{
-		rootPath: rootPath,
+		rootPath:       rootPath,
+		ignorePatterns: ignorePatterns,
 	}
 }
 
@@ -47,6 +53,14 @@ func (s *Scanner) ScanDirectory() ([]utils.FileEntry, []string, error) {
 
 		// Skip backup.cyberpatcher directory and all its contents
 		if relPath == "backup.cyberpatcher" || strings.HasPrefix(relPath, "backup.cyberpatcher/") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Check if path should be ignored based on .cyberignore patterns
+		if s.ignorePatterns.ShouldIgnore(relPath) {
 			if info.IsDir() {
 				return filepath.SkipDir
 			}
@@ -102,6 +116,13 @@ func (s *Scanner) ScanDirectoryWithProgress(progressCallback func(current, total
 			}
 			return nil
 		}
+		// Check .cyberignore patterns
+		if s.ignorePatterns.ShouldIgnore(relPath) {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 		if !info.IsDir() {
 			totalFiles++
 		}
@@ -130,6 +151,14 @@ func (s *Scanner) ScanDirectoryWithProgress(progressCallback func(current, total
 
 		// Skip backup.cyberpatcher directory and all its contents
 		if relPath == "backup.cyberpatcher" || strings.HasPrefix(relPath, "backup.cyberpatcher/") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Check if path should be ignored based on .cyberignore patterns
+		if s.ignorePatterns.ShouldIgnore(relPath) {
 			if info.IsDir() {
 				return filepath.SkipDir
 			}
