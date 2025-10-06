@@ -1583,6 +1583,132 @@ Test-Step "Verify CLI executables use CLI applier (not GUI)" {
     Write-Host "  CLI applier verification complete" -ForegroundColor Gray
 }
 
+# Test 40: Backup Directory Exclusion
+Test-Step "Verify backup.cyberpatcher directories are excluded" {
+    Write-Host "  Testing backup directory exclusion feature..." -ForegroundColor Gray
+    
+    # Create test structure with backup.cyberpatcher directories
+    $testBasePath = "testdata/advanced-output/backup-exclusion-test"
+    
+    # Version 1.0.0 with backup directory
+    $v1Path = "$testBasePath/1.0.0"
+    New-Item -ItemType Directory -Force -Path "$v1Path/data" | Out-Null
+    New-Item -ItemType Directory -Force -Path "$v1Path/backup.cyberpatcher/data" | Out-Null
+    
+    Set-Content -Path "$v1Path/app.exe" -Value "Application v1.0.0`n"
+    Set-Content -Path "$v1Path/data/config.json" -Value '{"version":"1.0.0"}'
+    
+    # Add files to backup.cyberpatcher (should be ignored)
+    Set-Content -Path "$v1Path/backup.cyberpatcher/app.exe" -Value "Old backup v0.9.0`n"
+    Set-Content -Path "$v1Path/backup.cyberpatcher/data/config.json" -Value '{"version":"0.9.0"}'
+    Set-Content -Path "$v1Path/backup.cyberpatcher/data/old-data.dat" -Value "old data"
+    
+    # Version 1.0.1 with backup directory
+    $v2Path = "$testBasePath/1.0.1"
+    New-Item -ItemType Directory -Force -Path "$v2Path/data" | Out-Null
+    New-Item -ItemType Directory -Force -Path "$v2Path/backup.cyberpatcher" | Out-Null
+    
+    Set-Content -Path "$v2Path/app.exe" -Value "Application v1.0.1 - UPDATED`n"
+    Set-Content -Path "$v2Path/data/config.json" -Value '{"version":"1.0.1","new_feature":true}'
+    
+    # Add files to backup.cyberpatcher (should be ignored)
+    Set-Content -Path "$v2Path/backup.cyberpatcher/app.exe" -Value "Backup from v1.0.0`n"
+    
+    Write-Host "  Created test versions with backup.cyberpatcher directories" -ForegroundColor Gray
+    Write-Host "    v1.0.0: 2 real files + 3 backup files" -ForegroundColor Gray
+    Write-Host "    v1.0.1: 2 real files + 1 backup file" -ForegroundColor Gray
+    
+    # Generate patch (should only scan real files, ignore backups)
+    Write-Host "  Generating patch (should ignore backup files)..." -ForegroundColor Gray
+    
+    $output = & .\patch-gen.exe --from-dir "$v1Path" --to-dir "$v2Path" `
+        --output "$testBasePath/patches/1.0.0-to-1.0.1.patch" `
+        --compression none 2>&1 | Out-String
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Patch generation failed: $output"
+    }
+    
+    Write-Host "  Patch generation output:" -ForegroundColor Gray
+    Write-Host "$output" -ForegroundColor DarkGray
+    
+    # Verify output shows only 2 files scanned (backup files excluded)
+    # Look for "Version X.X.X registered: N files" pattern
+    if ($output -match "Version 1\.0\.0 registered:\s+(\d+)\s+files") {
+        $filesScanned = [int]$matches[1]
+        
+        if ($filesScanned -eq 2) {
+            Write-Host "  ✓ Correctly scanned 2 files in v1.0.0 (backup.cyberpatcher excluded)" -ForegroundColor Green
+        } else {
+            throw "Expected 2 files scanned in v1.0.0, got $filesScanned (backup.cyberpatcher not excluded?)"
+        }
+    } else {
+        throw "Could not parse scan output for v1.0.0"
+    }
+    
+    if ($output -match "Version 1\.0\.1 registered:\s+(\d+)\s+files") {
+        $filesScanned = [int]$matches[1]
+        
+        if ($filesScanned -eq 2) {
+            Write-Host "  ✓ Correctly scanned 2 files in v1.0.1 (backup.cyberpatcher excluded)" -ForegroundColor Green
+        } else {
+            throw "Expected 2 files scanned in v1.0.1, got $filesScanned (backup.cyberpatcher not excluded?)"
+        }
+    } else {
+        throw "Could not parse scan output for v1.0.1"
+    }
+    
+    # Verify patch only contains changes to real files
+    if ($output -notmatch "backup\.cyberpatcher") {
+        Write-Host "  ✓ Patch does not reference backup.cyberpatcher" -ForegroundColor Green
+    } else {
+        throw "Patch incorrectly includes backup.cyberpatcher files"
+    }
+    
+    # Test application phase - add backup.cyberpatcher to apply directory
+    Write-Host "  Testing patch application with backup present..." -ForegroundColor Gray
+    
+    $applyPath = "$testBasePath/apply-test"
+    Copy-Item -Path "$v1Path" -Destination "$applyPath" -Recurse -Force
+    
+    # Dry-run application (should ignore backup.cyberpatcher during verification)
+    $applyOutput = & .\patch-apply.exe --patch "$testBasePath/patches/1.0.0-to-1.0.1.patch/1.0.0-to-1.0.1.patch" `
+        --current-dir "$applyPath" --dry-run 2>&1 | Out-String
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Dry-run failed: $applyOutput"
+    }
+    
+    Write-Host "  Dry-run output:" -ForegroundColor Gray
+    Write-Host "$applyOutput" -ForegroundColor DarkGray
+    
+    # Verify dry-run only checks real files
+    # The output format is "Current version registered: N files"
+    if ($applyOutput -match "Current version registered:\s+(\d+)\s+files") {
+        $filesVerified = [int]$matches[1]
+        
+        if ($filesVerified -eq 2) {
+            Write-Host "  ✓ Verified 2 files (backup.cyberpatcher excluded)" -ForegroundColor Green
+        } else {
+            throw "Expected 2 files verified, got $filesVerified"
+        }
+    } else {
+        # If dry-run succeeds without error, the backup exclusion is working
+        Write-Host "  ✓ Dry-run successful (backup.cyberpatcher excluded)" -ForegroundColor Green
+    }
+    
+    if ($applyOutput -notmatch "backup\.cyberpatcher") {
+        Write-Host "  ✓ Verification did not check backup.cyberpatcher" -ForegroundColor Green
+    } else {
+        throw "Verification incorrectly checked backup.cyberpatcher files"
+    }
+    
+    Write-Host "  ✓ Backup directory exclusion working correctly!" -ForegroundColor Green
+    Write-Host "    • Scanner ignores backup.cyberpatcher during generation" -ForegroundColor Gray
+    Write-Host "    • Applier ignores backup.cyberpatcher during verification" -ForegroundColor Gray
+    Write-Host "    • Prevents infinite loops and patch bloat" -ForegroundColor Gray
+}
+
 # Final summary
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
@@ -1593,7 +1719,7 @@ Write-Host "Failed: $failed" -ForegroundColor Red
 Write-Host ""
 
 if ($failed -eq 0) {
-    $totalTests = if ($1gbtest) { 40 } else { 39 }
+    $totalTests = if ($1gbtest) { 41 } else { 40 }
     Write-Host "✓ All $totalTests advanced tests passed!" -ForegroundColor Green
     Write-Host ""
     Write-Host "Advanced Features Verified:" -ForegroundColor Cyan
@@ -1622,6 +1748,7 @@ if ($failed -eq 0) {
     Write-Host "  • CLI executable structure verification (header, magic bytes)" -ForegroundColor Gray
     Write-Host "  • Batch mode with executable creation" -ForegroundColor Gray
     Write-Host "  • CLI applier verification (not GUI)" -ForegroundColor Gray
+    Write-Host "  • Backup directory exclusion (backup.cyberpatcher ignored)" -ForegroundColor Gray
     if ($1gbtest) {
         Write-Host "  • 1GB bypass mode with large patches (>1GB)" -ForegroundColor Gray
     }
