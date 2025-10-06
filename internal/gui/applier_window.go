@@ -24,24 +24,31 @@ type ApplierWindow struct {
 	window fyne.Window
 
 	// UI Components
-	patchFile    string
-	currentDir   string
-	dryRun       bool
-	verifyBefore bool
-	verifyAfter  bool
-	createBackup bool
-	autoDetect   bool
+	patchFile     string
+	currentDir    string
+	customKeyFile string
+	dryRun        bool
+	verifyBefore  bool
+	verifyAfter   bool
+	createBackup  bool
+	autoDetect    bool
+	ignore1GB     bool
 
-	patchFileEntry    *widget.Entry
-	currentDirEntry   *widget.Entry
-	dryRunCheck       *widget.Check
-	verifyBeforeCheck *widget.Check
-	verifyAfterCheck  *widget.Check
-	backupCheck       *widget.Check
-	autoDetectCheck   *widget.Check
-	applyBtn          *widget.Button
-	statusLabel       *widget.Label
-	logText           *widget.Entry
+	// Callback for when ignore1GB changes (to update global flag)
+	onIgnore1GBChanged func(bool)
+
+	patchFileEntry     *widget.Entry
+	currentDirEntry    *widget.Entry
+	customKeyFileEntry *widget.Entry
+	dryRunCheck        *widget.Check
+	verifyBeforeCheck  *widget.Check
+	verifyAfterCheck   *widget.Check
+	backupCheck        *widget.Check
+	autoDetectCheck    *widget.Check
+	ignore1GBCheck     *widget.Check
+	applyBtn           *widget.Button
+	statusLabel        *widget.Label
+	logText            *widget.Entry
 
 	// Patch info display
 	patchInfoBox     *fyne.Container
@@ -84,6 +91,11 @@ func (aw *ApplierWindow) CreateRenderer() fyne.WidgetRenderer {
 // SetWindow sets the parent window (needed for dialogs)
 func (aw *ApplierWindow) SetWindow(window fyne.Window) {
 	aw.window = window
+}
+
+// SetIgnore1GBCallback sets the callback for when the ignore1GB checkbox changes
+func (aw *ApplierWindow) SetIgnore1GBCallback(callback func(bool)) {
+	aw.onIgnore1GBChanged = callback
 }
 
 // buildUI builds the complete UI layout
@@ -141,6 +153,27 @@ func (aw *ApplierWindow) buildUI() fyne.CanvasObject {
 		widget.NewLabel("Current Dir:"),
 		currentDirBrowse,
 		aw.currentDirEntry,
+	)
+
+	// Create custom key file selector (optional)
+	aw.customKeyFileEntry = widget.NewEntry()
+	aw.customKeyFileEntry.SetPlaceHolder("Optional: Custom key file path (if renamed)...")
+	aw.customKeyFileEntry.OnChanged = func(text string) {
+		aw.customKeyFile = text
+	}
+	aw.customKeyFileEntry.OnSubmitted = func(text string) {
+		aw.customKeyFile = text
+	}
+
+	customKeyFileBrowse := widget.NewButton("Browse", func() {
+		aw.selectCustomKeyFile()
+	})
+
+	customKeyFileContainer := container.NewBorder(
+		nil, nil,
+		widget.NewLabel("Custom Key:"),
+		customKeyFileBrowse,
+		aw.customKeyFileEntry,
 	)
 
 	// Create patch information display labels
@@ -224,15 +257,26 @@ func (aw *ApplierWindow) buildUI() fyne.CanvasObject {
 	})
 	aw.autoDetectCheck.SetChecked(true)
 
+	aw.ignore1GBCheck = widget.NewCheck("Ignore 1GB limit (use with caution)", func(checked bool) {
+		aw.ignore1GB = checked
+		// Notify callback if set (updates global flag in main.go)
+		if aw.onIgnore1GBChanged != nil {
+			aw.onIgnore1GBChanged(checked)
+		}
+	})
+	aw.ignore1GBCheck.SetChecked(false)
+
 	// Options in horizontal layout to save space
 	optionsRow1 := container.NewGridWithColumns(2, aw.verifyBeforeCheck, aw.verifyAfterCheck)
 	optionsRow2 := container.NewGridWithColumns(2, aw.backupCheck, aw.autoDetectCheck)
+	optionsRow3 := container.NewGridWithColumns(1, aw.ignore1GBCheck)
 
 	optionsContainer := container.NewVBox(
 		widget.NewLabel("Options:"),
 		aw.dryRunCheck,
 		optionsRow1,
 		optionsRow2,
+		optionsRow3,
 	)
 
 	// Create apply button
@@ -262,6 +306,7 @@ func (aw *ApplierWindow) buildUI() fyne.CanvasObject {
 	return container.NewVBox(
 		patchFileContainer,
 		currentDirContainer,
+		customKeyFileContainer,
 		widget.NewSeparator(),
 		aw.patchInfoBox,
 		widget.NewSeparator(),
@@ -305,6 +350,22 @@ func (aw *ApplierWindow) selectCurrentDirectory() {
 	}, aw.window)
 }
 
+// selectCustomKeyFile opens a file dialog for selecting custom key file
+func (aw *ApplierWindow) selectCustomKeyFile() {
+	if aw.window == nil {
+		return
+	}
+
+	dialog.ShowFileOpen(func(file fyne.URIReadCloser, err error) {
+		if err == nil && file != nil {
+			path := file.URI().Path()
+			aw.customKeyFileEntry.SetText(path)
+			aw.customKeyFile = path
+			file.Close()
+		}
+	}, aw.window)
+}
+
 // updateApplyButton enables/disables apply button based on selections
 func (aw *ApplierWindow) updateApplyButton() {
 	if aw.patchFile != "" && aw.currentDir != "" {
@@ -338,12 +399,7 @@ func (aw *ApplierWindow) loadPatchInfo() {
 	aw.fromVersionLabel.SetText(patch.FromVersion)
 	aw.toVersionLabel.SetText(patch.ToVersion)
 	aw.keyFileLabel.SetText(patch.FromKeyFile.Path)
-
-	hashStr := patch.FromKeyFile.Checksum
-	if len(hashStr) > 16 {
-		hashStr = hashStr[:16] + "..."
-	}
-	aw.hashLabel.SetText(hashStr)
+	aw.hashLabel.SetText(patch.FromKeyFile.Checksum)
 
 	sizeKB := float64(patch.Header.PatchSize) / 1024.0
 	sizeMB := sizeKB / 1024.0
@@ -445,6 +501,12 @@ func (aw *ApplierWindow) applyPatch() {
 	aw.appendLog("=== Starting Patch Application ===")
 	aw.appendLog(fmt.Sprintf("Patch: %s → %s", aw.loadedPatch.FromVersion, aw.loadedPatch.ToVersion))
 	aw.appendLog(fmt.Sprintf("Target: %s", aw.currentDir))
+
+	// Override key file path if custom one is provided
+	if aw.customKeyFile != "" {
+		aw.appendLog(fmt.Sprintf("Using custom key file: %s", aw.customKeyFile))
+		aw.loadedPatch.FromKeyFile.Path = aw.customKeyFile
+	}
 
 	if aw.dryRun {
 		aw.appendLog("\n=== DRY RUN MODE ===")
@@ -711,4 +773,108 @@ func (aw *ApplierWindow) appendLog(message string) {
 
 	// Auto-scroll to bottom
 	aw.logText.Refresh()
+}
+
+// LoadEmbeddedPatch loads an embedded patch (called from main when self-contained exe detected)
+func (aw *ApplierWindow) LoadEmbeddedPatch(patch *utils.Patch, targetDir string) {
+	aw.loadedPatch = patch
+	aw.currentDir = targetDir
+
+	// Set the current directory in UI
+	if aw.currentDirEntry != nil {
+		aw.currentDirEntry.SetText(targetDir)
+	}
+
+	// Disable patch file selection (not needed for embedded)
+	if aw.patchFileEntry != nil {
+		aw.patchFileEntry.SetText("[Embedded Patch Data]")
+		aw.patchFileEntry.Disable()
+	}
+
+	// Update UI with patch information
+	if aw.fromVersionLabel != nil {
+		aw.fromVersionLabel.SetText(patch.FromVersion)
+	}
+	if aw.toVersionLabel != nil {
+		aw.toVersionLabel.SetText(patch.ToVersion)
+	}
+	if aw.keyFileLabel != nil {
+		aw.keyFileLabel.SetText(patch.FromKeyFile.Path)
+	}
+
+	if aw.hashLabel != nil {
+		hashStr := patch.FromKeyFile.Checksum
+		if len(hashStr) > 16 {
+			hashStr = hashStr[:16] + "..."
+		}
+		aw.hashLabel.SetText(hashStr)
+	}
+
+	if aw.sizeLabel != nil {
+		sizeKB := float64(patch.Header.PatchSize) / 1024.0
+		sizeMB := sizeKB / 1024.0
+		if sizeMB >= 1.0 {
+			aw.sizeLabel.SetText(fmt.Sprintf("%.2f MB", sizeMB))
+		} else {
+			aw.sizeLabel.SetText(fmt.Sprintf("%.2f KB", sizeKB))
+		}
+	}
+
+	if aw.compressionLabel != nil {
+		aw.compressionLabel.SetText(patch.Header.Compression)
+	}
+	if aw.createdLabel != nil {
+		aw.createdLabel.SetText(patch.Header.CreatedAt.Format("2006-01-02 15:04:05"))
+	}
+
+	// Count operations
+	addCount := 0
+	modifyCount := 0
+	deleteCount := 0
+	addDirCount := 0
+	deleteDirCount := 0
+
+	for _, op := range patch.Operations {
+		switch op.Type {
+		case utils.OpAdd:
+			addCount++
+		case utils.OpModify:
+			modifyCount++
+		case utils.OpDelete:
+			deleteCount++
+		case utils.OpAddDir:
+			addDirCount++
+		case utils.OpDeleteDir:
+			deleteDirCount++
+		}
+	}
+
+	if aw.addedLabel != nil {
+		aw.addedLabel.SetText(fmt.Sprintf("%d", addCount))
+	}
+	if aw.modifiedLabel != nil {
+		aw.modifiedLabel.SetText(fmt.Sprintf("%d", modifyCount))
+	}
+	if aw.deletedLabel != nil {
+		aw.deletedLabel.SetText(fmt.Sprintf("%d", deleteCount))
+	}
+	if aw.addDirsLabel != nil {
+		aw.addDirsLabel.SetText(fmt.Sprintf("%d", addDirCount))
+	}
+	if aw.deleteDirsLabel != nil {
+		aw.deleteDirsLabel.SetText(fmt.Sprintf("%d", deleteDirCount))
+	}
+	if aw.requiredLabel != nil {
+		aw.requiredLabel.SetText(fmt.Sprintf("%d (must match exact hashes)", len(patch.RequiredFiles)))
+	}
+
+	aw.setStatus("Embedded patch loaded - ready to apply")
+	aw.appendLog("✓ Self-contained patch loaded successfully")
+	aw.appendLog(fmt.Sprintf("From version: %s", patch.FromVersion))
+	aw.appendLog(fmt.Sprintf("To version: %s", patch.ToVersion))
+	aw.appendLog(fmt.Sprintf("Target directory: %s", targetDir))
+	aw.appendLog("")
+	aw.appendLog("Click 'Apply Patch' when ready...")
+
+	aw.updateApplyButton()
 }

@@ -13,7 +13,7 @@ The applier tool safely applies binary patches to existing installations. It ver
 **The recommended method** - apply patch with complete safety checks:
 
 ```bash
-applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --verify
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --verify
 ```
 
 This will:
@@ -74,7 +74,7 @@ Time elapsed: 12.3 seconds
 **Preview what would happen** without making any changes:
 
 ```bash
-applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --dry-run
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --dry-run
 ```
 
 This will:
@@ -125,6 +125,13 @@ No changes were made to your installation
 - Example: `C:\MyApp\`
 
 ### Optional Options
+
+**`--key-file <path>`**
+- Specify custom key file path if renamed or moved
+- Can be absolute path or relative to current-dir
+- Example: `--key-file app.exe` or `--key-file C:\MyApp\renamed.exe`
+- Use case: When the key file (typically the main executable) has been renamed
+- Default: Uses key file path stored in patch
 
 **`--verify`** (Enabled by Default)
 - Check files before and after patching
@@ -339,6 +346,108 @@ Restoring from backup...
 
 ---
 
+**"Key file not found"**
+```
+Error: patch application failed: key file verification failed:
+  key file not found: program.exe
+```
+
+**Meaning:** The key file specified in the patch cannot be found
+
+**Causes:**
+- Key file was renamed (e.g., program.exe → app.exe)
+- Key file was moved to different location
+- Key file was deleted
+
+**Solution:**
+- Use `--key-file` option to specify the renamed/moved key file
+- Example: `patch-apply --patch 1.0.0-to-1.0.1.patch --current-dir ./myapp --key-file app.exe`
+- Restore the key file to its original name/location
+
+---
+
+## Custom Key File Usage
+
+### When to Use Custom Key File
+
+The `--key-file` option is useful when:
+
+1. **Main executable was renamed** for branding or clarity
+   - `program.exe` → `MyApp.exe`
+   - `server.exe` → `MyCompanyServer.exe`
+
+2. **Executable location changed** in directory structure
+   - Moved from root to `bin/` subdirectory
+   - Restructured folder hierarchy
+
+3. **Testing with renamed files** in development/staging environments
+
+### How It Works
+
+The key file is the primary executable that uniquely identifies your application version. When you specify a custom key file:
+
+1. The applier uses your specified file for version verification
+2. Hash is checked against expected version hash from patch
+3. All other patch operations proceed normally
+4. Custom key file path only affects verification, not patching operations
+
+### Examples
+
+**Simple rename (relative path):**
+```bash
+# Key file renamed from program.exe to MyApp.exe
+patch-apply --patch ./patches/1.0.0-to-1.0.1.patch \
+            --current-dir ./myapp \
+            --key-file MyApp.exe
+```
+
+**Moved to subdirectory:**
+```bash
+# Key file moved to bin/ subdirectory
+patch-apply --patch ./patches/1.0.0-to-1.0.1.patch \
+            --current-dir ./myapp \
+            --key-file bin/program.exe
+```
+
+**Absolute path:**
+```bash
+# Using absolute path to key file
+patch-apply --patch ./patches/1.0.0-to-1.0.1.patch \
+            --current-dir C:\MyApp \
+            --key-file C:\MyApp\renamed_program.exe
+```
+
+**With dry-run (test before applying):**
+```bash
+# Test with custom key file first
+patch-apply --patch ./patches/1.0.0-to-1.0.1.patch \
+            --current-dir ./myapp \
+            --key-file MyApp.exe \
+            --dry-run
+```
+
+### GUI Support
+
+The GUI applier also supports custom key files:
+
+1. Select your patch file
+2. Select current directory
+3. Enter custom key file path in the "Custom Key:" field (optional)
+4. Browse or type the path manually
+5. Apply patch as normal
+
+### Self-Contained Executable Support
+
+Self-contained `.exe` patches also support custom key files:
+
+1. Run the self-contained executable
+2. Accept or change the target directory
+3. Select option **5: Specify Custom Key File**
+4. Enter the custom key file path
+5. Choose **1: Dry Run** to test or **2: Apply Patch**
+
+---
+
 ## Examples
 
 ### Example 1: Safe Production Update
@@ -347,7 +456,7 @@ Update production installation with full safety:
 
 ```bash
 # Always use --verify for production!
-applier --patch ./patches/1.0.2-to-1.0.3.patch --current-dir C:\Production\MyApp --verify
+patch-apply --patch ./patches/1.0.2-to-1.0.3.patch --current-dir C:\Production\MyApp --verify
 ```
 
 **What Happens:**
@@ -365,10 +474,10 @@ Preview changes before committing:
 
 ```bash
 # First: Dry-run to see what would change
-applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --dry-run
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --dry-run
 
 # If everything looks good, apply for real:
-applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --verify
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --verify
 ```
 
 ---
@@ -379,7 +488,7 @@ For testing environments where speed matters more than safety:
 
 ```bash
 # Skip verification and backup (FASTER but RISKY!)
-applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./test-app
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./test-app
 ```
 
 **WARNING:** Only use this for disposable test environments!
@@ -391,7 +500,7 @@ applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./test-app
 Applying patch to network-installed application:
 
 ```bash
-applier --patch ./patches/1.0.1-to-1.0.2.patch --current-dir \\server\share\MyApp --verify
+patch-apply --patch ./patches/1.0.1-to-1.0.2.patch --current-dir \\server\share\MyApp --verify
 ```
 
 **Note:** Backup will be at `\\server\share\MyApp.backup\`

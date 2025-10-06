@@ -508,6 +508,149 @@ The GUI provides a visual interface for patch generation but is still under acti
 
 ---
 
+## Self-Contained Executable Format
+
+### Overview
+
+The generator GUI can create self-contained executables that embed patch data directly into a standalone `.exe` file. This provides a simpler distribution method for end users.
+
+### File Structure
+
+A self-contained executable consists of three parts concatenated together:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                 Base Applier Executable                      │
+│              (patch-apply-gui.exe ~50 MB)                    │
+│                                                              │
+│  Full GUI applier with all dependencies                      │
+├─────────────────────────────────────────────────────────────┤
+│                    Patch Data                                │
+│           (compressed JSON patch file)                       │
+│                                                              │
+│  Complete patch manifest with all operations                 │
+├─────────────────────────────────────────────────────────────┤
+│                   128-byte Header                            │
+│              (metadata at end of file)                       │
+│                                                              │
+│  Magic bytes, offsets, sizes, checksum                       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Header Format (128 bytes)
+
+The header is always located at the **last 128 bytes** of the file:
+
+| Offset | Size | Type | Field | Description |
+|--------|------|------|-------|-------------|
+| 0-7 | 8 bytes | string | Magic | "CPMPATCH" identifier |
+| 8-11 | 4 bytes | uint32 | Version | Format version (currently 1) |
+| 12-19 | 8 bytes | uint64 | StubSize | Size of base applier executable |
+| 20-27 | 8 bytes | uint64 | DataOffset | Byte offset where patch data starts |
+| 28-35 | 8 bytes | uint64 | DataSize | Size of compressed patch data |
+| 36-51 | 16 bytes | string | Compression | Type: "zstd", "gzip", or "none" |
+| 52-83 | 32 bytes | [32]byte | Checksum | SHA-256 hash of patch data |
+| 84-127 | 44 bytes | - | Reserved | Reserved for future use |
+
+**Binary Layout:**
+```go
+type Header struct {
+    Magic       [8]byte   // "CPMPATCH"
+    Version     uint32    // Format version = 1
+    StubSize    uint64    // Size of applier.exe
+    DataOffset  uint64    // Where patch data starts
+    DataSize    uint64    // Size of patch data
+    Compression [16]byte  // Compression type
+    Checksum    [32]byte  // SHA-256 of patch data
+    Reserved    [44]byte  // Future expansion
+}
+```
+
+### Creation Process
+
+When the generator creates a self-contained executable:
+
+1. **Read base applier**: Load `patch-apply-gui.exe` from same directory
+2. **Read patch data**: Load the generated `.patch` file
+3. **Calculate checksum**: SHA-256 hash of patch data
+4. **Build header**: Populate 128-byte header with metadata
+5. **Write combined file**:
+   ```
+   output.exe = applier + patchData + header
+   ```
+
+**Generator Code Location:** `internal/gui/generator_window.go` (lines ~1053-1134)
+
+### Detection Process
+
+When a self-contained executable runs:
+
+1. **Open self**: Executable opens itself for reading
+2. **Seek to header**: Reads last 128 bytes
+3. **Parse header**: Decodes binary header structure
+4. **Validate version**: Checks format version (currently only v1 supported)
+5. **Validate magic**: Checks for "CPMPATCH" bytes
+6. **Bounds validation**:
+   - Verify `DataOffset == StubSize` (data starts right after applier)
+   - Verify `StubSize + DataSize + HEADER_SIZE == fileSize` (no gaps or overruns)
+   - Check offsets are within file bounds
+   - Prevent excessive allocation (max 1 GB patch data)
+7. **Read patch data**: Seeks to `DataOffset`, reads `DataSize` bytes
+8. **Verify checksum**: Validates SHA-256 hash of patch data
+9. **Decompress**: Decompresses based on `Compression` field
+10. **Parse JSON**: Decodes patch manifest
+11. **Load UI**: Populates GUI with patch information automatically
+
+**Detection Code Location:** `cmd/applier-gui/main.go` (lines 82-198)
+
+### Security
+
+- **Magic bytes**: Prevents false positives from non-patch executables
+- **Version validation**: Strictly checks format version (only v1 accepted), fails fast on unknown formats
+- **Bounds validation**: 
+  - Validates `DataOffset == StubSize` to prevent gaps or manipulation
+  - Verifies `StubSize + DataSize + HEADER_SIZE == fileSize` for exact structure match
+  - Ensures all offsets are within file bounds before reading
+  - Prevents buffer overruns and out-of-range seeks
+- **Allocation protection**: Maximum 1 GB patch size limit prevents memory exhaustion attacks
+  - Can be bypassed with explicit user consent via `--ignore1gb` CLI flag or GUI checkbox
+  - When bypassed, user assumes responsibility for sufficient memory availability
+- **Checksum verification**: SHA-256 hash ensures data integrity and detects tampering
+- **Size validation**: Header contains exact sizes validated before allocation
+- **No execution**: Patch data is never executed, only parsed as JSON
+- **Fail-safe design**: All validations return false on failure, preventing partial application
+
+### Advantages
+
+- **Single file**: End users only download one `.exe`
+- **No configuration**: Patch info auto-detected and loaded
+- **User friendly**: Double-click and apply
+- **Portable**: Can be easily shared or distributed
+- **Safe**: Still includes all verification and backup features
+
+### Limitations
+
+- **File size**: Always ~50 MB + patch size (includes full GUI)
+- **Windows only**: Currently only generates `.exe` files
+- **No streaming**: Entire file must be downloaded before use
+- **Fixed format**: Cannot mix compression methods in header
+
+### Related Code
+
+**Generator:**
+- `internal/gui/generator_window.go` - `createStandaloneExe()` function
+- Checkbox: "Create self-contained executable"
+
+**Applier:**
+- `cmd/applier-gui/main.go` - `checkEmbeddedPatch()` function
+- `internal/gui/applier_window.go` - `LoadEmbeddedPatch()` method
+
+**Documentation:**
+- [Self-Contained Executables Guide](self-contained-executables.md) - Complete user guide
+- [GUI Usage Guide](gui-usage.md) - How to create self-contained executables
+
+---
+
 ## Related Documentation
 
 - [Code Structure](code-structure.md) - Detailed file organization

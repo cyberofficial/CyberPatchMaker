@@ -48,14 +48,14 @@ Running CyberPatchMaker Advanced Test Suite
 
 Testing: Generate complex patch (1.0.1 → 1.0.2) with zstd
   Generating patch from 1.0.1 to 1.0.2 with zstd compression...
-  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches --compression zstd
+  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches --compression zstd
   Patch generated (zstd): 1627 bytes
 ✓ PASSED: Generate complex patch (1.0.1 → 1.0.2) with zstd
 
 Testing: Apply zstd patch to complex directory structure
   Copying version 1.0.1 to test-zstd...
   Applying zstd patch...
-  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-zstd --verify
+  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-zstd --verify
   Zstd patch applied successfully
 ✓ PASSED: Apply zstd patch to complex directory structure
 
@@ -128,8 +128,8 @@ ls testdata/patches/
 The advanced test suite includes 24 comprehensive tests organized into several categories:
 
 ### Core Functionality Tests (Tests 1-6)
-1. **Build Generator Tool** - Verifies generator.exe compiles correctly
-2. **Build Applier Tool** - Verifies applier.exe compiles correctly
+1. **Build Generator Tool** - Verifies patch-gen.exe compiles correctly
+2. **Build Applier Tool** - Verifies patch-apply.exe compiles correctly
 3. **Auto-Generate Test Versions** - Creates test data (1.0.0, 1.0.1, 1.0.2) if missing
 4. **Generate Patches (Batch)** - Tests batch patch generation from all versions to 1.0.2
 5. **Patch File Verification** - Confirms all expected patch files were created

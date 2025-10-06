@@ -7,7 +7,7 @@ Quick reference for CyberPatchMaker command-line tools.
 ### Basic Syntax
 
 ```bash
-generator [options]
+patch-gen [options]
 ```
 
 ### Options
@@ -41,22 +41,22 @@ generator [options]
 
 **Batch Mode** (generate all patches to new version):
 ```bash
-generator --versions-dir ./versions --new-version 1.0.3 --output ./patches
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches
 ```
 
 **Single Patch Mode**:
 ```bash
-generator --from 1.0.1 --to 1.0.3 --versions-dir ./versions --output ./patches
+patch-gen --from 1.0.1 --to 1.0.3 --versions-dir ./versions --output ./patches
 ```
 
 **With Compression**:
 ```bash
-generator --versions-dir ./versions --new-version 1.0.3 --output ./patches --compression zstd --level 4
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --compression zstd --level 4
 ```
 
 **With Verification**:
 ```bash
-generator --versions-dir ./versions --new-version 1.0.3 --output ./patches --verify
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --verify
 ```
 
 ---
@@ -66,7 +66,7 @@ generator --versions-dir ./versions --new-version 1.0.3 --output ./patches --ver
 ### Basic Syntax
 
 ```bash
-applier [options]
+patch-apply [options]
 ```
 
 ### Options
@@ -75,6 +75,7 @@ applier [options]
 |--------|----------|-------------|
 | `--patch <path>` | Yes | Path to patch file |
 | `--current-dir <path>` | Yes | Directory containing current installation |
+| `--key-file <path>` | No | Custom key file path (if renamed or moved) |
 | `--verify` | No | Enable full verification (recommended!) |
 | `--dry-run` | No | Preview changes without applying |
 | `--create-backup` | No | Create selective backup before patching (default: `true`) |
@@ -131,27 +132,40 @@ See [Backup Lifecycle](backup-lifecycle.md) for complete backup system documenta
 
 **Safe Application** (with verification):
 ```bash
-applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --verify
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --verify
 ```
 
 **Dry-Run** (preview only):
 ```bash
-applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --dry-run
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --dry-run
 ```
 
 **Quick Application** (no verification - RISKY!):
 ```bash
-applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp
 ```
 
 **Without Backup** (for testing only - NOT recommended!):
 ```bash
-applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --no-backup
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --no-backup
 ```
 
 **Explicit Backup** (default behavior):
 ```bash
-applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --create-backup --verify
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --create-backup --verify
+```
+
+**Custom Key File** (if the key file was renamed):
+```bash
+# If program.exe was renamed to app.exe
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch \
+            --current-dir ./myapp \
+            --key-file app.exe
+
+# Or with absolute path
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch \
+            --current-dir ./myapp \
+            --key-file C:\MyApp\renamed_program.exe
 ```
 
 ---
@@ -162,18 +176,18 @@ applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --create-ba
 
 ```bash
 # 1. Generate all patches to new version
-generator --versions-dir ./versions \
+patch-gen --versions-dir ./versions \
           --new-version 1.0.3 \
           --output ./patches \
           --verify
 
 # 2. Test with dry-run
-applier --patch ./patches/1.0.2-to-1.0.3.patch \
+patch-apply --patch ./patches/1.0.2-to-1.0.3.patch \
         --current-dir ./test-app \
         --dry-run
 
 # 3. Apply to production
-applier --patch ./patches/1.0.2-to-1.0.3.patch \
+patch-apply --patch ./patches/1.0.2-to-1.0.3.patch \
         --current-dir C:\Production\MyApp \
         --verify
 ```
@@ -183,7 +197,7 @@ applier --patch ./patches/1.0.2-to-1.0.3.patch \
 **Generate downgrade patch:**
 ```bash
 # Generate patch to downgrade from 1.0.3 back to 1.0.2
-generator --from 1.0.3 \
+patch-gen --from 1.0.3 \
           --to 1.0.2 \
           --versions-dir ./versions \
           --output ./patches/downgrade \
@@ -193,12 +207,12 @@ generator --from 1.0.3 \
 **Apply downgrade patch:**
 ```bash
 # Test rollback
-applier --patch ./patches/downgrade/1.0.3-to-1.0.2.patch \
+patch-apply --patch ./patches/downgrade/1.0.3-to-1.0.2.patch \
         --current-dir ./test-app \
         --dry-run
 
 # Apply rollback to production
-applier --patch ./patches/downgrade/1.0.3-to-1.0.2.patch \
+patch-apply --patch ./patches/downgrade/1.0.3-to-1.0.2.patch \
         --current-dir C:\Production\MyApp \
         --verify
 ```
@@ -206,9 +220,9 @@ applier --patch ./patches/downgrade/1.0.3-to-1.0.2.patch \
 **Generate all downgrade paths from current version:**
 ```bash
 # From 1.0.3 to all previous versions
-generator --from 1.0.3 --to 1.0.2 --versions-dir ./versions --output ./patches/downgrade
-generator --from 1.0.3 --to 1.0.1 --versions-dir ./versions --output ./patches/downgrade
-generator --from 1.0.3 --to 1.0.0 --versions-dir ./versions --output ./patches/downgrade
+patch-gen --from 1.0.3 --to 1.0.2 --versions-dir ./versions --output ./patches/downgrade
+patch-gen --from 1.0.3 --to 1.0.1 --versions-dir ./versions --output ./patches/downgrade
+patch-gen --from 1.0.3 --to 1.0.0 --versions-dir ./versions --output ./patches/downgrade
 ```
 
 **Result:**
@@ -225,7 +239,7 @@ patches/downgrade/
 
 ```bash
 # Generate single patch with highest compression
-generator --from 1.0.1 \
+patch-gen --from 1.0.1 \
           --to 1.0.3 \
           --versions-dir ./versions \
           --output ./patches \
@@ -238,13 +252,13 @@ generator --from 1.0.1 \
 
 ```bash
 # Generate without compression (fastest)
-generator --versions-dir ./versions \
+patch-gen --versions-dir ./versions \
           --new-version 1.0.3 \
           --output ./patches \
           --compression none
 
 # Apply without verification (fastest)
-applier --patch ./patches/1.0.0-to-1.0.3.patch \
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch \
         --current-dir ./test-app
 ```
 
@@ -344,14 +358,14 @@ Time elapsed: 8.2 seconds (selective backup saved time!)
 
 **PowerShell:**
 ```powershell
-.\generator.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches
-.\applier.exe --patch .\patches\1.0.0-to-1.0.3.patch --current-dir .\myapp --verify
+.\patch-gen.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches
+.\patch-apply.exe --patch .\patches\1.0.0-to-1.0.3.patch --current-dir .\myapp --verify
 ```
 
 **Command Prompt (cmd):**
 ```batch
-generator.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches
-applier.exe --patch .\patches\1.0.0-to-1.0.3.patch --current-dir .\myapp --verify
+patch-gen.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.3.patch --current-dir .\myapp --verify
 ```
 
 **Paths:** Use backslashes `\` or forward slashes `/` (both work)
@@ -389,7 +403,7 @@ param(
 
 Write-Host "Generating patches for version $NewVersion..."
 
-& .\generator.exe `
+& .\patch-gen.exe `
     --versions-dir $VersionsDir `
     --new-version $NewVersion `
     --output $OutputDir `
@@ -422,7 +436,7 @@ OUTPUT_DIR="./patches"
 
 echo "Generating patches for version $NEW_VERSION..."
 
-./generator \
+./patch-gen \
     --versions-dir "$VERSIONS_DIR" \
     --new-version "$NEW_VERSION" \
     --output "$OUTPUT_DIR" \

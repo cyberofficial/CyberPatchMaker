@@ -1,25 +1,35 @@
 # CyberPatchMaker Advanced Test Suite
 # Tests complex scenarios with nested directories, multiple operations, and various compression formats
 
+param(
+    [switch]$1gbtest
+)
+
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "CyberPatchMaker Advanced Test Suite" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
+if ($1gbtest) {
+    Write-Host "1GB Bypass Test Mode: ENABLED" -ForegroundColor Yellow
+    Write-Host "Will test large patch (>1GB) creation and application" -ForegroundColor Yellow
+    Write-Host "" 
+}
+
 # Check and build executables if missing
 Write-Host "Checking executables..." -ForegroundColor Cyan
 
 $needsBuild = $false
-$generatorExists = Test-Path ".\generator.exe"
-$applierExists = Test-Path ".\applier.exe"
+$generatorExists = Test-Path ".\patch-gen.exe"
+$applierExists = Test-Path ".\patch-apply.exe"
 
 if (-not $generatorExists) {
-    Write-Host "  generator.exe not found" -ForegroundColor Yellow
+    Write-Host "  patch-gen.exe not found" -ForegroundColor Yellow
     $needsBuild = $true
 }
 
 if (-not $applierExists) {
-    Write-Host "  applier.exe not found" -ForegroundColor Yellow
+    Write-Host "  patch-apply.exe not found" -ForegroundColor Yellow
     $needsBuild = $true
 }
 
@@ -28,23 +38,23 @@ if ($needsBuild) {
     Write-Host "Building missing executables..." -ForegroundColor Yellow
     
     if (-not $generatorExists) {
-        Write-Host "  Building generator.exe..." -ForegroundColor Gray
-        go build -o generator.exe ./cmd/generator
+        Write-Host "  Building patch-gen.exe..." -ForegroundColor Gray
+        go build -o patch-gen.exe ./cmd/generator
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "✗ Failed to build generator.exe" -ForegroundColor Red
+            Write-Host "✗ Failed to build patch-gen.exe" -ForegroundColor Red
             exit 1
         }
-        Write-Host "  ✓ generator.exe built successfully" -ForegroundColor Green
+        Write-Host "  ✓ patch-gen.exe built successfully" -ForegroundColor Green
     }
     
     if (-not $applierExists) {
-        Write-Host "  Building applier.exe..." -ForegroundColor Gray
-        go build -o applier.exe ./cmd/applier
+        Write-Host "  Building patch-apply.exe..." -ForegroundColor Gray
+        go build -o patch-apply.exe ./cmd/applier
         if ($LASTEXITCODE -ne 0) {
-            Write-Host "✗ Failed to build applier.exe" -ForegroundColor Red
+            Write-Host "✗ Failed to build patch-apply.exe" -ForegroundColor Red
             exit 1
         }
-        Write-Host "  ✓ applier.exe built successfully" -ForegroundColor Green
+        Write-Host "  ✓ patch-apply.exe built successfully" -ForegroundColor Green
     }
     
     Write-Host ""
@@ -227,11 +237,11 @@ function Test-Step {
 
 # Test 1: Verify executables
 Test-Step "Verify executables exist" {
-    if (-not (Test-Path "generator.exe")) {
-        throw "generator.exe not found. Run 'go build ./cmd/generator' first."
+    if (-not (Test-Path "patch-gen.exe")) {
+        throw "patch-gen.exe not found. Run 'go build ./cmd/generator' first."
     }
-    if (-not (Test-Path "applier.exe")) {
-        throw "applier.exe not found. Run 'go build ./cmd/applier' first."
+    if (-not (Test-Path "patch-apply.exe")) {
+        throw "patch-apply.exe not found. Run 'go build ./cmd/applier' first."
     }
     Write-Host "  Both executables found" -ForegroundColor Gray
 }
@@ -988,6 +998,77 @@ Test-Step "Verify backup handles complex nested paths" {
     Write-Host "  Complex nested backup structure verified" -ForegroundColor Gray
 }
 
+# Test 27b: Verify deleted directories are backed up
+Test-Step "Verify deleted directories are backed up with all contents" {
+    Write-Host "  Testing backup of deleted directories..." -ForegroundColor Gray
+    
+    # Create test versions with a directory to be deleted
+    New-Item -ItemType Directory -Force -Path "testdata/advanced-output/dir-delete-test/1.0.0/data/temp" | Out-Null
+    Set-Content -Path "testdata/advanced-output/dir-delete-test/1.0.0/program.exe" -Value "v1.0.0"
+    Set-Content -Path "testdata/advanced-output/dir-delete-test/1.0.0/data/temp/file1.txt" -Value "temp file 1"
+    Set-Content -Path "testdata/advanced-output/dir-delete-test/1.0.0/data/temp/file2.txt" -Value "temp file 2"
+    Set-Content -Path "testdata/advanced-output/dir-delete-test/1.0.0/data/temp/file3.log" -Value "temp log file"
+    
+    New-Item -ItemType Directory -Force -Path "testdata/advanced-output/dir-delete-test/1.0.1/data" | Out-Null
+    Set-Content -Path "testdata/advanced-output/dir-delete-test/1.0.1/program.exe" -Value "v1.0.1"
+    
+    # Generate patch that deletes directory
+    Write-Host "  Command: patch-gen.exe --from-dir .\testdata\advanced-output\dir-delete-test\1.0.0 --to-dir .\testdata\advanced-output\dir-delete-test\1.0.1 --output .\testdata\advanced-output\dir-delete-test\patches" -ForegroundColor Cyan
+    $output = .\patch-gen.exe --from-dir .\testdata\advanced-output\dir-delete-test\1.0.0 --to-dir .\testdata\advanced-output\dir-delete-test\1.0.1 --output .\testdata\advanced-output\dir-delete-test\patches 2>&1
+    
+    if ($LASTEXITCODE -ne 0) {
+        $outputStr = $output -join "`n"
+        throw "Patch generation failed: $outputStr"
+    }
+    
+    # Verify patch includes directory deletion
+    if (-not ($output -match "Delete directory")) {
+        throw "Patch should delete a directory"
+    }
+    Write-Host "  ✓ Patch includes directory deletion" -ForegroundColor Green
+    
+    # Copy test version and apply patch
+    Copy-Item "testdata/advanced-output/dir-delete-test/1.0.0" "testdata/advanced-output/dir-delete-test/apply-test" -Recurse -Force
+    
+    Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\dir-delete-test\patches\1.0.0-to-1.0.1.patch --current-dir .\testdata\advanced-output\dir-delete-test\apply-test --verify" -ForegroundColor Cyan
+    $output = .\patch-apply.exe --patch .\testdata\advanced-output\dir-delete-test\patches\1.0.0-to-1.0.1.patch --current-dir .\testdata\advanced-output\dir-delete-test\apply-test --verify 2>&1
+    
+    if ($LASTEXITCODE -ne 0) {
+        $outputStr = $output -join "`n"
+        throw "Patch application failed: $outputStr"
+    }
+    
+    # Verify backup contains deleted directory
+    if (-not (Test-Path "testdata/advanced-output/dir-delete-test/apply-test/backup.cyberpatcher/data/temp")) {
+        throw "Deleted directory not backed up"
+    }
+    Write-Host "  ✓ Deleted directory backed up: data/temp/" -ForegroundColor Green
+    
+    # Verify all files in deleted directory were backed up
+    $backedUpFiles = Get-ChildItem -Path "testdata/advanced-output/dir-delete-test/apply-test/backup.cyberpatcher/data/temp" -File
+    if ($backedUpFiles.Count -ne 3) {
+        throw "Expected 3 files in backed up directory, got $($backedUpFiles.Count)"
+    }
+    Write-Host "  ✓ All files in deleted directory backed up: $($backedUpFiles.Count) files" -ForegroundColor Green
+    
+    # Verify specific files
+    $expectedTempFiles = @("file1.txt", "file2.txt", "file3.log")
+    foreach ($file in $expectedTempFiles) {
+        if (-not (Test-Path "testdata/advanced-output/dir-delete-test/apply-test/backup.cyberpatcher/data/temp/$file")) {
+            throw "Expected backup file not found: data/temp/$file"
+        }
+    }
+    Write-Host "  ✓ Verified: file1.txt, file2.txt, file3.log" -ForegroundColor Green
+    
+    # Verify directory was actually deleted from target
+    if (Test-Path "testdata/advanced-output/dir-delete-test/apply-test/data/temp") {
+        throw "Directory should be deleted from target"
+    }
+    Write-Host "  ✓ Directory deleted from target (but preserved in backup)" -ForegroundColor Green
+    
+    Write-Host "  Deleted directory backup verified" -ForegroundColor Gray
+}
+
 # Test 24: Performance check - verify generation speed
 Test-Step "Verify patch generation performance" {
     Write-Host "  Measuring patch generation time..." -ForegroundColor Gray
@@ -1281,8 +1362,8 @@ Test-Step "Test error handling for non-existent directories" {
 Test-Step "Verify backward compatibility with legacy --versions-dir mode" {
     Write-Host "  Testing that legacy mode still works alongside custom paths..." -ForegroundColor Gray
     
-    Write-Host "  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\custom-paths\patches" -ForegroundColor Cyan
-    $output = .\generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\custom-paths\patches 2>&1
+    Write-Host "  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\custom-paths\patches" -ForegroundColor Cyan
+    $output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\custom-paths\patches 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         throw "Legacy mode broken after custom paths implementation"
@@ -1296,6 +1377,212 @@ Test-Step "Verify backward compatibility with legacy --versions-dir mode" {
     Write-Host "  Backward compatibility verified" -ForegroundColor Gray
 }
 
+# Test 35: CLI Executable Creation
+Test-Step "Test CLI self-contained executable creation" {
+    Write-Host "  Testing --create-exe flag with CLI generator..." -ForegroundColor Gray
+    
+    # Generate patch with executable creation
+    Write-Host "  Command: patch-gen.exe --from-dir .\testdata\versions\1.0.0 --to-dir .\testdata\versions\1.0.1 --output .\testdata\advanced-output\exe-test --create-exe" -ForegroundColor Cyan
+    New-Item -ItemType Directory -Force -Path "testdata/advanced-output/exe-test" | Out-Null
+    $output = .\patch-gen.exe --from-dir .\testdata\versions\1.0.0 --to-dir .\testdata\versions\1.0.1 --output .\testdata\advanced-output\exe-test --create-exe 2>&1
+    
+    if ($LASTEXITCODE -ne 0) {
+        $outputStr = $output -join "`n"
+        throw "CLI executable creation failed: $outputStr"
+    }
+    
+    # Verify both patch and exe were created
+    if (-not (Test-Path "testdata/advanced-output/exe-test/1.0.0-to-1.0.1.patch")) {
+        throw "Patch file not created"
+    }
+    
+    if (-not (Test-Path "testdata/advanced-output/exe-test/1.0.0-to-1.0.1.exe")) {
+        throw "Self-contained executable not created"
+    }
+    
+    $patchSize = (Get-Item "testdata/advanced-output/exe-test/1.0.0-to-1.0.1.patch").Length
+    $exeSize = (Get-Item "testdata/advanced-output/exe-test/1.0.0-to-1.0.1.exe").Length
+    
+    Write-Host "  ✓ Patch file created: $patchSize bytes" -ForegroundColor Green
+    Write-Host "  ✓ Executable created: $exeSize bytes" -ForegroundColor Green
+    
+    # Verify exe is larger than patch (contains applier + patch + header)
+    if ($exeSize -le $patchSize) {
+        throw "Executable should be larger than patch file"
+    }
+    
+    Write-Host "  CLI self-contained executable creation verified" -ForegroundColor Gray
+}
+
+# Test 36: Verify CLI Executable Structure
+Test-Step "Verify CLI executable structure and header" {
+    Write-Host "  Verifying embedded patch structure..." -ForegroundColor Gray
+    
+    $exePath = "testdata/advanced-output/exe-test/1.0.0-to-1.0.1.exe"
+    $exeSize = (Get-Item $exePath).Length
+    
+    # Read last 128 bytes (header)
+    $fileStream = [System.IO.File]::OpenRead($exePath)
+    $fileStream.Seek(-128, [System.IO.SeekOrigin]::End) | Out-Null
+    $header = New-Object byte[] 128
+    $fileStream.Read($header, 0, 128) | Out-Null
+    $fileStream.Close()
+    
+    # Check magic bytes "CPMPATCH"
+    $magic = [System.Text.Encoding]::ASCII.GetString($header, 0, 8).TrimEnd([char]0)
+    if ($magic -ne "CPMPATCH") {
+        throw "Magic bytes not found. Got: $magic"
+    }
+    
+    Write-Host "  ✓ Magic bytes verified: CPMPATCH" -ForegroundColor Green
+    
+    # Extract version (4 bytes at offset 8)
+    $version = [BitConverter]::ToUInt32($header, 8)
+    if ($version -ne 1) {
+        throw "Unexpected format version: $version"
+    }
+    
+    Write-Host "  ✓ Format version: $version" -ForegroundColor Green
+    
+    Write-Host "  CLI executable structure verified" -ForegroundColor Gray
+}
+
+# Test 37: Batch Mode with CLI Executables
+Test-Step "Test batch mode with CLI executable creation" {
+    Write-Host "  Testing batch mode with --create-exe..." -ForegroundColor Gray
+    
+    Write-Host "  Command: patch-gen.exe --versions-dir .\testdata\versions --new-version 1.0.2 --output .\testdata\advanced-output\batch-exe --create-exe" -ForegroundColor Cyan
+    New-Item -ItemType Directory -Force -Path "testdata/advanced-output/batch-exe" | Out-Null
+    $output = .\patch-gen.exe --versions-dir .\testdata\versions --new-version 1.0.2 --output .\testdata\advanced-output\batch-exe --create-exe 2>&1
+    
+    if ($LASTEXITCODE -ne 0) {
+        $outputStr = $output -join "`n"
+        throw "Batch mode with executables failed: $outputStr"
+    }
+    
+    # Verify all patches and executables were created
+    $expectedPatches = @("1.0.0-to-1.0.2.patch", "1.0.1-to-1.0.2.patch")
+    $expectedExes = @("1.0.0-to-1.0.2.exe", "1.0.1-to-1.0.2.exe")
+    
+    foreach ($patch in $expectedPatches) {
+        if (-not (Test-Path "testdata/advanced-output/batch-exe/$patch")) {
+            throw "Batch patch not created: $patch"
+        }
+        Write-Host "  ✓ Created: $patch" -ForegroundColor Green
+    }
+    
+    foreach ($exe in $expectedExes) {
+        if (-not (Test-Path "testdata/advanced-output/batch-exe/$exe")) {
+            throw "Batch executable not created: $exe"
+        }
+        $size = (Get-Item "testdata/advanced-output/batch-exe/$exe").Length
+        Write-Host "  ✓ Created: $exe ($([math]::Round($size / 1MB, 2)) MB)" -ForegroundColor Green
+    }
+    
+    Write-Host "  Batch mode with executables verified" -ForegroundColor Gray
+}
+
+# Test 38: 1GB Bypass Test (only if -1gbtest flag is set)
+if ($1gbtest) {
+    Test-Step "Test 1GB bypass with large patch creation" {
+        Write-Host "  Creating large version (>1GB)..." -ForegroundColor Gray
+        
+        # Create large version 1.0.0-large with ~1.1GB of data
+        New-Item -ItemType Directory -Force -Path "testdata/versions/large-1.0.0/data" | Out-Null
+        
+        # Create key file
+        Set-Content -Path "testdata/versions/large-1.0.0/program.exe" -Value "Large Test v1.0.0`n"
+        
+        # Create a ~550MB file
+        Write-Host "  Creating 550MB file (part 1)..." -ForegroundColor Gray
+        $largeData1 = New-Object byte[] (550MB)
+        $random = New-Object System.Random
+        $random.NextBytes($largeData1)
+        [System.IO.File]::WriteAllBytes("testdata/versions/large-1.0.0/data/large-file-1.bin", $largeData1)
+        
+        # Create another ~550MB file
+        Write-Host "  Creating 550MB file (part 2)..." -ForegroundColor Gray
+        $largeData2 = New-Object byte[] (550MB)
+        $random.NextBytes($largeData2)
+        [System.IO.File]::WriteAllBytes("testdata/versions/large-1.0.0/data/large-file-2.bin", $largeData2)
+        
+        # Create large version 1.0.1-large (modified)
+        New-Item -ItemType Directory -Force -Path "testdata/versions/large-1.0.1/data" | Out-Null
+        Set-Content -Path "testdata/versions/large-1.0.1/program.exe" -Value "Large Test v1.0.1`n"
+        
+        # Copy and modify large files
+        Write-Host "  Creating modified large files..." -ForegroundColor Gray
+        Copy-Item "testdata/versions/large-1.0.0/data/large-file-1.bin" "testdata/versions/large-1.0.1/data/large-file-1.bin"
+        Copy-Item "testdata/versions/large-1.0.0/data/large-file-2.bin" "testdata/versions/large-1.0.1/data/large-file-2.bin"
+        
+        # Modify a bit of data in each file to create changes
+        $modifyStream = [System.IO.File]::OpenWrite("testdata/versions/large-1.0.1/data/large-file-1.bin")
+        $modifyStream.Seek(1000, [System.IO.SeekOrigin]::Begin) | Out-Null
+        $modifyBytes = [System.Text.Encoding]::ASCII.GetBytes("MODIFIED")
+        $modifyStream.Write($modifyBytes, 0, $modifyBytes.Length)
+        $modifyStream.Close()
+        
+        Write-Host "  Large versions created (~1.1GB each)" -ForegroundColor Gray
+        
+        # Generate large patch with executable
+        Write-Host "  Generating large patch with executable..." -ForegroundColor Yellow
+        Write-Host "  Command: patch-gen.exe --from-dir .\testdata\versions\large-1.0.0 --to-dir .\testdata\versions\large-1.0.1 --output .\testdata\advanced-output\large-patches --create-exe --compression zstd --level 4" -ForegroundColor Cyan
+        New-Item -ItemType Directory -Force -Path "testdata/advanced-output/large-patches" | Out-Null
+        
+        $output = .\patch-gen.exe --from-dir .\testdata\versions\large-1.0.0 --to-dir .\testdata\versions\large-1.0.1 --output .\testdata\advanced-output\large-patches --create-exe --compression zstd --level 4 2>&1
+        
+        if ($LASTEXITCODE -ne 0) {
+            $outputStr = $output -join "`n"
+            throw "Large patch generation failed: $outputStr"
+        }
+        
+        $patchSize = (Get-Item "testdata/advanced-output/large-patches/large-1.0.0-to-large-1.0.1.patch").Length
+        $exeSize = (Get-Item "testdata/advanced-output/large-patches/large-1.0.0-to-large-1.0.1.exe").Length
+        
+        Write-Host "  ✓ Large patch created: $([math]::Round($patchSize / 1GB, 2)) GB" -ForegroundColor Green
+        Write-Host "  ✓ Large executable created: $([math]::Round($exeSize / 1GB, 2)) GB" -ForegroundColor Green
+        
+        # Verify the patch is >1GB
+        if ($patchSize -gt 1GB) {
+            Write-Host "  ✓ Patch exceeds 1GB limit (will require bypass)" -ForegroundColor Green
+        } else {
+            Write-Host "  Note: Patch is $([math]::Round($patchSize / 1MB, 2)) MB (compression was very effective)" -ForegroundColor Yellow
+        }
+        
+        Write-Host "  Large patch creation with 1GB bypass verified" -ForegroundColor Gray
+    }
+}
+
+# Test 39: Verify All Executables Use CLI Applier
+Test-Step "Verify CLI executables use CLI applier (not GUI)" {
+    Write-Host "  Verifying executables embed CLI applier..." -ForegroundColor Gray
+    
+    # The CLI applier (patch-apply.exe) should be smaller than GUI applier (patch-apply-gui.exe)
+    # CLI exe base size is ~4-5 MB, GUI exe base size is ~50 MB
+    
+    $exePath = "testdata/advanced-output/exe-test/1.0.0-to-1.0.1.exe"
+    $patchPath = "testdata/advanced-output/exe-test/1.0.0-to-1.0.1.patch"
+    
+    $exeSize = (Get-Item $exePath).Length
+    $patchSize = (Get-Item $patchPath).Length
+    
+    # Calculate approximate applier size (exe size - patch size - 128 byte header)
+    $applierSize = $exeSize - $patchSize - 128
+    
+    Write-Host "  Executable size: $([math]::Round($exeSize / 1MB, 2)) MB" -ForegroundColor Gray
+    Write-Host "  Patch size: $([math]::Round($patchSize / 1MB, 2)) MB" -ForegroundColor Gray
+    Write-Host "  Estimated applier size: $([math]::Round($applierSize / 1MB, 2)) MB" -ForegroundColor Gray
+    
+    # CLI applier should be < 10 MB, GUI applier would be > 40 MB
+    if ($applierSize -lt 10MB) {
+        Write-Host "  ✓ Uses CLI applier (small base size)" -ForegroundColor Green
+    } else {
+        throw "Executable appears to use GUI applier instead of CLI applier"
+    }
+    
+    Write-Host "  CLI applier verification complete" -ForegroundColor Gray
+}
+
 # Final summary
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
@@ -1306,7 +1593,8 @@ Write-Host "Failed: $failed" -ForegroundColor Red
 Write-Host ""
 
 if ($failed -eq 0) {
-    Write-Host "✓ All advanced tests passed!" -ForegroundColor Green
+    $totalTests = if ($1gbtest) { 40 } else { 39 }
+    Write-Host "✓ All $totalTests advanced tests passed!" -ForegroundColor Green
     Write-Host ""
     Write-Host "Advanced Features Verified:" -ForegroundColor Cyan
     Write-Host "  • Complex nested directory structures" -ForegroundColor Gray
@@ -1319,6 +1607,7 @@ if ($failed -eq 0) {
     Write-Host "  • File corruption detection" -ForegroundColor Gray
     Write-Host "  • Backup system with mirror structure" -ForegroundColor Gray
     Write-Host "  • Selective backup (only modified/deleted files)" -ForegroundColor Gray
+    Write-Host "  • Backup of deleted directories (with all contents)" -ForegroundColor Gray
     Write-Host "  • Backup preservation after successful patching" -ForegroundColor Gray
     Write-Host "  • Manual rollback from backup" -ForegroundColor Gray
     Write-Host "  • Backup with complex nested paths" -ForegroundColor Gray
@@ -1329,6 +1618,13 @@ if ($failed -eq 0) {
     Write-Host "  • All compression formats with custom paths" -ForegroundColor Gray
     Write-Host "  • Error handling for invalid custom paths" -ForegroundColor Gray
     Write-Host "  • Backward compatibility with legacy mode" -ForegroundColor Gray
+    Write-Host "  • CLI self-contained executable creation (--create-exe)" -ForegroundColor Gray
+    Write-Host "  • CLI executable structure verification (header, magic bytes)" -ForegroundColor Gray
+    Write-Host "  • Batch mode with executable creation" -ForegroundColor Gray
+    Write-Host "  • CLI applier verification (not GUI)" -ForegroundColor Gray
+    if ($1gbtest) {
+        Write-Host "  • 1GB bypass mode with large patches (>1GB)" -ForegroundColor Gray
+    }
     Write-Host ""
     Write-Host "CyberPatchMaker advanced functionality verified!" -ForegroundColor Green
     

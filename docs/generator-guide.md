@@ -6,6 +6,18 @@ Complete guide to using the CyberPatchMaker generator tool for creating delta pa
 
 The generator tool creates efficient binary patches between software versions. It compares two complete directory trees and generates a small patch file containing only the changes.
 
+> **💡 GUI Alternative Available**
+> 
+> For a visual interface with additional features like self-contained executables, see the [GUI Usage Guide](gui-usage.md).
+> 
+> The GUI includes:
+> - User-friendly interface for all options
+> - Real-time validation and progress monitoring
+> - **Self-contained executable creation** (generates standalone `.exe` files with embedded patches)
+> - Batch mode for generating multiple patches at once
+> 
+> This guide focuses on the command-line tool.
+
 ## Basic Usage
 
 ### Generate Patches from All Versions to New Version
@@ -13,7 +25,7 @@ The generator tool creates efficient binary patches between software versions. I
 **The most common use case** - generate patches from all existing versions to your new release:
 
 ```bash
-generator --versions-dir ./versions --new-version 1.0.3 --output ./patches
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches
 ```
 
 This will:
@@ -62,7 +74,7 @@ Successfully generated 3 patches
 To create one patch between two specific versions:
 
 ```bash
-generator --from 1.0.0 --to 1.0.3 --output ./patches/custom-patch.patch
+patch-gen --from 1.0.0 --to 1.0.3 --output ./patches/custom-patch.patch
 ```
 
 This requires both versions to already be registered in the system.
@@ -127,6 +139,14 @@ This requires both versions to already be registered in the system.
 - Recommended for production patches
 - Adds time to generation process
 
+**`--create-exe`**
+- Create self-contained CLI executable
+- Embeds patch data into a standalone `.exe` file
+- Creates both `.patch` file and `.exe` file
+- Uses CLI applier (console interface) instead of GUI
+- See [Self-Contained Executables Guide](self-contained-executables.md) for details
+- Works with all generation modes (single, batch, custom paths)
+
 **`--help`**
 - Display usage information
 - Shows all available options
@@ -150,7 +170,7 @@ This requires both versions to already be registered in the system.
 **Custom Path Example:**
 ```bash
 # Generate patch from arbitrary locations
-generator --from-dir D:\old\1.0.0 --to-dir C:\new\1.0.3 --output ./patch.patch
+patch-gen --from-dir D:\old\1.0.0 --to-dir C:\new\1.0.3 --output ./patch.patch
 ```
 
 **When to Use Custom Paths:**
@@ -287,7 +307,7 @@ mkdir versions\1.0.3
 xcopy /E C:\builds\v1.0.3\* versions\1.0.3\
 
 # Generate all patches
-generator --versions-dir ./versions --new-version 1.0.3 --output ./patches --verify
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --verify
 ```
 
 Result:
@@ -304,7 +324,7 @@ Upload these patches to your update server.
 Generate a specific patch with gzip compression:
 
 ```bash
-generator --from 1.0.0 --to 1.0.2 --output ./patches/legacy.patch --compression gzip --verify
+patch-gen --from 1.0.0 --to 1.0.2 --output ./patches/legacy.patch --compression gzip --verify
 ```
 
 ---
@@ -314,7 +334,7 @@ generator --from 1.0.0 --to 1.0.2 --output ./patches/legacy.patch --compression 
 Generate patches with maximum compression for slow internet users:
 
 ```bash
-generator --versions-dir ./versions --new-version 1.0.3 --output ./patches --compression zstd --level 4
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --compression zstd --level 4
 ```
 
 Note: Level 4 takes longer but creates smallest patches.
@@ -326,16 +346,16 @@ Note: Level 4 takes longer but creates smallest patches.
 **Generate downgrade patch to roll back from 1.0.3 to 1.0.2:**
 
 ```bash
-generator --from 1.0.3 --to 1.0.2 --versions-dir ./versions --output ./patches/downgrade --verify
+patch-gen --from 1.0.3 --to 1.0.2 --versions-dir ./versions --output ./patches/downgrade --verify
 ```
 
 **Generate all downgrade paths from current version:**
 
 ```bash
 # From 1.0.3 to each previous version
-generator --from 1.0.3 --to 1.0.2 --versions-dir ./versions --output ./patches/downgrade
-generator --from 1.0.3 --to 1.0.1 --versions-dir ./versions --output ./patches/downgrade
-generator --from 1.0.3 --to 1.0.0 --versions-dir ./versions --output ./patches/downgrade
+patch-gen --from 1.0.3 --to 1.0.2 --versions-dir ./versions --output ./patches/downgrade
+patch-gen --from 1.0.3 --to 1.0.1 --versions-dir ./versions --output ./patches/downgrade
+patch-gen --from 1.0.3 --to 1.0.0 --versions-dir ./versions --output ./patches/downgrade
 ```
 
 **Result:**
@@ -360,8 +380,42 @@ patches/downgrade/
 Generate patches quickly without compression for local testing:
 
 ```bash
-generator --versions-dir ./versions --new-version 1.0.3 --output ./patches --compression none
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --compression none
 ```
+
+---
+
+### Example 6: Self-Contained Executables (CLI)
+
+Create standalone executables with embedded patches for easy distribution:
+
+```bash
+# Single patch with self-contained executable
+patch-gen --from-dir "C:\releases\1.0.0" --to-dir "C:\releases\1.0.1" --output ./patches --create-exe
+
+# Batch mode with executables for all versions
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --create-exe --verify
+```
+
+**Result:**
+```
+patches/
+├── 1.0.0-to-1.0.3.patch     ← Standard patch file
+├── 1.0.0-to-1.0.3.exe       ← Self-contained CLI executable
+├── 1.0.1-to-1.0.3.patch
+├── 1.0.1-to-1.0.3.exe       ← Self-contained CLI executable
+├── 1.0.2-to-1.0.3.patch
+└── 1.0.2-to-1.0.3.exe       ← Self-contained CLI executable
+```
+
+**User Experience:**
+- Users download the `.exe` matching their version
+- Double-click to run - shows interactive console menu
+- Choose "Dry Run" to simulate, or "Apply Patch" to update
+- Can toggle 1GB bypass mode if needed
+- No need to download separate patch files or tools
+
+See [Self-Contained Executables Guide](self-contained-executables.md) for complete documentation.
 
 ---
 

@@ -11,6 +11,7 @@ Welcome to the CyberPatchMaker documentation wiki. This comprehensive guide cove
 - ✅ [Generator Tool Guide](generator-guide.md) - Complete guide to patch generation (CLI)
 - ✅ [Applier Tool Guide](applier-guide.md) - Complete guide to patch application (CLI)
 - 🧪 [GUI Usage Guide](gui-usage.md) - Using the graphical interface **(Experimental)**
+- ✨ [Self-Contained Executables](self-contained-executables.md) - Create standalone patch executables **(New!)**
 - ✅ [Downgrade Guide](downgrade-guide.md) - Rollback to previous versions
 - ✅ [CLI Reference](cli-reference.md) - Quick command-line reference
 - ✅ [CLI Examples](CLI-EXAMPLES.md) - Real-world command examples
@@ -40,11 +41,12 @@ Welcome to the CyberPatchMaker documentation wiki. This comprehensive guide cove
 - **Need Help?** Start with the [Quick Start Guide](quick-start.md)
 - **Generating Patches?** See [Generator Tool Guide](generator-guide.md) ✅
 - **Applying Patches?** See [Applier Tool Guide](applier-guide.md) ✅
+- **Want Simple Distribution?** Check out [Self-Contained Executables](self-contained-executables.md) ✨
 - **Understanding Backups?** Read [Backup System](backup-system.md) ✅
 - **Something Not Working?** Check [Troubleshooting](troubleshooting.md)
 - **Want to Contribute?** Read [Development Setup](development-setup.md)
 
-**Legend:** ✅ = Production Ready | 🧪 = Experimental (In Development)
+**Legend:** ✅ = Production Ready | 🧪 = Experimental (In Development) | ✨ = New Feature
 
 ## Documentation Version
 

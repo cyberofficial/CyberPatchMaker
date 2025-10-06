@@ -26,7 +26,8 @@ Perfect for:
 ✅ **Bidirectional** - Generate both upgrade and downgrade patches for version flexibility  
 ✅ **Cross-Platform** - Works on Windows, macOS, and Linux  
 ✅ **Developer-Friendly** - Simple command-line tools  
-✅ **Production-Ready** - Built-in backup and recovery systems
+✅ **Production-Ready** - Built-in backup and recovery systems  
+✨ **Self-Contained Executables** - Create standalone `.exe` files for easy end-user distribution **(New!)**
 
 ## Quick Start
 
@@ -213,6 +214,7 @@ All documentation is in the [docs/](docs/) folder:
 **Reference:**
 - [Generator Guide](docs/generator-guide.md) - Creating patches
 - [Applier Guide](docs/applier-guide.md) - Applying patches
+- [Self-Contained Executables](docs/self-contained-executables.md) - Standalone patch distribution
 - [CLI Reference](docs/cli-reference.md) - All commands and options
 
 **Advanced:**

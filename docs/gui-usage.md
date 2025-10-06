@@ -52,6 +52,18 @@ The Patch Generator GUI provides a user-friendly interface for creating binary p
   - Improves performance by avoiding unnecessary diffs
   - Reduces patch size for files that haven't changed
   - Default: Enabled
+- **Ignore 1GB limit (use with caution)**: Bypass the 1GB patch size safety limit
+  - Allows creating self-contained executables with patches larger than 1GB
+  - Use only when necessary (e.g., very large updates)
+  - End users may need to use CLI flag `--ignore1gb` or enable checkbox when applying
+  - Default: Disabled
+- **Create self-contained executable**: Generate standalone `.exe` with embedded patch data
+  - Creates both `.patch` file and self-contained `.exe` file
+  - End users get single file that includes applier + patch data
+  - Executable size: ~50 MB + patch size
+  - Perfect for non-technical users (just double-click to apply)
+  - See [Self-Contained Executables Guide](self-contained-executables.md) for details
+  - Default: Disabled
 
 #### Patch Generation
 
@@ -179,10 +191,17 @@ The log area shows detailed information:
 7. **Advanced options**:
    - Keep "Verify" enabled for production patches (catches errors early)
    - "Skip identical" improves performance (recommended)
-8. **Batch mode benefits**:
+8. **Self-contained executables**:
+   - Enable the checkbox for end-user friendly distribution
+   - Creates both `.patch` (advanced) and `.exe` (simple) files
+   - Perfect for non-technical users - just double-click and apply
+   - Increases file size by ~50 MB per patch (includes GUI applier)
+   - See [Self-Contained Executables Guide](self-contained-executables.md) for details
+9. **Batch mode benefits**:
    - Generate all upgrade paths at once
    - Consistent compression settings across all patches
    - Faster than manual single-patch generation
+   - Works with self-contained executables (creates .exe for each patch)
 
 ### Error Handling
 
@@ -228,6 +247,10 @@ The Batch Script Generator tab provides a tool for creating Windows batch script
 - **Disable backup (--backup=false)**: Skip backup creation
   - Saves disk space
   - Not recommended for production use
+- **Ignore 1GB limit (use with caution)**: Bypass the 1GB patch size safety limit
+  - Allows self-contained executables with patches larger than 1GB
+  - Use only when necessary (e.g., large game updates)
+  - Increases memory usage during patch loading
 
 #### Custom Instructions
 - Add custom messages for end users
@@ -300,7 +323,7 @@ echo.
 echo Applying patch...
 echo.
 
-applier.exe --patch "1.0.0-to-1.0.2.patch" --current-dir "%~dp0"
+patch-apply.exe --patch "1.0.0-to-1.0.2.patch" --current-dir "%~dp0"
 
 if %ERRORLEVEL% EQU 0 (
     echo.
@@ -337,7 +360,7 @@ pause
    MyApp_Update_1.0.2\
    ├── 1.0.0-to-1.0.2.patch
    ├── 1.0.1-to-1.0.2.patch
-   ├── applier.exe          ← Include the CLI applier
+   ├── patch-apply.exe          ← Include the CLI applier
    ├── apply_from_1.0.0.bat ← Batch script for 1.0.0 users
    └── apply_from_1.0.1.bat ← Batch script for 1.0.1 users
    ```
@@ -350,7 +373,7 @@ pause
    - Name them clearly: `apply_from_1.0.0.bat`, `apply_from_1.0.1.bat`
    - Users can easily identify which script to use
 
-2. **Include applier.exe**: Always package `applier.exe` with your batch scripts
+2. **Include patch-apply.exe**: Always package `patch-apply.exe` with your batch scripts
    - Batch script calls `applier.exe` from the same directory
    - Users don't need CyberPatchMaker installed
 
@@ -412,6 +435,32 @@ While the GUI can generate batch scripts for end users, patches can also be appl
 ```
 
 See [applier-guide.md](applier-guide.md) for detailed instructions on applying patches.
+
+### GUI Applier Custom Key File
+
+The GUI applier includes support for specifying custom key file paths when the key file has been renamed or moved:
+
+**Fields:**
+- **Patch File**: Select the `.patch` file to apply
+- **Current Dir**: Select the directory containing the current installation
+- **Custom Key**: (Optional) Specify custom key file path if renamed
+  - Leave empty to use the default key file from the patch
+  - Enter relative path (e.g., `app.exe`) or absolute path
+  - Click "Browse" to select the file with a file picker
+
+**Use Cases:**
+- Main executable was renamed (e.g., `program.exe` → `MyApp.exe`)
+- Key file moved to subdirectory (e.g., `program.exe` → `bin/program.exe`)
+- Testing scenarios with renamed files
+
+**Example:**
+```
+Patch File:    E:\patches\1.0.0-to-1.0.1.patch
+Current Dir:   E:\MyApp
+Custom Key:    MyApp.exe          ← Specify renamed key file
+```
+
+The custom key file will be used for version verification instead of the default key file path stored in the patch.
 
 ## Building the GUI
 

@@ -4,7 +4,7 @@ This document provides comprehensive examples for every command-line argument av
 
 ## Table of Contents
 
-- [Generator Tool (`generator.exe`)](#generator-tool-generatorexe)
+- [Generator Tool (`patch-gen.exe`)](#generator-tool-generatorexe)
   - [Basic Usage](#basic-usage)
   - [--versions-dir](#--versions-dir)
   - [--new-version](#--new-version)
@@ -14,7 +14,7 @@ This document provides comprehensive examples for every command-line argument av
   - [--level](#--level)
   - [--verify](#--verify)
   - [--help](#--help-generator)
-- [Applier Tool (`applier.exe`)](#applier-tool-applierexe)
+- [Applier Tool (`patch-apply.exe`)](#applier-tool-applierexe)
   - [Basic Usage](#basic-usage-1)
   - [--patch](#--patch)
   - [--current-dir](#--current-dir)
@@ -27,7 +27,7 @@ This document provides comprehensive examples for every command-line argument av
 
 ---
 
-## Generator Tool (`generator.exe`)
+## Generator Tool (`patch-gen.exe`)
 
 The generator tool creates binary patch files by comparing two versions of your application.
 
@@ -35,12 +35,12 @@ The generator tool creates binary patch files by comparing two versions of your 
 
 **Minimum required arguments:**
 ```powershell
-generator.exe --versions-dir <path> --from <version> --to <version> --output <path>
+patch-gen.exe --versions-dir <path> --from <version> --to <version> --output <path>
 ```
 
 **Example:**
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
 ```
 
 **Output:**
@@ -78,22 +78,22 @@ versions/
 
 #### Example 1: Local Versions Directory
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
 ```
 
 #### Example 2: Absolute Path
 ```powershell
-generator.exe --versions-dir C:\MyApp\releases --from 2.5.0 --to 2.5.1 --output C:\patches
+patch-gen.exe --versions-dir C:\MyApp\releases --from 2.5.0 --to 2.5.1 --output C:\patches
 ```
 
 #### Example 3: Network Path
 ```powershell
-generator.exe --versions-dir \\server\share\versions --from 3.0.0 --to 3.1.0 --output .\patches
+patch-gen.exe --versions-dir \\server\share\versions --from 3.0.0 --to 3.1.0 --output .\patches
 ```
 
 #### Example 4: Different Drive
 ```powershell
-generator.exe --versions-dir D:\builds\versions --from 1.0.0 --to 1.0.1 --output E:\patches
+patch-gen.exe --versions-dir D:\builds\versions --from 1.0.0 --to 1.0.1 --output E:\patches
 ```
 
 **What This Does:**
@@ -114,7 +114,7 @@ generator.exe --versions-dir D:\builds\versions --from 1.0.0 --to 1.0.1 --output
 
 #### Example 1: Generate All Patches for New Release
 ```powershell
-generator.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches
+patch-gen.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches
 ```
 
 **What This Does:**
@@ -138,7 +138,7 @@ Successfully generated 3 patches
 
 #### Example 2: New Major Version
 ```powershell
-generator.exe --versions-dir C:\releases --new-version 2.0.0 --output C:\patches
+patch-gen.exe --versions-dir C:\releases --new-version 2.0.0 --output C:\patches
 ```
 
 **Use Case:**
@@ -158,7 +158,7 @@ generator.exe --versions-dir C:\releases --new-version 2.0.0 --output C:\patches
 
 #### Example 1: Simple Version Update
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
 ```
 
 **Output:**
@@ -168,7 +168,7 @@ Patch created: .\patches\1.0.0-to-1.0.1.patch
 
 #### Example 2: Skip a Version
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.2 --output .\patches
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.2 --output .\patches
 ```
 
 **Use Case:**
@@ -177,12 +177,12 @@ generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.2 --output .\patch
 
 #### Example 3: Major Version Jump
 ```powershell
-generator.exe --versions-dir .\versions --from 1.5.0 --to 2.0.0 --output .\patches
+patch-gen.exe --versions-dir .\versions --from 1.5.0 --to 2.0.0 --output .\patches
 ```
 
 #### Example 4: Semantic Versioning
 ```powershell
-generator.exe --versions-dir .\versions --from 2.1.3 --to 2.1.4 --output .\patches
+patch-gen.exe --versions-dir .\versions --from 2.1.3 --to 2.1.4 --output .\patches
 ```
 
 **Version Number Rules:**
@@ -204,35 +204,35 @@ generator.exe --versions-dir .\versions --from 2.1.3 --to 2.1.4 --output .\patch
 
 #### Example 1: Relative Path
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
 ```
 
 **Result:** Creates `.\patches\1.0.0-to-1.0.1.patch`
 
 #### Example 2: Absolute Path
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output C:\MyApp\updates\patches
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output C:\MyApp\updates\patches
 ```
 
 **Result:** Creates `C:\MyApp\updates\patches\1.0.0-to-1.0.1.patch`
 
 #### Example 3: Network Share
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output \\fileserver\updates\patches
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output \\fileserver\updates\patches
 ```
 
 **Use Case:** Store patches on a central server for distribution
 
 #### Example 4: Nested Directory
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\release\v1.0.1\patches
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\release\v1.0.1\patches
 ```
 
 **Result:** Creates nested directories if they don't exist
 
 #### Example 5: Different Drive
 ```powershell
-generator.exe --versions-dir C:\builds\versions --from 1.0.0 --to 1.0.1 --output E:\distribution\patches
+patch-gen.exe --versions-dir C:\builds\versions --from 1.0.0 --to 1.0.1 --output E:\distribution\patches
 ```
 
 ---
@@ -250,14 +250,14 @@ generator.exe --versions-dir C:\builds\versions --from 1.0.0 --to 1.0.1 --output
 
 #### Example 1: Default (zstd)
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
 ```
 
 **Result:** Creates patch with zstd compression (~2.3 MB)
 
 #### Example 2: Gzip Compression
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression gzip
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression gzip
 ```
 
 **Use Case:** Maximum compatibility - gzip is supported everywhere
@@ -273,7 +273,7 @@ Size: 2.5 MB
 
 #### Example 3: No Compression
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression none
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression none
 ```
 
 **Use Case:** 
@@ -293,13 +293,13 @@ Size: 7.8 MB (uncompressed)
 #### Example 4: Comparing All Compression Methods
 ```powershell
 # Generate with zstd
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches-zstd --compression zstd
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches-zstd --compression zstd
 
 # Generate with gzip
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches-gzip --compression gzip
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches-gzip --compression gzip
 
 # Generate with no compression
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches-none --compression none
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches-none --compression none
 ```
 
 **Results:**
@@ -329,14 +329,14 @@ none: 7.8 MB (no compression overhead)
 
 #### Example 1: Default Level
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression zstd
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression zstd
 ```
 
 **Result:** Uses level 3 (balanced speed and size)
 
 #### Example 2: Fastest Compression (zstd)
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression zstd --level 1
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression zstd --level 1
 ```
 
 **Use Case:** Quick patch generation, size less important
@@ -351,7 +351,7 @@ Time: 0.8 seconds
 
 #### Example 3: Maximum Compression (zstd)
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression zstd --level 4
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression zstd --level 4
 ```
 
 **Use Case:** Minimize download size, time less important
@@ -366,7 +366,7 @@ Time: 2.3 seconds
 
 #### Example 4: Gzip with Custom Level
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression gzip --level 6
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression gzip --level 6
 ```
 
 **Output:**
@@ -378,7 +378,7 @@ Size: 2.4 MB
 
 #### Example 5: Maximum Gzip Compression
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression gzip --level 9
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression gzip --level 9
 ```
 
 **Use Case:** Absolute minimum file size with gzip
@@ -415,7 +415,7 @@ Level 9: 2.4 MB, 3.2 seconds (maximum)
 
 #### Example 1: Default (Verification Enabled)
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
 ```
 
 **Output:**
@@ -431,14 +431,14 @@ Verification passed
 
 #### Example 2: Explicitly Enable Verification
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --verify=true
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --verify=true
 ```
 
 **Same as default behavior**
 
 #### Example 3: Disable Verification (Not Recommended)
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --verify=false
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --verify=false
 ```
 
 **Use Case:**
@@ -455,7 +455,7 @@ Patch created: .\patches\1.0.0-to-1.0.1.patch
 
 #### Example 4: Verification with Multiple Patches
 ```powershell
-generator.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches --verify=true
+patch-gen.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches --verify=true
 ```
 
 **Output:**
@@ -482,6 +482,115 @@ All patches verified successfully
 
 ---
 
+### `--create-exe`
+
+**Purpose:** Create self-contained CLI executable with embedded patch data.
+
+**Type:** Boolean (optional, default: `false`)
+
+**Behavior:**
+- Creates both `.patch` file and `.exe` file
+- Embeds patch data into CLI applier executable
+- Results in standalone executable that users can run directly
+- Uses console interface (not GUI)
+- See [Self-Contained Executables Guide](self-contained-executables.md) for details
+
+#### Example 1: Single Patch with Executable
+```powershell
+patch-gen.exe --from-dir "C:\releases\1.0.0" --to-dir "C:\releases\1.0.1" --output .\patches --create-exe
+```
+
+**Output:**
+```
+Generating patch from 1.0.0 to 1.0.1...
+Patch saved to: .\patches\1.0.0-to-1.0.1.patch
+✓ Created executable: .\patches\1.0.0-to-1.0.1.exe
+```
+
+**Result:**
+```
+patches/
+├── 1.0.0-to-1.0.1.patch     (2.3 MB - standard patch file)
+└── 1.0.0-to-1.0.1.exe       (52.8 MB - self-contained executable)
+```
+
+#### Example 2: Batch Mode with Executables
+```powershell
+patch-gen.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches --create-exe
+```
+
+**Output:**
+```
+Generating patches for new version 1.0.3
+Processing version 1.0.0...
+  Patch saved: 1.0.0-to-1.0.3.patch
+  ✓ Created executable: 1.0.0-to-1.0.3.exe
+Processing version 1.0.1...
+  Patch saved: 1.0.1-to-1.0.3.patch
+  ✓ Created executable: 1.0.1-to-1.0.3.exe
+Processing version 1.0.2...
+  Patch saved: 1.0.2-to-1.0.3.patch
+  ✓ Created executable: 1.0.2-to-1.0.3.exe
+Successfully generated 3 patches and executables
+```
+
+#### Example 3: With Verification
+```powershell
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --create-exe --verify
+```
+
+**Verifies patch before creating executable**
+
+#### Example 4: Custom Compression with Executable
+```powershell
+patch-gen.exe --from-dir "D:\v1" --to-dir "D:\v2" --output .\dist --compression zstd --level 4 --create-exe
+```
+
+**Creates highly compressed self-contained executable**
+
+**User Experience:**
+When users run the created `.exe` file:
+```
+==============================================
+  CyberPatchMaker - Self-Contained Patch
+==============================================
+
+=== Patch Information ===
+From Version:     1.0.0
+To Version:       1.0.1
+Key File:         program.exe
+Files Added:      5
+Files Modified:   12
+Files Deleted:    2
+
+Target directory [C:\Program Files\MyApp]:
+
+==============================================
+Options:
+  1. Dry Run (simulate without changes)
+  2. Apply Patch
+  3. Toggle 1GB Bypass Mode (currently: Disabled)
+  4. Change Target Directory
+  5. Exit
+==============================================
+Select option [1-5]:
+```
+
+**Benefits:**
+- ✅ Users only need one file
+- ✅ No separate tools required
+- ✅ Interactive console interface
+- ✅ Can't select wrong patch file
+- ✅ Includes dry-run option
+- ✅ 1GB bypass toggle available
+
+**Considerations:**
+- ⚠ Larger file size (~50 MB base + patch data)
+- ⚠ Higher bandwidth for distribution
+- ⚠ Requires `patch-apply.exe` in same directory as generator
+
+---
+
 ### `--help` (Generator)
 
 **Purpose:** Display usage information and available options.
@@ -490,7 +599,7 @@ All patches verified successfully
 
 #### Example 1: Show Help
 ```powershell
-generator.exe --help
+patch-gen.exe --help
 ```
 
 **Output:**
@@ -499,7 +608,7 @@ CyberPatchMaker - Generator Tool
 Version: 0.1.0
 
 Usage:
-  generator.exe [options]
+  patch-gen.exe [options]
 
 Required Arguments (Mode 1 - Single Patch):
   --versions-dir string    Directory containing version folders
@@ -520,28 +629,28 @@ Optional Arguments:
 
 Examples:
   # Generate single patch
-  generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
+  patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
 
   # Generate patches for new version
-  generator.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches
+  patch-gen.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches
 
   # Use gzip compression
-  generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression gzip
+  patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression gzip
 
   # Maximum compression
-  generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression zstd --level 4
+  patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression zstd --level 4
 ```
 
 #### Example 2: Help Shortcut
 ```powershell
-generator.exe -help
+patch-gen.exe -help
 ```
 
 **Same output as `--help`**
 
 ---
 
-## Applier Tool (`applier.exe`)
+## Applier Tool (`patch-apply.exe`)
 
 The applier tool applies binary patch files to update an application from one version to another.
 
@@ -549,12 +658,12 @@ The applier tool applies binary patch files to update an application from one ve
 
 **Minimum required arguments:**
 ```powershell
-applier.exe --patch <patch-file> --current-dir <directory>
+patch-apply.exe --patch <patch-file> --current-dir <directory>
 ```
 
 **Example:**
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 ```
 
 **Output:**
@@ -586,17 +695,17 @@ Backup preserved in: C:\MyApp\backup.cyberpatcher
 
 #### Example 1: Relative Path
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 ```
 
 #### Example 2: Absolute Path
 ```powershell
-applier.exe --patch C:\updates\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
+patch-apply.exe --patch C:\updates\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 ```
 
 #### Example 3: Network Path
 ```powershell
-applier.exe --patch \\server\updates\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
+patch-apply.exe --patch \\server\updates\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 ```
 
 **Use Case:** Download patches from central server
@@ -604,13 +713,13 @@ applier.exe --patch \\server\updates\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 #### Example 4: Different Compression Types
 ```powershell
 # Apply zstd-compressed patch
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 
 # Apply gzip-compressed patch (same command, auto-detected)
-applier.exe --patch .\patches-gzip\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
+patch-apply.exe --patch .\patches-gzip\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 
 # Apply uncompressed patch (same command, auto-detected)
-applier.exe --patch .\patches-none\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
+patch-apply.exe --patch .\patches-none\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 ```
 
 **Note:** Compression type is auto-detected from patch file metadata.
@@ -627,7 +736,7 @@ applier.exe --patch .\patches-none\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 
 #### Example 1: Local Application Directory
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 ```
 
 **What This Does:**
@@ -637,24 +746,24 @@ applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 
 #### Example 2: Relative Path
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir .\application
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir .\application
 ```
 
 #### Example 3: Different Drive
 ```powershell
-applier.exe --patch C:\patches\1.0.0-to-1.0.1.patch --current-dir D:\MyApp
+patch-apply.exe --patch C:\patches\1.0.0-to-1.0.1.patch --current-dir D:\MyApp
 ```
 
 #### Example 4: Network Installation
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir \\server\apps\myapp
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir \\server\apps\myapp
 ```
 
 **Use Case:** Update applications on network shares
 
 #### Example 5: Program Files
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir "C:\Program Files\MyApp"
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir "C:\Program Files\MyApp"
 ```
 
 **Note:** Requires administrator privileges for Program Files
@@ -671,7 +780,7 @@ applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir "C:\Program Fil
 
 #### Example 1: Dry Run Before Applying
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --dry-run
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --dry-run
 ```
 
 **Output:**
@@ -700,12 +809,12 @@ Operations that would be performed:
 ✓ All operations are valid
 
 To apply this patch for real, run without --dry-run:
-  applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
+  patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 ```
 
 #### Example 2: Dry Run with Verification
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --dry-run --verify
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --dry-run --verify
 ```
 
 **Additional Output:**
@@ -718,7 +827,7 @@ Verifying file hashes...
 #### Example 3: Check Compatibility
 ```powershell
 # Test if patch can be applied to current installation
-applier.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir C:\MyApp --dry-run
+patch-apply.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir C:\MyApp --dry-run
 ```
 
 **If current version is wrong:**
@@ -737,10 +846,10 @@ This patch cannot be applied to the current version.
 #### Example 4: Production Validation Workflow
 ```powershell
 # Step 1: Dry run to validate
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --dry-run
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --dry-run
 
 # Step 2: If successful, apply for real
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 ```
 
 **Benefits of Dry Run:**
@@ -764,7 +873,7 @@ applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 
 #### Example 1: Default (Verification Enabled)
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 ```
 
 **Output:**
@@ -786,14 +895,14 @@ Verifying patched version...
 
 #### Example 2: Explicitly Enable Verification
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --verify=true
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --verify=true
 ```
 
 **Same as default**
 
 #### Example 3: Disable Verification (Not Recommended)
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --verify=false
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --verify=false
 ```
 
 **Use Case:**
@@ -814,7 +923,7 @@ WARNING: Verification was disabled. Use --verify=true for production.
 
 #### Example 4: Verification Catches Corruption
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --verify
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --verify
 ```
 
 **If a file is corrupted:**
@@ -838,7 +947,7 @@ Recommendation:
 
 #### Example 5: Verification Catches Wrong Version
 ```powershell
-applier.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir C:\MyApp --verify
+patch-apply.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir C:\MyApp --verify
 ```
 
 **If current version is 1.0.0:**
@@ -870,6 +979,87 @@ You need to apply the 1.0.0-to-1.0.1 patch first.
 
 ---
 
+### `--ignore1gb`
+
+**Purpose:** Bypass 1GB patch size limit for self-contained executables.
+
+**Type:** Boolean (optional, default: `false`)
+
+**Behavior:**
+- Only applies to self-contained executables (created with `--create-exe`)
+- Allows loading patch data larger than 1GB into memory
+- Standard mode limits patch size to 1GB to prevent memory exhaustion
+- Use with caution on systems with limited RAM
+
+#### Example 1: Running Self-Contained Executable with 1GB Bypass
+```powershell
+# When patch is larger than 1GB
+.\1.0.0-to-1.0.1.exe --ignore1gb
+```
+
+**Output:**
+```
+==============================================
+  CyberPatchMaker - Self-Contained Patch
+==============================================
+
+=== Patch Information ===
+From Version:     1.0.0
+To Version:       1.0.1
+Patch Size:       1.8 GB
+Files Modified:   2,456
+
+Target directory [C:\MyApp]:
+
+==============================================
+Options:
+  1. Dry Run (simulate without changes)
+  2. Apply Patch
+  3. Toggle 1GB Bypass Mode (currently: Enabled)
+  4. Change Target Directory
+  5. Exit
+==============================================
+Select option [1-5]:
+```
+
+#### Example 2: Without Bypass (Default)
+```powershell
+.\large-patch-1.0.0-to-1.0.1.exe
+```
+
+**Output (if patch > 1GB):**
+```
+Warning: Patch size (1.8 GB) exceeds 1GB limit
+Use --ignore1gb flag if you want to proceed anyway
+Press any key to exit...
+```
+
+#### Example 3: Toggle in Interactive Menu
+Users can also toggle the 1GB bypass from within the interactive console:
+```
+Select option [1-5]: 3
+
+1GB Bypass Mode: Enabled
+Warning: Large patches may consume significant memory!
+```
+
+**When to Use:**
+- ✅ Large game updates with many assets
+- ✅ Systems with 8GB+ RAM
+- ✅ Deploying to known hardware configurations
+
+**When NOT to Use:**
+- ❌ Low-memory systems (< 4GB RAM)
+- ❌ Unknown target hardware
+- ❌ When patch can be split into smaller updates
+
+**Considerations:**
+- Large patches require significant RAM to decompress and process
+- On 32-bit systems, memory limitations are more severe
+- Consider splitting very large patches into incremental updates instead
+
+---
+
 ### `--backup`
 
 **Purpose:** Create selective backup of files being changed before patching.
@@ -885,7 +1075,7 @@ You need to apply the 1.0.0-to-1.0.1 patch first.
 
 #### Example 1: Default (Backup Enabled)
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 ```
 
 **Output:**
@@ -909,14 +1099,14 @@ Files can be manually restored if needed. Delete backup.cyberpatcher when no lon
 
 #### Example 2: Explicitly Enable Backup
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --backup=true
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --backup=true
 ```
 
 **Same as default**
 
 #### Example 3: Disable Backup (Not Recommended)
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --backup=false
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --backup=false
 ```
 
 **Use Case:**
@@ -936,7 +1126,7 @@ WARNING: No backup was created. Cannot rollback if issues occur.
 
 #### Example 4: Backup with Large Application
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --backup
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --backup
 ```
 
 **Output for 5GB application (only 15 files changed):**
@@ -984,7 +1174,7 @@ Start-Process C:\MyApp\program.exe
 
 #### Example 6: Automatic Rollback on Failure
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --backup --verify
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --backup --verify
 ```
 
 **If post-verification fails:**
@@ -1027,7 +1217,7 @@ Backup preserved in: C:\MyApp\backup.cyberpatcher for investigation.
 
 #### Example 1: Show Help
 ```powershell
-applier.exe --help
+patch-apply.exe --help
 ```
 
 **Output:**
@@ -1036,7 +1226,7 @@ CyberPatchMaker - Applier Tool
 Version: 0.1.0
 
 Usage:
-  applier.exe [options]
+  patch-apply.exe [options]
 
 Required Arguments:
   --patch string          Path to patch file
@@ -1050,21 +1240,21 @@ Optional Arguments:
 
 Examples:
   # Apply patch with full verification and backup (recommended)
-  applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
+  patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 
   # Dry run to preview changes
-  applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --dry-run
+  patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --dry-run
 
   # Apply without backup (not recommended)
-  applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --backup=false
+  patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --backup=false
 
   # Quick apply (skip verification, not recommended for production)
-  applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --verify=false
+  patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --verify=false
 ```
 
 #### Example 2: Help Shortcut
 ```powershell
-applier.exe -help
+patch-apply.exe -help
 ```
 
 **Same output as `--help`**
@@ -1077,17 +1267,17 @@ applier.exe -help
 
 **Step 1: Generate Patch**
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
 ```
 
 **Step 2: Test with Dry Run**
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --dry-run
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --dry-run
 ```
 
 **Step 3: Apply Patch**
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 ```
 
 ---
@@ -1098,7 +1288,7 @@ applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 
 **Step 1: Generate All Patches at Once**
 ```powershell
-generator.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches --compression zstd
+patch-gen.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches --compression zstd
 ```
 
 **Step 2: Distribute Patches**
@@ -1110,13 +1300,13 @@ Copy-Item .\patches\* \\webserver\downloads\updates\
 **Step 3: Users Apply Appropriate Patch**
 ```powershell
 # User on 1.0.0 downloads and applies:
-applier.exe --patch .\downloads\1.0.0-to-1.0.3.patch --current-dir C:\MyApp
+patch-apply.exe --patch .\downloads\1.0.0-to-1.0.3.patch --current-dir C:\MyApp
 
 # User on 1.0.1 downloads and applies:
-applier.exe --patch .\downloads\1.0.1-to-1.0.3.patch --current-dir C:\MyApp
+patch-apply.exe --patch .\downloads\1.0.1-to-1.0.3.patch --current-dir C:\MyApp
 
 # User on 1.0.2 downloads and applies:
-applier.exe --patch .\downloads\1.0.2-to-1.0.3.patch --current-dir C:\MyApp
+patch-apply.exe --patch .\downloads\1.0.2-to-1.0.3.patch --current-dir C:\MyApp
 ```
 
 ---
@@ -1127,12 +1317,12 @@ applier.exe --patch .\downloads\1.0.2-to-1.0.3.patch --current-dir C:\MyApp
 
 **Step 1: Apply First Patch**
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --verify
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --verify
 ```
 
 **Step 2: Apply Second Patch**
 ```powershell
-applier.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir C:\MyApp --verify
+patch-apply.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir C:\MyApp --verify
 ```
 
 **Final Result:** Application is now at version 1.0.2
@@ -1149,7 +1339,7 @@ Write-Host "Building version 1.0.3..."
 
 # Generate all patches
 Write-Host "Generating patches..."
-.\generator.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches --compression zstd --verify
+.\patch-gen.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches --compression zstd --verify
 
 # Run automated tests on each patch
 Write-Host "Testing patches..."
@@ -1165,7 +1355,7 @@ foreach ($patch in Get-ChildItem .\patches\*.patch) {
     Copy-Item ".\versions\$sourceVersion" $testDir -Recurse
     
     # Apply patch
-    .\applier.exe --patch $patch.FullName --current-dir $testDir --verify
+    .\patch-apply.exe --patch $patch.FullName --current-dir $testDir --verify
     
     if ($LASTEXITCODE -eq 0) {
         Write-Host "✓ Patch $($patch.Name) verified successfully"
@@ -1201,7 +1391,7 @@ Write-Host "Target directory: $TestDir"
 
 # Step 1: Dry run
 Write-Host "`nStep 1: Dry run..."
-.\applier.exe --patch $PatchFile --current-dir $TestDir --dry-run
+.\patch-apply.exe --patch $PatchFile --current-dir $TestDir --dry-run
 if ($LASTEXITCODE -ne 0) {
     Write-Host "✗ Dry run failed"
     exit 1
@@ -1210,7 +1400,7 @@ Write-Host "✓ Dry run passed"
 
 # Step 2: Apply with verification
 Write-Host "`nStep 2: Applying patch with verification..."
-.\applier.exe --patch $PatchFile --current-dir $TestDir --verify --backup
+.\patch-apply.exe --patch $PatchFile --current-dir $TestDir --verify --backup
 if ($LASTEXITCODE -ne 0) {
     Write-Host "✗ Patch application failed"
     exit 1
@@ -1251,17 +1441,17 @@ Write-Host "Generating patches with different compression..."
 
 # Zstd
 Measure-Command {
-    .\generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches-zstd --compression zstd
+    .\patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches-zstd --compression zstd
 } | Select-Object -ExpandProperty TotalSeconds | Tee-Object -Variable zstdTime
 
 # Gzip
 Measure-Command {
-    .\generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches-gzip --compression gzip
+    .\patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches-gzip --compression gzip
 } | Select-Object -ExpandProperty TotalSeconds | Tee-Object -Variable gzipTime
 
 # None
 Measure-Command {
-    .\generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches-none --compression none
+    .\patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches-none --compression none
 } | Select-Object -ExpandProperty TotalSeconds | Tee-Object -Variable noneTime
 
 # Compare sizes
@@ -1296,7 +1486,7 @@ if ($zstdSize -le $gzipSize -and $zstdTime -le $gzipTime) {
 
 **Command:**
 ```powershell
-generator.exe --from 1.0.0 --to 1.0.1 --output .\patches
+patch-gen.exe --from 1.0.0 --to 1.0.1 --output .\patches
 ```
 
 **Error:**
@@ -1306,7 +1496,7 @@ Error: --versions-dir is required
 
 **Solution:** Add `--versions-dir` argument
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
 ```
 
 ---
@@ -1315,7 +1505,7 @@ generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patch
 
 **Command:**
 ```powershell
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
 ```
 
 **Error:**
@@ -1334,7 +1524,7 @@ Error: Version directory not found: .\versions\1.0.0
 Get-ChildItem .\versions
 
 # Fix command with correct version number
-generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
 ```
 
 ---
@@ -1343,7 +1533,7 @@ generator.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patch
 
 **Command:**
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 ```
 
 **Error:**
@@ -1366,7 +1556,7 @@ Get-ChildItem .\patches\*.patch
 
 **Command:**
 ```powershell
-applier.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir C:\MyApp
+patch-apply.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir C:\MyApp
 ```
 
 **Error:**
@@ -1381,10 +1571,10 @@ Error: Version mismatch
 **Solution:** Apply correct patch for current version
 ```powershell
 # Apply 1.0.0 to 1.0.1 first
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 
 # Then apply 1.0.1 to 1.0.2
-applier.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir C:\MyApp
+patch-apply.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir C:\MyApp
 ```
 
 ---
@@ -1393,7 +1583,7 @@ applier.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir C:\MyApp
 
 **Command:**
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
 ```
 
 **Error:**
@@ -1407,7 +1597,7 @@ Error: Insufficient disk space
 ```powershell
 # Option 1: Free up space and retry
 # Option 2: Disable backup (not recommended)
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --backup=false
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --backup=false
 ```
 
 ---
@@ -1416,7 +1606,7 @@ applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --back
 
 **Command:**
 ```powershell
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir "C:\Program Files\MyApp"
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir "C:\Program Files\MyApp"
 ```
 
 **Error:**
@@ -1428,7 +1618,7 @@ Error: Permission denied
 **Solution:** Run as administrator
 ```powershell
 # Open PowerShell as Administrator, then run:
-applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir "C:\Program Files\MyApp"
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir "C:\Program Files\MyApp"
 ```
 
 ---

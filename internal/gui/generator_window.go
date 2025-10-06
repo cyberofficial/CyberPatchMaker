@@ -1,6 +1,8 @@
 package gui
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"image/color"
@@ -42,6 +44,8 @@ type GeneratorWindow struct {
 	verifyAfter      bool
 	skipIdentical    bool
 	batchMode        bool
+	createExecutable bool
+	ignore1GB        bool
 	fromKeyFile      string
 	toKeyFile        string
 
@@ -49,8 +53,8 @@ type GeneratorWindow struct {
 	fromDirEntry       *widget.Entry // Custom from directory path
 	toDirEntry         *widget.Entry // Custom to directory path
 	customPathCheck    *widget.Check // Toggle for custom paths mode
-	fromKeyFileSelect  *widget.Select
-	toKeyFileSelect    *widget.Select
+	fromKeyFileEntry   *widget.Entry
+	toKeyFileEntry     *widget.Entry
 	fromVersionSelect  *widget.Select
 	toVersionSelect    *widget.Select
 	outputDirEntry     *widget.Entry
@@ -60,6 +64,8 @@ type GeneratorWindow struct {
 	verifyCheck        *widget.Check
 	skipIdenticalCheck *widget.Check
 	batchModeCheck     *widget.Check
+	createExeCheck     *widget.Check
+	ignore1GBCheck     *widget.Check
 	generateBtn        *widget.Button
 	statusLabel        *widget.Label
 	logText            *widget.Entry
@@ -194,11 +200,11 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		if checked {
 			// In batch mode, from version is not used
 			gw.fromVersionSelect.Disable()
-			gw.fromKeyFileSelect.Disable()
+			gw.fromKeyFileEntry.Disable()
 		} else {
 			if !gw.useCustomPaths {
 				gw.fromVersionSelect.Enable()
-				gw.fromKeyFileSelect.Enable()
+				gw.fromKeyFileEntry.Enable()
 			}
 		}
 		gw.updateGenerateButton()
@@ -212,12 +218,13 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	})
 	gw.fromVersionSelect.PlaceHolder = "Select source version..."
 
-	// Create from key file selector
-	gw.fromKeyFileSelect = widget.NewSelect([]string{}, func(selected string) {
-		gw.fromKeyFile = selected
-	})
-	gw.fromKeyFileSelect.PlaceHolder = "Select key file..."
-	gw.fromKeyFileSelect.SetSelected(gw.fromKeyFile)
+	// Create from key file entry
+	gw.fromKeyFileEntry = widget.NewEntry()
+	gw.fromKeyFileEntry.SetPlaceHolder("Enter key file path (e.g., program.exe or cmd/main.go)...")
+	gw.fromKeyFileEntry.SetText(gw.fromKeyFile)
+	gw.fromKeyFileEntry.OnChanged = func(text string) {
+		gw.fromKeyFile = text
+	}
 
 	// Create to version selector
 	gw.toVersionSelect = widget.NewSelect([]string{}, func(selected string) {
@@ -227,21 +234,22 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	})
 	gw.toVersionSelect.PlaceHolder = "Select target version..."
 
-	// Create to key file selector
-	gw.toKeyFileSelect = widget.NewSelect([]string{}, func(selected string) {
-		gw.toKeyFile = selected
-	})
-	gw.toKeyFileSelect.PlaceHolder = "Select key file..."
-	gw.toKeyFileSelect.SetSelected(gw.toKeyFile)
+	// Create to key file entry
+	gw.toKeyFileEntry = widget.NewEntry()
+	gw.toKeyFileEntry.SetPlaceHolder("Enter key file path (e.g., program.exe or cmd/main.go)...")
+	gw.toKeyFileEntry.SetText(gw.toKeyFile)
+	gw.toKeyFileEntry.OnChanged = func(text string) {
+		gw.toKeyFile = text
+	}
 
 	// Left column: Version selection
 	leftColumn := container.NewVBox(
 		widget.NewLabel("Version Selection:"),
 		container.NewBorder(nil, nil, widget.NewLabel("From:"), nil, gw.fromVersionSelect),
-		container.NewBorder(nil, nil, widget.NewLabel("Key:"), nil, gw.fromKeyFileSelect),
+		container.NewBorder(nil, nil, widget.NewLabel("Key:"), nil, gw.fromKeyFileEntry),
 		widget.NewSeparator(),
 		container.NewBorder(nil, nil, widget.NewLabel("To:"), nil, gw.toVersionSelect),
-		container.NewBorder(nil, nil, widget.NewLabel("Key:"), nil, gw.toKeyFileSelect),
+		container.NewBorder(nil, nil, widget.NewLabel("Key:"), nil, gw.toKeyFileEntry),
 	)
 
 	// Create output directory selector
@@ -316,6 +324,16 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	})
 	gw.skipIdenticalCheck.SetChecked(true)
 
+	gw.createExeCheck = widget.NewCheck("Create self-contained executable", func(checked bool) {
+		gw.createExecutable = checked
+	})
+	gw.createExeCheck.SetChecked(false)
+
+	gw.ignore1GBCheck = widget.NewCheck("Ignore 1GB limit (use with caution)", func(checked bool) {
+		gw.ignore1GB = checked
+	})
+	gw.ignore1GBCheck.SetChecked(false)
+
 	// Right column: Options
 	rightColumn := container.NewVBox(
 		widget.NewLabel("Compression:"),
@@ -324,6 +342,8 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		widget.NewLabel("Options:"),
 		gw.verifyCheck,
 		gw.skipIdenticalCheck,
+		gw.createExeCheck,
+		gw.ignore1GBCheck,
 	)
 
 	// Create two-column layout for version/options
@@ -514,7 +534,7 @@ func (gw *GeneratorWindow) updateCompressionLabel() {
 	gw.compressionLabel.SetText(fmt.Sprintf("Level: %d", gw.compressionLevel))
 }
 
-// updateFromKeyFileOptions scans from version and populates key file options
+// updateFromKeyFileOptions updates the from key file entry with auto-detected file if available
 func (gw *GeneratorWindow) updateFromKeyFileOptions() {
 	if gw.fromVersion == "" || gw.versionsDir == "" {
 		return
@@ -522,17 +542,15 @@ func (gw *GeneratorWindow) updateFromKeyFileOptions() {
 
 	versionPath := filepath.Join(gw.versionsDir, gw.fromVersion)
 	files := gw.getFilesInDirectory(versionPath)
-	gw.fromKeyFileSelect.Options = files
-	gw.fromKeyFileSelect.Refresh()
 
-	// Auto-select if only one file found (works with any file type)
+	// Auto-populate if only one file found (works with any file type)
 	if len(files) == 1 {
-		gw.fromKeyFileSelect.SetSelected(files[0])
+		gw.fromKeyFileEntry.SetText(files[0])
 		gw.fromKeyFile = files[0]
 	}
 }
 
-// updateToKeyFileOptions scans to version and populates key file options
+// updateToKeyFileOptions updates the to key file entry with auto-detected file if available
 func (gw *GeneratorWindow) updateToKeyFileOptions() {
 	if gw.toVersion == "" || gw.versionsDir == "" {
 		return
@@ -540,17 +558,15 @@ func (gw *GeneratorWindow) updateToKeyFileOptions() {
 
 	versionPath := filepath.Join(gw.versionsDir, gw.toVersion)
 	files := gw.getFilesInDirectory(versionPath)
-	gw.toKeyFileSelect.Options = files
-	gw.toKeyFileSelect.Refresh()
 
-	// Auto-select if only one file found (works with any file type)
+	// Auto-populate if only one file found (works with any file type)
 	if len(files) == 1 {
-		gw.toKeyFileSelect.SetSelected(files[0])
+		gw.toKeyFileEntry.SetText(files[0])
 		gw.toKeyFile = files[0]
 	}
 }
 
-// updateFromKeyFileOptionsCustom scans from directory and populates key file options (custom paths mode)
+// updateFromKeyFileOptionsCustom updates the from key file entry with auto-detected file if available (custom paths mode)
 func (gw *GeneratorWindow) updateFromKeyFileOptionsCustom() {
 	if gw.fromDir == "" {
 		return
@@ -562,17 +578,15 @@ func (gw *GeneratorWindow) updateFromKeyFileOptionsCustom() {
 	}
 
 	files := gw.getFilesInDirectory(gw.fromDir)
-	gw.fromKeyFileSelect.Options = files
-	gw.fromKeyFileSelect.Refresh()
 
-	// Auto-select if only one file found (works with any file type)
+	// Auto-populate if only one file found (works with any file type)
 	if len(files) == 1 {
-		gw.fromKeyFileSelect.SetSelected(files[0])
+		gw.fromKeyFileEntry.SetText(files[0])
 		gw.fromKeyFile = files[0]
 	}
 }
 
-// updateToKeyFileOptionsCustom scans to directory and populates key file options (custom paths mode)
+// updateToKeyFileOptionsCustom updates the to key file entry with auto-detected file if available (custom paths mode)
 func (gw *GeneratorWindow) updateToKeyFileOptionsCustom() {
 	if gw.toDir == "" {
 		return
@@ -584,12 +598,10 @@ func (gw *GeneratorWindow) updateToKeyFileOptionsCustom() {
 	}
 
 	files := gw.getFilesInDirectory(gw.toDir)
-	gw.toKeyFileSelect.Options = files
-	gw.toKeyFileSelect.Refresh()
 
-	// Auto-select if only one file found (works with any file type)
+	// Auto-populate if only one file found (works with any file type)
 	if len(files) == 1 {
-		gw.toKeyFileSelect.SetSelected(files[0])
+		gw.toKeyFileEntry.SetText(files[0])
 		gw.toKeyFile = files[0]
 	}
 }
@@ -801,13 +813,33 @@ func (gw *GeneratorWindow) generatePatch() {
 
 	gw.setStatus("Patch generated successfully!")
 	gw.appendLog("SUCCESS: Patch generated successfully")
+
+	// Create self-contained executable if requested
+	if gw.createExecutable {
+		exePath := strings.TrimSuffix(outputPath, ".patch") + ".exe"
+		gw.appendLog("Creating self-contained executable...")
+		if err := gw.createStandaloneExe(outputPath, exePath); err != nil {
+			gw.appendLog("ERROR: Failed to create executable: " + err.Error())
+		} else {
+			info, err := os.Stat(exePath)
+			if err == nil {
+				sizeMB := float64(info.Size()) / (1024.0 * 1024.0)
+				gw.appendLog(fmt.Sprintf("Executable size: %.2f MB", sizeMB))
+			}
+			gw.appendLog(fmt.Sprintf("✓ Created: %s", exePath))
+		}
+	}
+
 	gw.generateBtn.Enable()
 
 	// Show success dialog
 	if gw.window != nil {
-		dialog.ShowInformation("Success",
-			fmt.Sprintf("Patch generated successfully!\n\nOutput: %s", outputPath),
-			gw.window)
+		successMsg := fmt.Sprintf("Patch generated successfully!\n\nOutput: %s", outputPath)
+		if gw.createExecutable {
+			exePath := strings.TrimSuffix(outputPath, ".patch") + ".exe"
+			successMsg += fmt.Sprintf("\nExecutable: %s", exePath)
+		}
+		dialog.ShowInformation("Success", successMsg, gw.window)
 	}
 }
 
@@ -1011,6 +1043,82 @@ func (gw *GeneratorWindow) savePatch(patch *utils.Patch, filename string, option
 	// Write to file
 	if err := os.WriteFile(filename, data, 0644); err != nil {
 		return fmt.Errorf("failed to write patch file: %w", err)
+	}
+
+	return nil
+}
+
+// createStandaloneExe creates a self-contained executable by appending patch data to applier-gui.exe
+func (gw *GeneratorWindow) createStandaloneExe(patchPath, exePath string) error {
+	// Get path to patch-apply-gui.exe (same directory as patch-gen-gui.exe)
+	genExe, err := os.Executable()
+	if err != nil {
+		return fmt.Errorf("failed to get executable path: %w", err)
+	}
+
+	applierPath := filepath.Join(filepath.Dir(genExe), "patch-apply-gui.exe")
+
+	// Read the applier GUI executable
+	applierData, err := os.ReadFile(applierPath)
+	if err != nil {
+		return fmt.Errorf("failed to read applier executable: %w", err)
+	}
+
+	// Read the patch file
+	patchData, err := os.ReadFile(patchPath)
+	if err != nil {
+		return fmt.Errorf("failed to read patch file: %w", err)
+	}
+
+	// Calculate checksum of patch data
+	checksum := sha256.Sum256(patchData)
+
+	// Create 128-byte header
+	header := make([]byte, 128)
+
+	// Magic bytes "CPMPATCH" (8 bytes)
+	copy(header[0:8], []byte("CPMPATCH"))
+
+	// Version (4 bytes, uint32)
+	binary.LittleEndian.PutUint32(header[8:12], 1)
+
+	// Stub size (8 bytes, uint64) - size of applier exe
+	binary.LittleEndian.PutUint64(header[12:20], uint64(len(applierData)))
+
+	// Data offset (8 bytes, uint64) - right after stub
+	binary.LittleEndian.PutUint64(header[20:28], uint64(len(applierData)))
+
+	// Data size (8 bytes, uint64)
+	binary.LittleEndian.PutUint64(header[28:36], uint64(len(patchData)))
+
+	// Compression type (16 bytes)
+	compressionBytes := make([]byte, 16)
+	copy(compressionBytes, []byte(gw.compression))
+	copy(header[36:52], compressionBytes)
+
+	// Checksum (32 bytes, SHA-256)
+	copy(header[52:84], checksum[:])
+
+	// Reserved (44 bytes) - already zeroed
+
+	// Create output file
+	outFile, err := os.Create(exePath)
+	if err != nil {
+		return fmt.Errorf("failed to create output file: %w", err)
+	}
+	defer outFile.Close()
+
+	// Write: applier.exe + patch data + header
+	if _, err := outFile.Write(applierData); err != nil {
+		return fmt.Errorf("failed to write applier data: %w", err)
+	}
+
+	if _, err := outFile.Write(patchData); err != nil {
+		return fmt.Errorf("failed to write patch data: %w", err)
+	}
+
+	if _, err := outFile.Write(header); err != nil {
+		return fmt.Errorf("failed to write header: %w", err)
 	}
 
 	return nil

@@ -20,28 +20,28 @@ cd CyberPatchMaker
 
 **Windows (PowerShell):**
 ```powershell
-go build -o generator.exe .\cmd\generator\
-go build -o applier.exe .\cmd\applier\
+go build -o patch-gen.exe .\cmd\generator\
+go build -o patch-apply.exe .\cmd\applier\
 ```
 
 **Linux/macOS:**
 ```bash
-go build -o generator ./cmd/generator/
-go build -o applier ./cmd/applier/
+go build -o patch-gen ./cmd/generator/
+go build -o patch-apply ./cmd/applier/
 ```
 
 ### 3. Verify Installation
 
 **Windows:**
 ```powershell
-.\generator.exe --help
-.\applier.exe --help
+.\patch-gen.exe --help
+.\patch-apply.exe --help
 ```
 
 **Linux/macOS:**
 ```bash
-./generator --help
-./applier --help
+./patch-gen --help
+./patch-apply --help
 ```
 
 ## Your First Patch
@@ -80,12 +80,12 @@ versions/
 
 **Windows:**
 ```powershell
-.\generator.exe --versions-dir .\versions --new-version 1.0.1 --output .\patches
+.\patch-gen.exe --versions-dir .\versions --new-version 1.0.1 --output .\patches
 ```
 
 **Linux/macOS:**
 ```bash
-./generator --versions-dir ./versions --new-version 1.0.1 --output ./patches
+./patch-gen --versions-dir ./versions --new-version 1.0.1 --output ./patches
 ```
 
 This will:
@@ -107,12 +107,12 @@ Run dry-run to see what would happen:
 
 **Windows:**
 ```powershell
-.\applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir .\test-app --dry-run
+.\patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir .\test-app --dry-run
 ```
 
 **Linux/macOS:**
 ```bash
-./applier --patch ./patches/1.0.0-to-1.0.1.patch --current-dir ./test-app --dry-run
+./patch-apply --patch ./patches/1.0.0-to-1.0.1.patch --current-dir ./test-app --dry-run
 ```
 
 This shows you exactly what will be changed without modifying anything.
@@ -123,12 +123,12 @@ If the dry-run looks good, apply the patch:
 
 **Windows:**
 ```powershell
-.\applier.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir .\test-app --verify
+.\patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir .\test-app --verify
 ```
 
 **Linux/macOS:**
 ```bash
-./applier --patch ./patches/1.0.0-to-1.0.1.patch --current-dir ./test-app --verify
+./patch-apply --patch ./patches/1.0.0-to-1.0.1.patch --current-dir ./test-app --verify
 ```
 
 This will:
