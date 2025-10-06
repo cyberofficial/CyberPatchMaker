@@ -285,8 +285,8 @@ Test-Step "Verify test versions exist" {
 # Test 4: Generate patch with default compression (zstd)
 Test-Step "Generate complex patch (1.0.1 → 1.0.2) with zstd" {
     Write-Host "  Generating patch from 1.0.1 to 1.0.2 with zstd compression..." -ForegroundColor Gray
-    Write-Host "  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches --compression zstd" -ForegroundColor Cyan
-    $output = .\generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches --compression zstd 2>&1
+    Write-Host "  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches --compression zstd" -ForegroundColor Cyan
+    $output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches --compression zstd 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         throw "Generator failed with exit code $LASTEXITCODE"
@@ -308,8 +308,8 @@ Test-Step "Generate complex patch (1.0.1 → 1.0.2) with zstd" {
 # Test 5: Generate same patch with gzip compression
 Test-Step "Generate same patch with gzip compression" {
     Write-Host "  Generating patch with gzip compression..." -ForegroundColor Gray
-    Write-Host "  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-gzip --compression gzip" -ForegroundColor Cyan
-    $output = .\generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-gzip --compression gzip 2>&1
+    Write-Host "  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-gzip --compression gzip" -ForegroundColor Cyan
+    $output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-gzip --compression gzip 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         throw "Generator failed with exit code $LASTEXITCODE"
@@ -326,8 +326,8 @@ Test-Step "Generate same patch with gzip compression" {
 # Test 6: Generate same patch with no compression
 Test-Step "Generate same patch with no compression" {
     Write-Host "  Generating patch with no compression..." -ForegroundColor Gray
-    Write-Host "  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-none --compression none" -ForegroundColor Cyan
-    $output = .\generator.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-none --compression none 2>&1
+    Write-Host "  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-none --compression none" -ForegroundColor Cyan
+    $output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches-none --compression none 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         throw "Generator failed with exit code $LASTEXITCODE"
@@ -362,8 +362,8 @@ Test-Step "Compare compression efficiency" {
 # Test 8: Dry-run complex patch
 Test-Step "Dry-run complex patch application" {
     Write-Host "  Running applier in dry-run mode..." -ForegroundColor Gray
-    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\versions\1.0.1 --dry-run" -ForegroundColor Cyan
-    $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\versions\1.0.1 --dry-run 2>&1
+    Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\versions\1.0.1 --dry-run" -ForegroundColor Cyan
+    $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\versions\1.0.1 --dry-run 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         throw "Dry-run failed with exit code $LASTEXITCODE"
@@ -390,8 +390,8 @@ Test-Step "Apply zstd patch to complex directory structure" {
     } -Force
     
     Write-Host "  Applying zstd patch..." -ForegroundColor Gray
-    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-zstd --verify" -ForegroundColor Cyan
-    $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-zstd --verify 2>&1
+    Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-zstd --verify" -ForegroundColor Cyan
+    $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-zstd --verify 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         $outputStr = $output -join "`n"
@@ -418,8 +418,8 @@ Test-Step "Apply gzip patch to complex directory structure" {
     } -Force
     
     Write-Host "  Applying gzip patch..." -ForegroundColor Gray
-    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches-gzip\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-gzip --verify" -ForegroundColor Cyan
-    $output = .\applier.exe --patch .\testdata\advanced-output\patches-gzip\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-gzip --verify 2>&1
+    Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches-gzip\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-gzip --verify" -ForegroundColor Cyan
+    $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches-gzip\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-gzip --verify 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         $outputStr = $output -join "`n"
@@ -441,8 +441,8 @@ Test-Step "Apply uncompressed patch to complex directory structure" {
     } -Force
     
     Write-Host "  Applying uncompressed patch..." -ForegroundColor Gray
-    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches-none\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-none --verify" -ForegroundColor Cyan
-    $output = .\applier.exe --patch .\testdata\advanced-output\patches-none\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-none --verify 2>&1
+    Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches-none\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-none --verify" -ForegroundColor Cyan
+    $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches-none\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\test-none --verify 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         $outputStr = $output -join "`n"
@@ -564,8 +564,8 @@ Test-Step "Test multi-hop patching scenario" {
     Write-Host "  Testing 1.0.0 → 1.0.1 → 1.0.2 patch chain..." -ForegroundColor Gray
     
     # Generate 1.0.0 → 1.0.1 patch
-    Write-Host "  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches" -ForegroundColor Cyan
-    $output = .\generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches 2>&1
+    Write-Host "  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches" -ForegroundColor Cyan
+    $output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to generate 1.0.0→1.0.1 patch"
     }
@@ -582,16 +582,16 @@ Test-Step "Test multi-hop patching scenario" {
     
     # Apply first patch: 1.0.0 → 1.0.1
     Write-Host "  Applying first patch (1.0.0 → 1.0.1)..." -ForegroundColor Gray
-    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.1.patch --current-dir .\testdata\advanced-output\multi-hop --verify" -ForegroundColor Cyan
-    $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.1.patch --current-dir .\testdata\advanced-output\multi-hop --verify 2>&1
+    Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.1.patch --current-dir .\testdata\advanced-output\multi-hop --verify" -ForegroundColor Cyan
+    $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.1.patch --current-dir .\testdata\advanced-output\multi-hop --verify 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to apply 1.0.0→1.0.1 patch"
     }
     
     # Apply second patch: 1.0.1 → 1.0.2
     Write-Host "  Applying second patch (1.0.1 → 1.0.2)..." -ForegroundColor Gray
-    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\multi-hop --verify" -ForegroundColor Cyan
-    $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\multi-hop --verify 2>&1
+    Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\multi-hop --verify" -ForegroundColor Cyan
+    $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\multi-hop --verify 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to apply 1.0.1→1.0.2 patch"
     }
@@ -608,8 +608,8 @@ Test-Step "Test multi-hop patching scenario" {
 # Test 17: Test downgrade patch generation (1.0.2 → 1.0.1)
 Test-Step "Generate downgrade patch (1.0.2 → 1.0.1)" {
     Write-Host "  Generating downgrade patch from 1.0.2 to 1.0.1..." -ForegroundColor Gray
-    Write-Host "  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.2 --to 1.0.1 --output .\testdata\advanced-output\patches --compression zstd" -ForegroundColor Cyan
-    $output = .\generator.exe --versions-dir .\testdata\versions --from 1.0.2 --to 1.0.1 --output .\testdata\advanced-output\patches --compression zstd 2>&1
+    Write-Host "  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.2 --to 1.0.1 --output .\testdata\advanced-output\patches --compression zstd" -ForegroundColor Cyan
+    $output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.2 --to 1.0.1 --output .\testdata\advanced-output\patches --compression zstd 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         throw "Downgrade patch generation failed with exit code $LASTEXITCODE"
@@ -635,8 +635,8 @@ Test-Step "Apply downgrade patch to revert version" {
     } -Force
     
     Write-Host "  Applying downgrade patch (1.0.2 → 1.0.1)..." -ForegroundColor Gray
-    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.2-to-1.0.1.patch --current-dir .\testdata\advanced-output\downgrade-test --verify" -ForegroundColor Cyan
-    $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.2-to-1.0.1.patch --current-dir .\testdata\advanced-output\downgrade-test --verify 2>&1
+    Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.2-to-1.0.1.patch --current-dir .\testdata\advanced-output\downgrade-test --verify" -ForegroundColor Cyan
+    $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.2-to-1.0.1.patch --current-dir .\testdata\advanced-output\downgrade-test --verify 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         $outputStr = $output -join "`n"
@@ -690,8 +690,8 @@ Test-Step "Test bidirectional patching cycle" {
     
     # Upgrade: 1.0.1 → 1.0.2
     Write-Host "  Step 1: Upgrade 1.0.1 → 1.0.2..." -ForegroundColor Gray
-    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\bidirectional --verify" -ForegroundColor Cyan
-    $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\bidirectional --verify 2>&1
+    Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\bidirectional --verify" -ForegroundColor Cyan
+    $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\bidirectional --verify 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "Upgrade failed (1.0.1 → 1.0.2)"
     }
@@ -705,8 +705,8 @@ Test-Step "Test bidirectional patching cycle" {
     
     # Downgrade: 1.0.2 → 1.0.1
     Write-Host "  Step 2: Downgrade 1.0.2 → 1.0.1..." -ForegroundColor Gray
-    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.2-to-1.0.1.patch --current-dir .\testdata\advanced-output\bidirectional --verify" -ForegroundColor Cyan
-    $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.2-to-1.0.1.patch --current-dir .\testdata\advanced-output\bidirectional --verify 2>&1
+    Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.2-to-1.0.1.patch --current-dir .\testdata\advanced-output\bidirectional --verify" -ForegroundColor Cyan
+    $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.2-to-1.0.1.patch --current-dir .\testdata\advanced-output\bidirectional --verify 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "Downgrade failed (1.0.2 → 1.0.1)"
     }
@@ -735,8 +735,8 @@ Test-Step "Verify patch rejection for wrong source version" {
     } -Force
     
     # Try to apply 1.0.1→1.0.2 patch (should fail)
-    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\wrong-version --verify" -ForegroundColor Cyan
-    $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\wrong-version --verify 2>&1
+    Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\wrong-version --verify" -ForegroundColor Cyan
+    $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\wrong-version --verify 2>&1
     
     if ($LASTEXITCODE -eq 0) {
         throw "Patch should have been rejected but succeeded"
@@ -768,8 +768,8 @@ Test-Step "Verify detection of corrupted files in source" {
     Add-Content -Path "testdata/advanced-output/corrupted/libs/core.dll" -Value "CORRUPTED DATA"
     
     # Try to apply patch (should fail)
-    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\corrupted --verify" -ForegroundColor Cyan
-    $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\corrupted --verify 2>&1
+    Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\corrupted --verify" -ForegroundColor Cyan
+    $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\corrupted --verify 2>&1
     
     if ($LASTEXITCODE -eq 0) {
         throw "Patch should have been rejected but succeeded"
@@ -797,8 +797,8 @@ Test-Step "Verify backup creation and mirror structure" {
     } -Force
     
     # Apply patch (should create backup)
-    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\backup-test --verify" -ForegroundColor Cyan
-    $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\backup-test --verify 2>&1
+    Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\backup-test --verify" -ForegroundColor Cyan
+    $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\backup-test --verify 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         throw "Patch application failed"
@@ -959,14 +959,14 @@ Test-Step "Verify backup handles complex nested paths" {
     } -Force
     
     # Generate and apply 1.0.0 → 1.0.2 patch (includes deep nesting)
-    Write-Host "  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches" -ForegroundColor Cyan
-    $output = .\generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches 2>&1
+    Write-Host "  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches" -ForegroundColor Cyan
+    $output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to generate 1.0.0→1.0.2 patch"
     }
     
-    Write-Host "  Command: applier.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.2.patch --current-dir .\testdata\advanced-output\nested-backup-test --verify" -ForegroundColor Cyan
-    $output = .\applier.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.2.patch --current-dir .\testdata\advanced-output\nested-backup-test --verify 2>&1
+    Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.2.patch --current-dir .\testdata\advanced-output\nested-backup-test --verify" -ForegroundColor Cyan
+    $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.2.patch --current-dir .\testdata\advanced-output\nested-backup-test --verify 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         throw "Patch application with backup failed"
@@ -1072,10 +1072,10 @@ Test-Step "Verify deleted directories are backed up with all contents" {
 # Test 24: Performance check - verify generation speed
 Test-Step "Verify patch generation performance" {
     Write-Host "  Measuring patch generation time..." -ForegroundColor Gray
-    Write-Host "  Command: generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches" -ForegroundColor Cyan
+    Write-Host "  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches" -ForegroundColor Cyan
     
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
-    $output = .\generator.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches 2>&1
+    $output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches 2>&1
     $stopwatch.Stop()
     
     if ($LASTEXITCODE -ne 0) {
@@ -1116,8 +1116,8 @@ Test-Step "Test custom paths mode with different directories" {
         $dest
     } -Force
     
-    Write-Host "  Command: generator.exe --from-dir .\testdata\custom-paths\release-1.0.0 --to-dir .\testdata\custom-paths\build-1.0.1 --output .\testdata\custom-paths\patches" -ForegroundColor Cyan
-    $output = .\generator.exe --from-dir .\testdata\custom-paths\release-1.0.0 --to-dir .\testdata\custom-paths\build-1.0.1 --output .\testdata\custom-paths\patches 2>&1
+    Write-Host "  Command: patch-gen.exe --from-dir .\testdata\custom-paths\release-1.0.0 --to-dir .\testdata\custom-paths\build-1.0.1 --output .\testdata\custom-paths\patches" -ForegroundColor Cyan
+    $output = .\patch-gen.exe --from-dir .\testdata\custom-paths\release-1.0.0 --to-dir .\testdata\custom-paths\build-1.0.1 --output .\testdata\custom-paths\patches 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         throw "Custom paths patch generation failed with exit code $LASTEXITCODE"
@@ -1146,8 +1146,8 @@ Test-Step "Apply patch generated with custom paths mode" {
         $dest
     } -Force
     
-    Write-Host "  Command: applier.exe --patch .\testdata\custom-paths\patches\release-1.0.0-to-build-1.0.1.patch --current-dir .\testdata\custom-paths\apply-test --verify" -ForegroundColor Cyan
-    $output = .\applier.exe --patch .\testdata\custom-paths\patches\release-1.0.0-to-build-1.0.1.patch --current-dir .\testdata\custom-paths\apply-test --verify 2>&1
+    Write-Host "  Command: patch-apply.exe --patch .\testdata\custom-paths\patches\release-1.0.0-to-build-1.0.1.patch --current-dir .\testdata\custom-paths\apply-test --verify" -ForegroundColor Cyan
+    $output = .\patch-apply.exe --patch .\testdata\custom-paths\patches\release-1.0.0-to-build-1.0.1.patch --current-dir .\testdata\custom-paths\apply-test --verify 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         $outputStr = $output -join "`n"
@@ -1185,8 +1185,8 @@ Test-Step "Test custom paths with complex nested directories" {
         $dest
     } -Force
     
-    Write-Host "  Command: generator.exe --from-dir .\testdata\custom-paths\app-v101 --to-dir .\testdata\custom-paths\app-v102 --output .\testdata\custom-paths\patches --compression zstd" -ForegroundColor Cyan
-    $output = .\generator.exe --from-dir .\testdata\custom-paths\app-v101 --to-dir .\testdata\custom-paths\app-v102 --output .\testdata\custom-paths\patches --compression zstd 2>&1
+    Write-Host "  Command: patch-gen.exe --from-dir .\testdata\custom-paths\app-v101 --to-dir .\testdata\custom-paths\app-v102 --output .\testdata\custom-paths\patches --compression zstd" -ForegroundColor Cyan
+    $output = .\patch-gen.exe --from-dir .\testdata\custom-paths\app-v101 --to-dir .\testdata\custom-paths\app-v102 --output .\testdata\custom-paths\patches --compression zstd 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         throw "Complex custom paths patch generation failed"
@@ -1208,8 +1208,8 @@ Test-Step "Test custom paths with complex nested directories" {
         $dest
     } -Force
     
-    Write-Host "  Command: applier.exe --patch .\testdata\custom-paths\patches\app-v101-to-app-v102.patch --current-dir .\testdata\custom-paths\complex-apply --verify" -ForegroundColor Cyan
-    $output = .\applier.exe --patch .\testdata\custom-paths\patches\app-v101-to-app-v102.patch --current-dir .\testdata\custom-paths\complex-apply --verify 2>&1
+    Write-Host "  Command: patch-apply.exe --patch .\testdata\custom-paths\patches\app-v101-to-app-v102.patch --current-dir .\testdata\custom-paths\complex-apply --verify" -ForegroundColor Cyan
+    $output = .\patch-apply.exe --patch .\testdata\custom-paths\patches\app-v101-to-app-v102.patch --current-dir .\testdata\custom-paths\complex-apply --verify 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         throw "Complex patch application failed"
@@ -1250,8 +1250,8 @@ Test-Step "Verify version number extraction from directory names" {
     } -Force
     
     Write-Host "  Case A: Simple version numbers (1.0.0, 1.0.1)..." -ForegroundColor Gray
-    Write-Host "  Command: generator.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches" -ForegroundColor Cyan
-    $output = .\generator.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches 2>&1
+    Write-Host "  Command: patch-gen.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches" -ForegroundColor Cyan
+    $output = .\patch-gen.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         throw "Version extraction failed for simple numbers"
@@ -1281,8 +1281,8 @@ Test-Step "Verify version number extraction from directory names" {
     } -Force
     
     Write-Host "  Case B: Prefixed version numbers (v1.0.0, v1.0.1)..." -ForegroundColor Gray
-    Write-Host "  Command: generator.exe --from-dir .\testdata\custom-paths\v1.0.0 --to-dir .\testdata\custom-paths\v1.0.1 --output .\testdata\custom-paths\patches" -ForegroundColor Cyan
-    $output = .\generator.exe --from-dir .\testdata\custom-paths\v1.0.0 --to-dir .\testdata\custom-paths\v1.0.1 --output .\testdata\custom-paths\patches 2>&1
+    Write-Host "  Command: patch-gen.exe --from-dir .\testdata\custom-paths\v1.0.0 --to-dir .\testdata\custom-paths\v1.0.1 --output .\testdata\custom-paths\patches" -ForegroundColor Cyan
+    $output = .\patch-gen.exe --from-dir .\testdata\custom-paths\v1.0.0 --to-dir .\testdata\custom-paths\v1.0.1 --output .\testdata\custom-paths\patches 2>&1
     
     if ($LASTEXITCODE -ne 0) {
         throw "Version extraction failed for prefixed versions"
@@ -1302,8 +1302,8 @@ Test-Step "Test compression options with custom paths" {
     
     # Test zstd
     Write-Host "  Testing zstd compression..." -ForegroundColor Gray
-    Write-Host "  Command: generator.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches --compression zstd" -ForegroundColor Cyan
-    $output = .\generator.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches --compression zstd 2>&1
+    Write-Host "  Command: patch-gen.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches --compression zstd" -ForegroundColor Cyan
+    $output = .\patch-gen.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches --compression zstd 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "Custom paths with zstd failed"
     }
@@ -1312,9 +1312,9 @@ Test-Step "Test compression options with custom paths" {
     
     # Test gzip
     Write-Host "  Testing gzip compression..." -ForegroundColor Gray
-    Write-Host "  Command: generator.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches-gzip --compression gzip" -ForegroundColor Cyan
+    Write-Host "  Command: patch-gen.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches-gzip --compression gzip" -ForegroundColor Cyan
     New-Item -ItemType Directory -Force -Path "testdata/custom-paths/patches-gzip" | Out-Null
-    $output = .\generator.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches-gzip --compression gzip 2>&1
+    $output = .\patch-gen.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches-gzip --compression gzip 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "Custom paths with gzip failed"
     }
@@ -1323,9 +1323,9 @@ Test-Step "Test compression options with custom paths" {
     
     # Test none
     Write-Host "  Testing no compression..." -ForegroundColor Gray
-    Write-Host "  Command: generator.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches-none --compression none" -ForegroundColor Cyan
+    Write-Host "  Command: patch-gen.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches-none --compression none" -ForegroundColor Cyan
     New-Item -ItemType Directory -Force -Path "testdata/custom-paths/patches-none" | Out-Null
-    $output = .\generator.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches-none --compression none 2>&1
+    $output = .\patch-gen.exe --from-dir .\testdata\custom-paths\1.0.0 --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches-none --compression none 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "Custom paths with no compression failed"
     }
@@ -1341,8 +1341,8 @@ Test-Step "Test error handling for non-existent directories" {
     
     # Test non-existent from directory
     Write-Host "  Testing non-existent from directory..." -ForegroundColor Gray
-    Write-Host "  Command: generator.exe --from-dir .\testdata\custom-paths\does-not-exist --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches" -ForegroundColor Cyan
-    $output = .\generator.exe --from-dir .\testdata\custom-paths\does-not-exist --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches 2>&1
+    Write-Host "  Command: patch-gen.exe --from-dir .\testdata\custom-paths\does-not-exist --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches" -ForegroundColor Cyan
+    $output = .\patch-gen.exe --from-dir .\testdata\custom-paths\does-not-exist --to-dir .\testdata\custom-paths\1.0.1 --output .\testdata\custom-paths\patches 2>&1
     
     if ($LASTEXITCODE -eq 0) {
         throw "Generator should have failed for non-existent from directory"
