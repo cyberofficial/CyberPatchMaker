@@ -6,6 +6,55 @@ Write-Host "CyberPatchMaker Advanced Test Suite" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
+# Check and build executables if missing
+Write-Host "Checking executables..." -ForegroundColor Cyan
+
+$needsBuild = $false
+$generatorExists = Test-Path ".\generator.exe"
+$applierExists = Test-Path ".\applier.exe"
+
+if (-not $generatorExists) {
+    Write-Host "  generator.exe not found" -ForegroundColor Yellow
+    $needsBuild = $true
+}
+
+if (-not $applierExists) {
+    Write-Host "  applier.exe not found" -ForegroundColor Yellow
+    $needsBuild = $true
+}
+
+if ($needsBuild) {
+    Write-Host ""
+    Write-Host "Building missing executables..." -ForegroundColor Yellow
+    
+    if (-not $generatorExists) {
+        Write-Host "  Building generator.exe..." -ForegroundColor Gray
+        go build -o generator.exe ./cmd/generator
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "✗ Failed to build generator.exe" -ForegroundColor Red
+            exit 1
+        }
+        Write-Host "  ✓ generator.exe built successfully" -ForegroundColor Green
+    }
+    
+    if (-not $applierExists) {
+        Write-Host "  Building applier.exe..." -ForegroundColor Gray
+        go build -o applier.exe ./cmd/applier
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "✗ Failed to build applier.exe" -ForegroundColor Red
+            exit 1
+        }
+        Write-Host "  ✓ applier.exe built successfully" -ForegroundColor Green
+    }
+    
+    Write-Host ""
+    Write-Host "✓ Build complete" -ForegroundColor Green
+} else {
+    Write-Host "  ✓ Both executables found" -ForegroundColor Green
+}
+
+Write-Host ""
+
 # Track test results
 $passed = 0
 $failed = 0
