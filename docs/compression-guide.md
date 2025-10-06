@@ -328,20 +328,6 @@ For testing/debugging only:
 
 ---
 
-### Parallel Compression
-
-**Future enhancement** - Compress multiple patches in parallel:
-
-```bash
-# Generate patches for all previous versions (parallel)
-./generator --versions-dir ./versions \
-            --new-version 1.0.5 \
-            --output ./patches \
-            --compression zstd \
-            --level 3 \
-            --parallel 4        # Use 4 CPU cores
-```
-
 ---
 
 ## Real-World Examples
@@ -564,51 +550,6 @@ Apply diff: Binary diff + Original file → Changed file
             --output ./patches \
             --compression gzip \
             --level 6
-```
-
----
-
-## Future Enhancements
-
-### Additional Algorithms
-
-**Planned support:**
-- **brotli** - Google's compression algorithm (excellent ratio)
-- **lz4** - Ultra-fast compression/decompression
-- **xz** - Maximum compression (very slow)
-
-**Example (future):**
-```bash
-./generator --versions-dir ./versions \
-            --new-version 1.0.1 \
-            --output ./patches \
-            --compression brotli \
-            --level 11
-```
-
----
-
-### Custom Parameters
-
-**Fine-tune compression:**
-```bash
-./generator --versions-dir ./versions \
-            --new-version 1.0.1 \
-            --output ./patches \
-            --compression zstd \
-            --compression-params "windowLog=23,chainLog=23"
-```
-
----
-
-### Adaptive Compression
-
-**Automatic selection based on file types:**
-```bash
-./generator --versions-dir ./versions \
-            --new-version 1.0.1 \
-            --output ./patches \
-            --compression auto    # Auto-detect best algorithm per file
 ```
 
 ---

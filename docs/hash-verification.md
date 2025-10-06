@@ -60,14 +60,12 @@ x9y8z7w6v5u4321fedcba9876543210fedcba9876543210fedcba9876543210
 | **SHA-1** | 160-bit | ⚠️ BROKEN | Fast | ❌ DEPRECATED |
 | **SHA-256** | 256-bit | ✅ SECURE | Fast | ✅ **RECOMMENDED** |
 | SHA-512 | 512-bit | ✅ SECURE | Medium | ✅ Overkill for files |
-| SHA-3 | Variable | ✅ SECURE | Medium | ✅ Future option |
-| BLAKE3 | 256-bit | ✅ SECURE | Very Fast | ✅ Future option |
 
 **CyberPatchMaker Choice**: SHA-256
 - **Secure**: No known practical attacks
 - **Fast**: ~500 MB/s on modern CPUs
 - **Standard**: Widely supported, well-tested
-- **Future-proof**: Will remain secure for decades
+- **Long-term security**: Will remain secure for many years
 
 ### Security Guarantees
 
@@ -637,7 +635,6 @@ Tampered patch:
    - Expected hash: xyz789...
    - Actual hash: evil666... → ✗ VERIFICATION FAILS
    - Automatic rollback restores original
-2. **Digital signatures** (future feature) prevent patch tampering
 
 **Result**: ✅ Attack detected and prevented.
 
@@ -648,8 +645,7 @@ Tampered patch:
 **Protection Layers**:
 1. **HTTPS**: Encrypt download (prevents interception)
 2. **Patch checksum**: Verify downloaded patch hash
-3. **Digital signature**: Verify patch signed by developer (future)
-4. **Post-patch verification**: Verify result even if malicious patch applied
+3. **Post-patch verification**: Verify result even if malicious patch applied
 
 **Result**: ✅ Multiple layers of protection.
 
@@ -660,22 +656,7 @@ Tampered patch:
 - **Corrupted Source**: Force patch despite modified source (dangerous)
 - **Performance**: Skip verification for trusted environments (not recommended)
 
-**Future Feature** (not implemented):
-```bash
-# DANGEROUS - Only for testing
-patch-apply apply --skip-verification \
-                  --i-know-what-im-doing \
-                  --patch 1.0.0-to-1.0.3.patch \
-                  --target ./app/
-```
-
-**Warnings**:
-- ⚠️ **DATA LOSS RISK**: Corrupt installation likely
-- ⚠️ **SECURITY RISK**: Malicious modifications undetected
-- ⚠️ **NO ROLLBACK**: Failed patch cannot be safely rolled back
-- ⚠️ **UNSUPPORTED**: No support for problems caused by skipping verification
-
-**Recommendation**: **NEVER SKIP VERIFICATION IN PRODUCTION**.
+**Important**: CyberPatchMaker does not currently support skipping verification. Verification is always performed to ensure data integrity and security.
 
 ## Troubleshooting Verification Failures
 
@@ -784,34 +765,7 @@ Rolling back changes...
 - **Content-Addressable**: Layers identified by hash
 - **Container Isolation**: Requires container runtime
 
-## Future Enhancements
 
-### 1. Alternative Hash Algorithms
-
-**SHA-3 Support**:
-```bash
-patch-gen generate --hash-algorithm sha3-256 \
-                   --from 1.0.0 --to 1.0.1
-```
-
-**BLAKE3 Support** (3-4x faster than SHA-256):
-```bash
-patch-gen generate --hash-algorithm blake3 \
-                   --from 1.0.0 --to 1.0.1
-```
-
-### 2. Incremental Verification
-
-**Use Case**: Verify only changed files instead of all files
-
-**Design**:
-- Cache file hashes in manifest
-- Check modification time before recalculating
-- Only recalculate if file newer than cached hash
-
-### 3. Verification Reports
-
-**Use Case**: Detailed verification report for compliance/auditing
 
 **Example Output**:
 ```json

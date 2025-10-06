@@ -1,5 +1,14 @@
 # GUI Usage Guide
 
+> **🧪 EXPERIMENTAL FEATURE - IN DEVELOPMENT**
+> 
+> The GUI tools are currently experimental and not recommended for production use.
+> For production environments, please use the fully-supported CLI tools:
+> - [Generator CLI Guide](generator-guide.md)
+> - [Applier CLI Guide](applier-guide.md)
+>
+> The information below describes the current development state of the GUI.
+
 ## Patch Generator GUI
 
 The Patch Generator GUI provides a user-friendly interface for creating binary patches between software versions.

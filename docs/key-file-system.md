@@ -250,14 +250,6 @@ Application/
 
 **Solution**: Detection algorithm checks `bin/` directory with high priority.
 
-**Manual Override** (future feature):
-```bash
-# Specify custom key file during registration
-patch-gen register --version 1.0.0 \
-                   --path ./app \
-                   --key-file bin/main.exe
-```
-
 ### Platform-Specific Key Files
 
 **Problem**: Cross-platform application with different executables per platform
@@ -303,18 +295,7 @@ ScriptApp/
 └── modules/
 ```
 
-**Workaround 1** - Designate entry script as key file (future feature):
-```bash
-patch-gen register --version 1.0.0 \
-                   --path ./app \
-                   --key-file main.py
-```
-
-**Workaround 2** - Use manifest checksum as version identifier:
-- Fall back to overall manifest checksum
-- Less precise but workable for script-only apps
-
-**Current Limitation**: CyberPatchMaker requires at least one executable. Script-only apps need wrapper executable or future enhancement.
+**Current Limitation**: CyberPatchMaker requires at least one executable file. Script-only apps need a wrapper executable.
 
 ## Edge Cases and Troubleshooting
 
@@ -330,7 +311,6 @@ patch-gen register --version 1.0.0 \
 **Solutions**:
 1. Verify executable exists and is accessible
 2. Check file permissions (Unix: `chmod +x`)
-3. Manually specify key file path (future feature)
 
 ### Case 2: Multiple Suitable Candidates
 
@@ -347,7 +327,6 @@ MyApp/
 **Solutions**:
 1. Review detection ranking - usually picks largest/primary
 2. Manually select during registration (current UI)
-3. Use `--key-file` flag to specify (future CLI feature)
 
 ### Case 3: Key File Modified
 
@@ -363,7 +342,6 @@ MyApp/
 1. Re-download clean version
 2. Verify with original installer
 3. Check anti-virus logs
-4. Use `--force` flag only if absolutely certain (future feature, not recommended)
 
 ### Case 4: Renamed Key File
 
@@ -453,75 +431,6 @@ Patch Check:
 - Even if attacker matches source hash, target hash must also match
 
 **Mitigation**: Users should obtain patches only from trusted sources.
-
-## Future Enhancements
-
-### 1. Multiple Key Files
-
-**Use Case**: Applications with multiple critical executables
-
-**Proposed Design**:
-```json
-{
-  "key_files": [
-    {
-      "path": "game.exe",
-      "checksum": "abc123...",
-      "priority": 1
-    },
-    {
-      "path": "server.exe",
-      "checksum": "def456...",
-      "priority": 2
-    }
-  ]
-}
-```
-
-**Verification**: ALL key files must match required hashes.
-
-### 2. Custom Detection Priority
-
-**Use Case**: Override automatic detection for specific applications
-
-**Proposed CLI**:
-```bash
-patch-gen config --priority-list "main.exe,app.exe,program.exe"
-```
-
-### 3. Key File Metadata
-
-**Use Case**: Include version info embedded in executable
-
-**Proposed Enhancement**:
-- Extract PE version info (Windows)
-- Extract Mach-O version (macOS)
-- Parse ELF version section (Linux)
-- Validate against expected version string
-
-### 4. Signature Verification
-
-**Use Case**: Verify executable is signed by trusted publisher
-
-**Proposed Enhancement**:
-- Check code signature (Windows Authenticode, macOS codesign)
-- Validate certificate chain
-- Require valid signature for key file acceptance
-
-### 5. Key File Rotation
-
-**Use Case**: Application changes main executable filename between versions
-
-**Example**:
-```
-Version 1.0.0: oldname.exe
-Version 1.0.1: newname.exe
-```
-
-**Proposed Solution**:
-- Allow patch to specify key file change
-- Verify both old and new key files during patch
-- Update manifest with new key file info
 
 ## Best Practices
 

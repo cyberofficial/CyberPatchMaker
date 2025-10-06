@@ -52,10 +52,10 @@ For each file, calculate a SHA-256 hash (256-bit fingerprint):
 program.exe → SHA-256 → 63573ff071ea5fa2b8c9d3e1a4f7c8e5...
 ```
 
-This hash:
+This hash (fingerprint):
 - **Uniquely identifies** the file contents
-- **Detects any modification** (even 1 bit change = different hash)
-- **Cannot be forged** (cryptographically secure)
+- **Detects any change** (even the smallest change creates a different hash)
+- **Cannot be faked** (mathematically secure)
 
 ---
 
@@ -126,11 +126,11 @@ New file: program.exe (52MB)
 Binary diff: (2MB) ← Much smaller than full file!
 ```
 
-**bsdiff** is intelligent:
-- Finds similar sections between files
-- Stores only the differences
-- Highly efficient for executable files
-- Can handle insertions, deletions, and modifications
+**bsdiff** is smart:
+- Finds matching sections between old and new files
+- Saves only what changed
+- Works great for program files
+- Handles additions, removals, and changes
 
 ---
 
@@ -287,7 +287,7 @@ If **ANY file is wrong** → Patch rejected, no changes made
 **Restoration triggers:**
 - Operation failure (disk full, permission error)
 - Post-verification failure (wrong result)
-- User interruption (Ctrl+C handling planned)
+- User interruption
 
 ---
 

@@ -126,21 +126,26 @@ No changes were made to your installation
 
 ### Optional Options
 
-**`--verify`** (Recommended!)
-- Enable full verification (pre-verification + post-verification)
-- Creates backup before applying
+**`--verify`** (Enabled by Default)
+- Check files before and after patching
 - Verifies current version before patching
 - Verifies result after patching
-- **Highly recommended for production use**
-- If not specified, no verification or backup is performed (DANGEROUS!)
+- Default: `true` (enabled)
+- Disable with `--verify=false` (not recommended)
+
+**`--backup`** (Enabled by Default)
+- Create backup of changed files before patching
+- Selective backup (only files being modified/deleted)
+- Backup saved to `{current-dir}.backup.cyberpatcher`
+- Default: `true` (enabled)
+- Disable with `--backup=false` (not recommended)
+- Manual rollback: Delete patched files, restore from backup
 
 **`--dry-run`**
 - Preview mode - show what would happen
-- No verification performed
 - No backup created
 - No changes made
 - Useful for testing and planning
-- Cannot be used with `--verify`
 
 **`--help`**
 - Display usage information
