@@ -136,6 +136,11 @@ func loadPatch(filename string) (*utils.Patch, error) {
 		return nil, fmt.Errorf("failed to read patch file: %w", err)
 	}
 
+	return parsePatchData(data)
+}
+
+// parsePatchData parses patch data, automatically detecting and decompressing if needed
+func parsePatchData(data []byte) (*utils.Patch, error) {
 	// Try to detect compression and decompress
 	// First try as JSON directly
 	var patch utils.Patch
@@ -165,7 +170,7 @@ func displayPatchInfo(patch *utils.Patch) {
 	fmt.Printf("From Version:     %s\n", patch.FromVersion)
 	fmt.Printf("To Version:       %s\n", patch.ToVersion)
 	fmt.Printf("Key File:         %s\n", patch.FromKeyFile.Path)
-	fmt.Printf("Required Hash:    %s\n", patch.FromKeyFile.Checksum[:16]+"...")
+	fmt.Printf("Required Hash:    %s\n", patch.FromKeyFile.Checksum)
 	fmt.Printf("Patch Size:       %d bytes\n", patch.Header.PatchSize)
 	fmt.Printf("Compression:      %s\n", patch.Header.Compression)
 	fmt.Printf("Created:          %s\n", patch.Header.CreatedAt.Format("2006-01-02 15:04:05"))
@@ -405,26 +410,17 @@ func checkEmbeddedPatch(ignore1GB bool) (*utils.Patch, string, bool) {
 		return nil, "", false
 	}
 
-	// Decompress if needed
-	compression := string(bytes.TrimRight(header.Compression[:], "\x00"))
-	if compression != "none" && compression != "" {
-		decompressed, err := utils.DecompressData(patchData, compression)
-		if err != nil {
-			return nil, "", false
-		}
-		patchData = decompressed
-	}
-
-	// Parse JSON patch
-	var patch utils.Patch
-	if err := json.Unmarshal(patchData, &patch); err != nil {
+	// The embedded patch data is the raw .patch file content
+	// We need to parse it the same way loadPatch() does
+	patch, err := parsePatchData(patchData)
+	if err != nil {
 		return nil, "", false
 	}
 
 	// Get current directory as default target
 	targetDir, _ := os.Getwd()
 
-	return &patch, targetDir, true
+	return patch, targetDir, true
 }
 
 // runInteractiveMode runs the interactive console interface for embedded patches

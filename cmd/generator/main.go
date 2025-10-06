@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -408,8 +409,8 @@ func createStandaloneCLIExe(patchPath, exePath, compression string) error {
 		return fmt.Errorf("failed to read patch file: %w", err)
 	}
 
-	// Calculate checksum of patch data
-	checksum := utils.CalculateDataChecksum(patchData)
+	// Calculate checksum of patch data (as bytes, not hex string)
+	checksum := sha256.Sum256(patchData)
 
 	// Create 128-byte header
 	header := make([]byte, 128)
@@ -448,7 +449,7 @@ func createStandaloneCLIExe(patchPath, exePath, compression string) error {
 	copy(header[36:52], compressionBytes)
 
 	// Checksum (32 bytes, SHA-256)
-	copy(header[52:84], checksum)
+	copy(header[52:84], checksum[:])
 
 	// Reserved (44 bytes) - already zeroed
 
