@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/cyberofficial/cyberpatchmaker/internal/core/patcher"
+	"github.com/cyberofficial/cyberpatchmaker/internal/core/version"
 	"github.com/cyberofficial/cyberpatchmaker/pkg/utils"
 )
 
@@ -17,9 +18,16 @@ func main() {
 	dryRun := flag.Bool("dry-run", false, "Simulate patch without making changes")
 	verify := flag.Bool("verify", true, "Verify file hashes before and after patching")
 	backup := flag.Bool("backup", true, "Create backup before patching")
+	versionFlag := flag.Bool("version", false, "Show version information")
 	help := flag.Bool("help", false, "Show help message")
 
 	flag.Parse()
+
+	// Show version if requested
+	if *versionFlag {
+		fmt.Printf("CyberPatchMaker Patch Applier v%s\n", version.GetVersion())
+		return
+	}
 
 	if *help {
 		printHelp()
@@ -295,7 +303,7 @@ func copyDir(src, dst string) error {
 }
 
 func printHelp() {
-	fmt.Println("CyberPatchMaker - Patch Applier")
+	fmt.Printf("CyberPatchMaker - Patch Applier v%s\n", version.GetVersion())
 	fmt.Println("\nUsage:")
 	fmt.Println("  patch-apply --patch <file> --current-dir <directory>")
 	fmt.Println("\nOptions:")
@@ -304,6 +312,7 @@ func printHelp() {
 	fmt.Println("  --dry-run       Simulate patch without making changes")
 	fmt.Println("  --verify        Verify file hashes before and after patching (default: true)")
 	fmt.Println("  --backup        Create backup before patching (default: true)")
+	fmt.Println("  --version       Show version information")
 	fmt.Println("  --help          Show this help message")
 	fmt.Println("\nExamples:")
 	fmt.Println("  # Apply patch")

@@ -25,9 +25,16 @@ func main() {
 	compression := flag.String("compression", "zstd", "Compression algorithm (zstd, gzip, none)")
 	level := flag.Int("level", 3, "Compression level (1-4 for zstd, 1-9 for gzip)")
 	verify := flag.Bool("verify", true, "Verify patches after creation")
+	versionFlag := flag.Bool("version", false, "Show version information")
 	help := flag.Bool("help", false, "Show help message")
 
 	flag.Parse()
+
+	// Show version if requested
+	if *versionFlag {
+		fmt.Printf("CyberPatchMaker Patch Generator v%s\n", version.GetVersion())
+		return
+	}
 
 	if *help {
 		printHelp()
@@ -305,7 +312,7 @@ func savePatch(patch *utils.Patch, filename string, options *utils.PatchOptions)
 }
 
 func printHelp() {
-	fmt.Println("CyberPatchMaker - Patch Generator")
+	fmt.Printf("CyberPatchMaker - Patch Generator v%s\n", version.GetVersion())
 	fmt.Println("\nUsage:")
 	fmt.Println("  Generate patches from all versions to new version:")
 	fmt.Println("    patch-gen --versions-dir <dir> --new-version <version>")
@@ -324,6 +331,7 @@ func printHelp() {
 	fmt.Println("  --compression     Compression algorithm: zstd, gzip, none (default: zstd)")
 	fmt.Println("  --level           Compression level (default: 3)")
 	fmt.Println("  --verify          Verify patches after creation (default: true)")
+	fmt.Println("  --version         Show version information")
 	fmt.Println("  --help            Show this help message")
 	fmt.Println("\nExamples:")
 	fmt.Println("  # Versions on different drives")
