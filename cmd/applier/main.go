@@ -243,23 +243,6 @@ func performDryRun(patch *utils.Patch, currentDir string) {
 	fmt.Println("\n✓ Dry run completed - patch can be applied safely")
 }
 
-func createBackup(srcDir, backupDir string) error {
-	// Remove existing backup if it exists
-	if utils.FileExists(backupDir) {
-		if err := os.RemoveAll(backupDir); err != nil {
-			return fmt.Errorf("failed to remove existing backup: %w", err)
-		}
-	}
-
-	// Create backup directory
-	if err := utils.EnsureDir(backupDir); err != nil {
-		return fmt.Errorf("failed to create backup directory: %w", err)
-	}
-
-	// Copy all files
-	return copyDir(srcDir, backupDir)
-}
-
 func restoreBackup(backupDir, targetDir string) error {
 	// Remove current directory
 	if err := os.RemoveAll(targetDir); err != nil {
