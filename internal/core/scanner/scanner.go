@@ -45,6 +45,14 @@ func (s *Scanner) ScanDirectory() ([]utils.FileEntry, []string, error) {
 		// Convert to forward slashes for consistency
 		relPath = filepath.ToSlash(relPath)
 
+		// Skip backup.cyberpatcher directory and all its contents
+		if relPath == "backup.cyberpatcher" || strings.HasPrefix(relPath, "backup.cyberpatcher/") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
 		if info.IsDir() {
 			// Track directories for empty directory handling
 			directories = append(directories, relPath)
@@ -82,7 +90,19 @@ func (s *Scanner) ScanDirectoryWithProgress(progressCallback func(current, total
 	// First pass: count total files
 	totalFiles := 0
 	filepath.Walk(s.rootPath, func(path string, info os.FileInfo, err error) error {
-		if err == nil && !info.IsDir() {
+		if err != nil {
+			return nil
+		}
+		relPath, _ := filepath.Rel(s.rootPath, path)
+		relPath = filepath.ToSlash(relPath)
+		// Skip backup.cyberpatcher directory
+		if relPath == "backup.cyberpatcher" || strings.HasPrefix(relPath, "backup.cyberpatcher/") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !info.IsDir() {
 			totalFiles++
 		}
 		return nil
@@ -107,6 +127,14 @@ func (s *Scanner) ScanDirectoryWithProgress(progressCallback func(current, total
 		}
 
 		relPath = filepath.ToSlash(relPath)
+
+		// Skip backup.cyberpatcher directory and all its contents
+		if relPath == "backup.cyberpatcher" || strings.HasPrefix(relPath, "backup.cyberpatcher/") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 
 		if info.IsDir() {
 			directories = append(directories, relPath)
