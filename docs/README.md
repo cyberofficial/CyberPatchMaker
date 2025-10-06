@@ -8,14 +8,14 @@ Welcome to the CyberPatchMaker documentation wiki. This comprehensive guide cove
 - [Quick Start Guide](quick-start.md) - Get up and running in 5 minutes
 
 ### User Guides
-- [Generator Tool Guide](generator-guide.md) - Complete guide to patch generation
-- [Applier Tool Guide](applier-guide.md) - Complete guide to patch application
-- [GUI Usage Guide](gui-usage.md) - Using the graphical interface
-- [Downgrade Guide](downgrade-guide.md) - Rollback to previous versions
-- [CLI Reference](cli-reference.md) - Quick command-line reference
-- [CLI Examples](CLI-EXAMPLES.md) - Real-world command examples
-- [Version Management](version-management.md) - Managing multiple versions
-- [Compression Options](compression-guide.md) - Choosing the right compression
+- ✅ [Generator Tool Guide](generator-guide.md) - Complete guide to patch generation (CLI)
+- ✅ [Applier Tool Guide](applier-guide.md) - Complete guide to patch application (CLI)
+- 🧪 [GUI Usage Guide](gui-usage.md) - Using the graphical interface **(Experimental)**
+- ✅ [Downgrade Guide](downgrade-guide.md) - Rollback to previous versions
+- ✅ [CLI Reference](cli-reference.md) - Quick command-line reference
+- ✅ [CLI Examples](CLI-EXAMPLES.md) - Real-world command examples
+- ✅ [Version Management](version-management.md) - Managing multiple versions
+- ✅ [Compression Options](compression-guide.md) - Choosing the right compression
 
 ### Core Concepts
 - [How It Works](how-it-works.md) - Understanding the patch system
@@ -38,11 +38,13 @@ Welcome to the CyberPatchMaker documentation wiki. This comprehensive guide cove
 ## Quick Links
 
 - **Need Help?** Start with the [Quick Start Guide](quick-start.md)
-- **Generating Patches?** See [Generator Tool Guide](generator-guide.md)
-- **Applying Patches?** See [Applier Tool Guide](applier-guide.md)
-- **Understanding Backups?** Read [Backup System](backup-system.md)
+- **Generating Patches?** See [Generator Tool Guide](generator-guide.md) ✅
+- **Applying Patches?** See [Applier Tool Guide](applier-guide.md) ✅
+- **Understanding Backups?** Read [Backup System](backup-system.md) ✅
 - **Something Not Working?** Check [Troubleshooting](troubleshooting.md)
 - **Want to Contribute?** Read [Development Setup](development-setup.md)
+
+**Legend:** ✅ = Production Ready | 🧪 = Experimental (In Development)
 
 ## Documentation Version
 

@@ -447,10 +447,9 @@ Output: Success/Error Message
 - **Memory**: O(1) - streaming I/O for large files
 
 ### Optimizations
-- Streaming for large files (no full load)
+- Streaming for large files (no full load into memory)
 - Skip binary-identical files
-- Parallel processing option (planned)
-- Incremental checksums (planned)
+- Efficient selective backup (only changed files)
 
 ---
 
@@ -484,30 +483,28 @@ See [Testing Guide](testing-guide.md) for details.
 
 ---
 
-## Future Architecture
+## Experimental Features
 
-### Planned Feature: GUI Application
+### GUI Application (In Development)
+
+> **Status: Experimental** - GUI tools are in development and not recommended for production use.
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                       GUI Layer (Fyne)                       │
+│                    GUI Layer (Fyne v2.6.3)                   │
 ├─────────────────────────────────────────────────────────────┤
 │  cmd/patch-gui/                                               │
-│  ├─ mainwindow.go      Main application window               │
-│  ├─ versionpanel.go    Version management UI                 │
-│  ├─ patchgenpanel.go   Patch generation UI                   │
-│  ├─ patchapplypanel.go Patch application UI                  │
-│  └─ progress.go        Progress dialogs                      │
+│  internal/gui/                                                │
+│  ├─ generator_window.go   Patch generation UI                │
+│  ├─ applier_window.go     Patch application UI               │
+│  ├─ components.go         Shared UI components               │
+│  └─ styles.go             Visual styling                     │
 └─────────────────────────────────────────────────────────────┘
                               ↓
         (Reuses all existing core business logic)
 ```
 
-### Planned Enhancements
-- Parallel file processing
-- Resume interrupted operations
-- Network path support optimization
-- Delta-of-delta compression
-- Patch chaining (1.0.0→1.0.1→1.0.2)
+The GUI provides a visual interface for patch generation but is still under active development. For production use, the CLI tools are recommended.
 
 ---
 

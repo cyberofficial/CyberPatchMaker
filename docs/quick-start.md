@@ -132,11 +132,11 @@ If the dry-run looks good, apply the patch:
 ```
 
 This will:
-1. Verify current version is 1.0.0
-2. Create backup of current state
-3. Apply the patch
-4. Verify result matches version 1.0.1
-5. Remove backup (or restore on failure)
+1. Check that you have version 1.0.0
+2. Create a backup of your current files
+3. Update the files to version 1.0.1
+4. Check that everything updated correctly
+5. Keep the backup for safety (automatic undo if something goes wrong)
 
 ### Step 5: Verify Success
 
@@ -151,11 +151,11 @@ Check your test-app directory - it should now be version 1.0.1!
 
 ## Common Issues
 
-**"Key file not found"**: Make sure your versions contain program.exe, game.exe, app.exe, or main.exe
+**"Key file not found"**: Make sure your application folder contains program.exe, game.exe, app.exe, or main.exe (the main program file)
 
-**"Checksum mismatch"**: The target directory was modified - ensure you're applying the patch to a clean installation
+**"Checksum mismatch"**: Your application files were changed after installation - patches only work on unmodified installations
 
-**"Too many arguments"**: Check you're using the latest build of the tools
+**"Too many arguments"**: Make sure you're using the latest version of the tools
 
 See [Troubleshooting](troubleshooting.md) for more help.
 

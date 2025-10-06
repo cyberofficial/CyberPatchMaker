@@ -629,12 +629,7 @@ func (aw *ApplierWindow) performDryRun() {
 
 	// Show operations that would be performed
 	aw.appendLog("\nOperations that would be performed:")
-	for i, op := range aw.loadedPatch.Operations {
-		if i >= 10 {
-			aw.appendLog(fmt.Sprintf("... and %d more operations", len(aw.loadedPatch.Operations)-10))
-			break
-		}
-
+	for _, op := range aw.loadedPatch.Operations {
 		switch op.Type {
 		case utils.OpAdd:
 			aw.appendLog(fmt.Sprintf("  ADD: %s", op.FilePath))
