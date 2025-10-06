@@ -225,12 +225,7 @@ func performDryRun(patch *utils.Patch, currentDir string) {
 
 	// Show operations that would be performed
 	fmt.Println("\nOperations that would be performed:")
-	for i, op := range patch.Operations {
-		if i >= 10 {
-			fmt.Printf("... and %d more operations\n", len(patch.Operations)-10)
-			break
-		}
-
+	for _, op := range patch.Operations {
 		switch op.Type {
 		case utils.OpAdd:
 			fmt.Printf("  ADD: %s\n", op.FilePath)
