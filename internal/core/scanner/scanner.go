@@ -11,13 +11,19 @@ import (
 
 // Scanner handles recursive directory scanning
 type Scanner struct {
-	rootPath string
+	rootPath       string
+	ignorePatterns *IgnorePatterns
 }
 
 // NewScanner creates a new scanner for the given root path
 func NewScanner(rootPath string) *Scanner {
+	ignorePatterns := NewIgnorePatterns()
+	// Try to load .cyberignore file (silently fail if not present)
+	ignorePatterns.LoadFromFile(rootPath)
+
 	return &Scanner{
-		rootPath: rootPath,
+		rootPath:       rootPath,
+		ignorePatterns: ignorePatterns,
 	}
 }
 
@@ -44,6 +50,22 @@ func (s *Scanner) ScanDirectory() ([]utils.FileEntry, []string, error) {
 
 		// Convert to forward slashes for consistency
 		relPath = filepath.ToSlash(relPath)
+
+		// Skip backup.cyberpatcher directory and all its contents
+		if relPath == "backup.cyberpatcher" || strings.HasPrefix(relPath, "backup.cyberpatcher/") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Check if path should be ignored based on .cyberignore patterns
+		if s.ignorePatterns.ShouldIgnore(relPath) {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 
 		if info.IsDir() {
 			// Track directories for empty directory handling
@@ -82,7 +104,26 @@ func (s *Scanner) ScanDirectoryWithProgress(progressCallback func(current, total
 	// First pass: count total files
 	totalFiles := 0
 	filepath.Walk(s.rootPath, func(path string, info os.FileInfo, err error) error {
-		if err == nil && !info.IsDir() {
+		if err != nil {
+			return nil
+		}
+		relPath, _ := filepath.Rel(s.rootPath, path)
+		relPath = filepath.ToSlash(relPath)
+		// Skip backup.cyberpatcher directory
+		if relPath == "backup.cyberpatcher" || strings.HasPrefix(relPath, "backup.cyberpatcher/") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		// Check .cyberignore patterns
+		if s.ignorePatterns.ShouldIgnore(relPath) {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !info.IsDir() {
 			totalFiles++
 		}
 		return nil
@@ -107,6 +148,22 @@ func (s *Scanner) ScanDirectoryWithProgress(progressCallback func(current, total
 		}
 
 		relPath = filepath.ToSlash(relPath)
+
+		// Skip backup.cyberpatcher directory and all its contents
+		if relPath == "backup.cyberpatcher" || strings.HasPrefix(relPath, "backup.cyberpatcher/") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Check if path should be ignored based on .cyberignore patterns
+		if s.ignorePatterns.ShouldIgnore(relPath) {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
 
 		if info.IsDir() {
 			directories = append(directories, relPath)
