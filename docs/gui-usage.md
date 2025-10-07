@@ -64,6 +64,14 @@ The Patch Generator GUI provides a user-friendly interface for creating binary p
   - Perfect for non-technical users (just double-click to apply)
   - See [Self-Contained Executables Guide](self-contained-executables.md) for details
   - Default: Disabled
+- **Create reverse patch (for downgrades)**: Automatically generate reverse patch
+  - Creates both forward patch (A→B) and reverse patch (B→A)
+  - Enables easy version rollback without manual patch creation
+  - Example: Creates `1.0.0-to-1.0.1.patch` AND `1.0.1-to-1.0.0.patch`
+  - Works with self-contained executables (creates reverse `.exe` too)
+  - Perfect for production deployments with rollback safety
+  - See [Downgrade Guide](downgrade-guide.md) for details
+  - Default: Disabled
 
 #### Patch Generation
 

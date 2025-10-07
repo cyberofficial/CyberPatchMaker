@@ -154,9 +154,208 @@ No changes were made to your installation
 - No changes made
 - Useful for testing and planning
 
+**`--silent`**
+- Silent mode for automation and scripting
+- Automatically applies patch without user prompts
+- Works with self-contained executables only
+- Applies patch with default settings (verify=true, backup=true)
+- Returns exit code 0 on success, 1 on failure
+- Example: `1.2.4-to-1.2.5.exe --silent`
+- Useful for automated deployments and CI/CD pipelines
+
 **`--help`**
 - Display usage information
 - Shows all available options
+
+---
+
+## Automation Mode (Silent Flag)
+
+### Overview
+
+The `--silent` flag enables fully automated patching for **self-contained executables** (`.exe` files created with `--create-exe`). This mode is designed for:
+
+- **Automated deployments** via scripts or task schedulers
+- **CI/CD pipelines** that need to update installations
+- **Mass deployments** across multiple machines
+- **Unattended updates** without user interaction
+
+### Key Features
+
+- **No user prompts**: Applies patch immediately without asking
+- **Default settings**: Uses verify=true and backup=true automatically
+- **Exit codes**: Returns 0 for success, 1 for failure (scriptable)
+- **Minimal output**: Only shows essential status messages
+- **Error handling**: Proper error codes for automation tools
+
+### Basic Usage
+
+```bash
+# Basic silent mode (uses current directory)
+1.2.4-to-1.2.5.exe --silent
+
+# Silent mode with explicit target directory
+1.2.4-to-1.2.5.exe --silent --current-dir C:\MyApp
+
+# Silent mode with custom key file
+1.2.4-to-1.2.5.exe --silent --current-dir C:\MyApp --key-file renamed.exe
+```
+
+### Exit Codes
+
+**Exit Code 0: Success**
+- Patch applied successfully
+- All verifications passed
+- Backup created and preserved
+
+**Exit Code 1: Failure**
+- Target directory not found
+- Pre-verification failed (wrong version/corrupted files)
+- Patch application failed
+- Post-verification failed
+- Any other error during patching
+
+### Example Output
+
+**Success:**
+```
+Applying patch from 1.0.0 to 1.0.1...
+Verifying current version...
+Pre-patch verification successful
+
+Creating backup...
+Backed up 3 files
+Backup created at: C:\MyApp\backup.cyberpatcher
+
+Applying 4 operations...
+  Added: libs/newfeature.dll
+  Modified: data/config.json
+  Modified: libs/core.dll
+  Modified: program.exe
+
+Verifying patched version...
+Post-patch verification successful
+
+Patch applied successfully: 1.0.0 → 1.0.1
+```
+
+**Failure:**
+```
+Error: Target directory not found: C:\NonExistent
+```
+
+### Automation Examples
+
+**PowerShell Script:**
+```powershell
+# Deploy patch to multiple servers
+$servers = @("Server1", "Server2", "Server3")
+$patchExe = "\\share\patches\1.2.4-to-1.2.5.exe"
+
+foreach ($server in $servers) {
+    Write-Host "Updating $server..."
+    $targetDir = "\\$server\C$\MyApp"
+    
+    # Run patch in silent mode
+    & $patchExe --silent --current-dir $targetDir
+    
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "✓ $server updated successfully" -ForegroundColor Green
+    } else {
+        Write-Host "✗ $server update failed" -ForegroundColor Red
+    }
+}
+```
+
+**Batch Script:**
+```batch
+@echo off
+REM Automated patch deployment
+
+echo Applying patch silently...
+1.2.4-to-1.2.5.exe --silent --current-dir C:\MyApp
+
+if %ERRORLEVEL% EQU 0 (
+    echo Success: Patch applied
+    exit /b 0
+) else (
+    echo Error: Patch failed
+    exit /b 1
+)
+```
+
+**Task Scheduler:**
+```powershell
+# Create scheduled task for automated patching
+$action = New-ScheduledTaskAction -Execute "C:\Patches\1.2.4-to-1.2.5.exe" `
+                                   -Argument "--silent --current-dir C:\MyApp"
+
+$trigger = New-ScheduledTaskTrigger -At 2:00AM -Daily
+
+Register-ScheduledTask -TaskName "MyApp Update" `
+                       -Action $action `
+                       -Trigger $trigger `
+                       -User "SYSTEM" `
+                       -RunLevel Highest
+```
+
+**CI/CD Pipeline (GitHub Actions):**
+```yaml
+name: Deploy Patch
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: windows-latest
+    steps:
+      - name: Download patch
+        uses: actions/download-artifact@v3
+        with:
+          name: patch-executable
+          
+      - name: Apply patch silently
+        run: |
+          .\1.2.4-to-1.2.5.exe --silent --current-dir C:\DeployedApp
+          
+      - name: Check result
+        run: |
+          if ($LASTEXITCODE -ne 0) {
+            throw "Patch application failed"
+          }
+```
+
+### Best Practices for Automation
+
+1. **Always test first**: Run in interactive mode once to verify
+2. **Monitor exit codes**: Check `$LASTEXITCODE` / `%ERRORLEVEL%` / `$?`
+3. **Log output**: Redirect output to log files for troubleshooting
+4. **Check disk space**: Ensure space for backup before running
+5. **Close application**: Ensure target application is stopped
+6. **Handle failures**: Implement retry logic or alerting
+7. **Verify result**: Check application version after patching
+
+### Limitations
+
+- **Self-contained executables only**: The `--silent` flag only works with `.exe` files created using `--create-exe`
+- **Standard patch files**: Regular `.patch` files require explicit `--patch` and `--current-dir` flags
+- **No confirmation**: Cannot undo once started (backup preserved for manual rollback)
+- **Default settings only**: Cannot customize verify/backup settings in silent mode (always enabled)
+
+### Error Handling
+
+Silent mode still performs all safety checks:
+- Pre-verification (version and file integrity)
+- Backup creation (automatic and selective)
+- Post-verification (result validation)
+- Automatic restoration on failure
+
+If any check fails:
+1. Operation stops immediately
+2. Backup is restored (if created)
+3. Exit code 1 is returned
+4. Error message is written to stderr
 
 ---
 

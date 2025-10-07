@@ -296,6 +296,65 @@ Need help? Visit: https://support.mygame.com/updates
 - ✅ **Portable**: Single file can be shared easily
 - ✅ **Safe**: Still includes all verification and backup features
 
+### Automation Mode (Silent Flag)
+
+Self-contained executables support a `--silent` flag for **fully automated patching** without user interaction:
+
+```powershell
+# Automated silent patching
+1.2.4-to-1.2.5.exe --silent
+
+# Silent mode with explicit target directory
+1.2.4-to-1.2.5.exe --silent --current-dir C:\MyApp
+```
+
+**Features:**
+- **No prompts**: Applies patch automatically without asking
+- **Default settings**: Uses verify=true and backup=true
+- **Exit codes**: Returns 0 on success, 1 on failure
+- **Minimal output**: Only essential status messages
+- **Perfect for**:
+  - Automated deployments via scripts
+  - CI/CD pipelines
+  - Mass deployments across machines
+  - Task Scheduler / cron jobs
+  - Unattended updates
+
+**Example: PowerShell deployment script**
+```powershell
+# Deploy patch to multiple machines
+$servers = @("Server1", "Server2", "Server3")
+
+foreach ($server in $servers) {
+    Write-Host "Updating $server..."
+    & "\\share\1.2.4-to-1.2.5.exe" --silent --current-dir "\\$server\C$\MyApp"
+    
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "✓ Success" -ForegroundColor Green
+    } else {
+        Write-Host "✗ Failed" -ForegroundColor Red
+    }
+}
+```
+
+**Example: Task Scheduler automation**
+```powershell
+# Create scheduled task for automated patching at 2 AM
+$action = New-ScheduledTaskAction `
+    -Execute "C:\Patches\1.2.4-to-1.2.5.exe" `
+    -Argument "--silent --current-dir C:\MyApp"
+
+$trigger = New-ScheduledTaskTrigger -At 2:00AM -Daily
+
+Register-ScheduledTask `
+    -TaskName "MyApp Auto-Update" `
+    -Action $action `
+    -Trigger $trigger `
+    -User "SYSTEM"
+```
+
+See [Applier Guide - Automation Mode](applier-guide.md#automation-mode-silent-flag) for more details.
+
 ## Advantages vs Traditional Patches
 
 ### For End Users

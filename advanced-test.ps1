@@ -23,6 +23,12 @@ $needsBuild = $false
 $generatorExists = Test-Path ".\patch-gen.exe"
 $applierExists = Test-Path ".\patch-apply.exe"
 
+# If the exe exist then rebuild
+if ($generatorExists) {
+    Write-Host "  patch-gen.exe exists, rebuilding..." -ForegroundColor Yellow
+    $needsBuild = $true
+}
+
 if (-not $generatorExists) {
     Write-Host "  patch-gen.exe not found" -ForegroundColor Yellow
     $needsBuild = $true
@@ -1841,6 +1847,217 @@ config/secrets.json
     Write-Host "    • .cyberignore itself automatically excluded" -ForegroundColor Gray
 }
 
+# Test 42: Self-Contained Executable Silent Mode
+Test-Step "Verify self-contained executable --silent flag for automation" {
+    Write-Host "  Testing silent mode for automated patching..." -ForegroundColor Gray
+    
+    # Create test executable with embedded patch
+    Write-Host "  Creating self-contained executable..." -ForegroundColor Gray
+    $output = & .\patch-gen.exe --from-dir .\testdata\versions\1.0.0 --to-dir .\testdata\versions\1.0.1 --output .\testdata\advanced-output\silent-test --create-exe 2>&1 | Out-String
+    
+    $exePath = ".\testdata\advanced-output\silent-test\1.0.0-to-1.0.1.exe"
+    if (-not (Test-Path $exePath)) {
+        throw "Self-contained executable not created"
+    }
+    Write-Host "  ✓ Self-contained executable created" -ForegroundColor Green
+    
+    # Copy test directory for silent patching
+    Write-Host "  Preparing test directory..." -ForegroundColor Gray
+    $testDir = ".\testdata\advanced-output\silent-mode-test"
+    if (Test-Path $testDir) {
+        Remove-Item $testDir -Recurse -Force
+    }
+    Copy-Item -Path .\testdata\versions\1.0.0 -Destination $testDir -Recurse -Force
+    
+    # Test 1: Basic silent mode with --current-dir
+    Write-Host "  Testing silent mode with explicit directory..." -ForegroundColor Gray
+    $output = & $exePath --silent --current-dir $testDir 2>&1 | Out-String
+    $exitCode = $LASTEXITCODE
+    
+    if ($exitCode -ne 0) {
+        throw "Silent mode failed with exit code $exitCode"
+    }
+    Write-Host "  ✓ Silent mode executed successfully (exit code 0)" -ForegroundColor Green
+    
+    # Verify patch was applied
+    $programContent = Get-Content "$testDir\program.exe"
+    if ($programContent -notmatch "v1\.0\.1") {
+        throw "Patch not applied correctly in silent mode"
+    }
+    Write-Host "  ✓ Patch applied successfully (v1.0.0 → v1.0.1)" -ForegroundColor Green
+    
+    # Verify backup was created
+    if (-not (Test-Path "$testDir\backup.cyberpatcher")) {
+        throw "Backup not created in silent mode"
+    }
+    Write-Host "  ✓ Backup created automatically" -ForegroundColor Green
+    
+    # Test 2: Silent mode from executable's directory (default current dir)
+    Write-Host "  Testing silent mode with default directory..." -ForegroundColor Gray
+    $testDir2 = ".\testdata\advanced-output\silent-mode-test2"
+    if (Test-Path $testDir2) {
+        Remove-Item $testDir2 -Recurse -Force
+    }
+    Copy-Item -Path .\testdata\versions\1.0.0 -Destination $testDir2 -Recurse -Force
+    
+    # Copy executable to test directory and run from there
+    Copy-Item $exePath "$testDir2\patch.exe"
+    Push-Location $testDir2
+    $output = & .\patch.exe --silent 2>&1 | Out-String
+    $exitCode = $LASTEXITCODE
+    Pop-Location
+    
+    if ($exitCode -ne 0) {
+        throw "Silent mode with default directory failed with exit code $exitCode"
+    }
+    Write-Host "  ✓ Silent mode works with default directory" -ForegroundColor Green
+    
+    # Test 3: Silent mode error handling (non-existent directory)
+    Write-Host "  Testing silent mode error handling..." -ForegroundColor Gray
+    $output = & $exePath --silent --current-dir ".\nonexistent-directory-12345" 2>&1 | Out-String
+    $exitCode = $LASTEXITCODE
+    
+    if ($exitCode -eq 0) {
+        throw "Silent mode should fail with non-existent directory"
+    }
+    if ($output -notmatch "Error.*not found") {
+        throw "Silent mode should output error message for invalid directory"
+    }
+    Write-Host "  ✓ Silent mode error handling verified (exit code $exitCode)" -ForegroundColor Green
+    
+    Write-Host "  ✓ Self-contained executable --silent flag verified!" -ForegroundColor Green
+    Write-Host "    • Silent mode applies patch without prompts" -ForegroundColor Gray
+    Write-Host "    • Works with explicit --current-dir flag" -ForegroundColor Gray
+    Write-Host "    • Works with default directory (executable location)" -ForegroundColor Gray
+    Write-Host "    • Creates backup automatically" -ForegroundColor Gray
+    Write-Host "    • Returns proper exit codes (0=success, 1=error)" -ForegroundColor Gray
+    Write-Host "    • Suitable for automation and scripting" -ForegroundColor Gray
+}
+
+# Test 43: Create Reverse Patch (--crp flag)
+Test-Step "Verify --crp flag creates reverse patches for downgrades" {
+    Write-Host "  Testing reverse patch generation with --crp flag..." -ForegroundColor Gray
+    
+    # Create test directory for CRP test
+    $crpTestDir = ".\testdata\advanced-output\crp-test"
+    if (Test-Path $crpTestDir) {
+        Remove-Item $crpTestDir -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force -Path $crpTestDir | Out-Null
+    
+    # Test 1: Generate patch with --crp flag
+    Write-Host "  Generating patches with --crp flag..." -ForegroundColor Gray
+    $output = & .\patch-gen.exe --from-dir .\testdata\versions\1.0.0 --to-dir .\testdata\versions\1.0.1 --output $crpTestDir --crp 2>&1 | Out-String
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Patch generation with --crp failed: $output"
+    }
+    
+    # Verify forward patch created
+    if (-not (Test-Path "$crpTestDir\1.0.0-to-1.0.1.patch")) {
+        throw "Forward patch (1.0.0-to-1.0.1.patch) not created"
+    }
+    Write-Host "  ✓ Forward patch created: 1.0.0-to-1.0.1.patch" -ForegroundColor Green
+    
+    # Verify reverse patch created
+    if (-not (Test-Path "$crpTestDir\1.0.1-to-1.0.0.patch")) {
+        throw "Reverse patch (1.0.1-to-1.0.0.patch) not created"
+    }
+    Write-Host "  ✓ Reverse patch created: 1.0.1-to-1.0.0.patch" -ForegroundColor Green
+    
+    # Test 2: Verify reverse patch content
+    Write-Host "  Verifying reverse patch operations..." -ForegroundColor Gray
+    if ($output -match "Generating reverse patch") {
+        Write-Host "  ✓ Reverse patch generation logged" -ForegroundColor Green
+    } else {
+        throw "No reverse patch generation logged in output"
+    }
+    
+    # Test 3: Generate with --crp and --create-exe
+    Write-Host "  Testing --crp with --create-exe..." -ForegroundColor Gray
+    $crpExeDir = ".\testdata\advanced-output\crp-exe-test"
+    if (Test-Path $crpExeDir) {
+        Remove-Item $crpExeDir -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force -Path $crpExeDir | Out-Null
+    
+    $output = & .\patch-gen.exe --from-dir .\testdata\versions\1.0.0 --to-dir .\testdata\versions\1.0.1 --output $crpExeDir --crp --create-exe 2>&1 | Out-String
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Patch generation with --crp --create-exe failed"
+    }
+    
+    # Verify all 4 files created
+    $expectedFiles = @(
+        "$crpExeDir\1.0.0-to-1.0.1.patch",
+        "$crpExeDir\1.0.0-to-1.0.1.exe",
+        "$crpExeDir\1.0.1-to-1.0.0.patch",
+        "$crpExeDir\1.0.1-to-1.0.0.exe"
+    )
+    
+    foreach ($file in $expectedFiles) {
+        if (-not (Test-Path $file)) {
+            throw "Missing file: $file"
+        }
+        $fileName = Split-Path $file -Leaf
+        Write-Host "  ✓ Created: $fileName" -ForegroundColor Green
+    }
+    
+    # Test 4: Apply forward patch then reverse patch
+    Write-Host "  Testing forward and reverse patch application..." -ForegroundColor Gray
+    $applyTestDir = ".\testdata\advanced-output\crp-apply-test"
+    if (Test-Path $applyTestDir) {
+        Remove-Item $applyTestDir -Recurse -Force
+    }
+    Copy-Item -Path .\testdata\versions\1.0.0 -Destination $applyTestDir -Recurse -Force
+    
+    # Apply forward patch (1.0.0 → 1.0.1)
+    Write-Host "  Applying forward patch (1.0.0 → 1.0.1)..." -ForegroundColor Gray
+    Copy-Item "$crpTestDir\1.0.0-to-1.0.1.patch" "$applyTestDir\forward.patch"
+    $output = & .\patch-apply.exe --patch "$applyTestDir\forward.patch" --current-dir $applyTestDir 2>&1 | Out-String
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Forward patch application failed: $output"
+    }
+    
+    # Verify version changed to 1.0.1
+    $programContent = Get-Content "$applyTestDir\program.exe"
+    if ($programContent -notmatch "v1\.0\.1") {
+        throw "Forward patch did not update to v1.0.1"
+    }
+    Write-Host "  ✓ Forward patch applied successfully (v1.0.0 → v1.0.1)" -ForegroundColor Green
+    
+    # Apply reverse patch (1.0.1 → 1.0.0)
+    Write-Host "  Applying reverse patch (1.0.1 → 1.0.0)..." -ForegroundColor Gray
+    Copy-Item "$crpTestDir\1.0.1-to-1.0.0.patch" "$applyTestDir\reverse.patch"
+    $output = & .\patch-apply.exe --patch "$applyTestDir\reverse.patch" --current-dir $applyTestDir 2>&1 | Out-String
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Reverse patch application failed: $output"
+    }
+    
+    # Verify version rolled back to 1.0.0
+    $programContent = Get-Content "$applyTestDir\program.exe"
+    if ($programContent -notmatch "v1\.0\.0") {
+        throw "Reverse patch did not rollback to v1.0.0"
+    }
+    Write-Host "  ✓ Reverse patch applied successfully (v1.0.1 → v1.0.0)" -ForegroundColor Green
+    
+    # Verify newfeature.dll removed
+    if (Test-Path "$applyTestDir\libs\newfeature.dll") {
+        throw "Reverse patch did not remove newfeature.dll"
+    }
+    Write-Host "  ✓ Reverse patch correctly removed added files" -ForegroundColor Green
+    
+    Write-Host "  ✓ Create Reverse Patch (--crp) verified!" -ForegroundColor Green
+    Write-Host "    • --crp creates both forward and reverse patches" -ForegroundColor Gray
+    Write-Host "    • Works with --create-exe to generate all 4 files" -ForegroundColor Gray
+    Write-Host "    • Forward patch upgrades correctly" -ForegroundColor Gray
+    Write-Host "    • Reverse patch downgrades correctly" -ForegroundColor Gray
+    Write-Host "    • Reverse patch removes added files properly" -ForegroundColor Gray
+    Write-Host "    • Enables easy version rollback without manual work" -ForegroundColor Gray
+}
+
 # Final summary
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
@@ -1851,7 +2068,7 @@ Write-Host "Failed: $failed" -ForegroundColor Red
 Write-Host ""
 
 if ($failed -eq 0) {
-    $totalTests = if ($1gbtest) { 42 } else { 41 }
+    $totalTests = if ($1gbtest) { 44 } else { 43 }
     Write-Host "✓ All $totalTests advanced tests passed!" -ForegroundColor Green
     Write-Host ""
     Write-Host "Advanced Features Verified:" -ForegroundColor Cyan
@@ -1882,6 +2099,7 @@ if ($failed -eq 0) {
     Write-Host "  • CLI applier verification (not GUI)" -ForegroundColor Gray
     Write-Host "  • Backup directory exclusion (backup.cyberpatcher ignored)" -ForegroundColor Gray
     Write-Host "  • .cyberignore file support (wildcard, directory, exact path patterns)" -ForegroundColor Gray
+    Write-Host "  • Self-contained executable silent mode (--silent flag for automation)" -ForegroundColor Gray
     if ($1gbtest) {
         Write-Host "  • 1GB bypass mode with large patches (>1GB)" -ForegroundColor Gray
     }
