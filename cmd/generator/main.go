@@ -29,6 +29,9 @@ func main() {
 	verify := flag.Bool("verify", true, "Verify patches after creation")
 	createExe := flag.Bool("create-exe", false, "Create self-contained CLI executable")
 	crp := flag.Bool("crp", false, "Create reverse patch (for downgrades)")
+	saveScans := flag.Bool("savescans", false, "Save directory scans to cache for faster subsequent patches")
+	rescan := flag.Bool("rescan", false, "Force rescan of cached versions")
+	scanData := flag.String("scandata", "", "Custom directory for scan cache (default: .data)")
 	versionFlag := flag.Bool("version", false, "Show version information")
 	help := flag.Bool("help", false, "Show help message")
 
@@ -54,6 +57,15 @@ func main() {
 
 	// Initialize version manager
 	versionMgr := version.NewManager()
+
+	// Enable scan caching if requested
+	if *saveScans {
+		versionMgr.EnableScanCache(*scanData, *rescan)
+		fmt.Printf("✓ Scan caching enabled (cache dir: %s)\n", versionMgr.GetScanCache().GetCacheDir())
+		if *rescan {
+			fmt.Println("  Force rescan: enabled")
+		}
+	}
 
 	// Set output directory
 	outputDir := *output
@@ -640,6 +652,9 @@ func printHelp() {
 	fmt.Println("  --verify          Verify patches after creation (default: true)")
 	fmt.Println("  --create-exe      Create self-contained CLI executable")
 	fmt.Println("  --crp             Create reverse patch (for downgrades)")
+	fmt.Println("  --savescans       Save directory scans to cache for faster subsequent patches")
+	fmt.Println("  --rescan          Force rescan of cached versions (use with --savescans)")
+	fmt.Println("  --scandata        Custom directory for scan cache (default: .data)")
 	fmt.Println("  --version         Show version information")
 	fmt.Println("  --help            Show this help message")
 	fmt.Println("\nExamples:")
@@ -649,6 +664,11 @@ func printHelp() {
 	fmt.Println("  patch-gen --from-dir C:\\\\v1 --to-dir C:\\\\v2 --output patches --create-exe")
 	fmt.Println("\n  # Create forward and reverse patches with executables")
 	fmt.Println("  patch-gen --from-dir C:\\\\v1.0.0 --to-dir C:\\\\v1.0.1 --output patches --crp --create-exe")
+	fmt.Println("\n  # Use scan caching for faster subsequent patches")
+	fmt.Println("  patch-gen --versions-dir C:\\\\versions --from 1.0.0 --to 1.0.1 --output patches --savescans")
+	fmt.Println("  patch-gen --versions-dir C:\\\\versions --from 1.0.1 --to 1.0.2 --output patches --savescans")
+	fmt.Println("\n  # Force rescan of cached versions")
+	fmt.Println("  patch-gen --versions-dir C:\\\\versions --from 1.0.0 --to 1.0.1 --output patches --savescans --rescan")
 	fmt.Println("\n  # Versions on different network locations")
 	fmt.Println("  patch-gen --from-dir \\\\\\\\server1\\\\app\\\\v1 --to-dir \\\\\\\\server2\\\\app\\\\v2 --output .")
 }

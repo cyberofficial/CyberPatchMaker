@@ -30,6 +30,12 @@ func CalculateDataChecksum(data []byte) string {
 	return hex.EncodeToString(hash[:])
 }
 
+// CalculateStringChecksum computes the SHA-256 hash of a string
+func CalculateStringChecksum(text string) string {
+	hash := sha256.Sum256([]byte(text))
+	return hex.EncodeToString(hash[:])
+}
+
 // VerifyFileChecksum verifies a file's checksum matches the expected value
 func VerifyFileChecksum(filePath string, expectedChecksum string) (bool, error) {
 	actualChecksum, err := CalculateFileChecksum(filePath)
