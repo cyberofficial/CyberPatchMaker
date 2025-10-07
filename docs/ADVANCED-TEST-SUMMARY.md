@@ -5,9 +5,13 @@ This document provides an in-depth explanation of the CyberPatchMaker Advanced T
 ## Overview
 
 **Test Suite:** `advanced-test.ps1`  
-**Total Tests:** 28 comprehensive tests  
-**Test Categories:** Build, Generation, Application, Verification, Compression, Backup System, Advanced Scenarios  
+**Total Tests:** 51 comprehensive tests (50 standard + 1 optional 1GB test)  
+**Test Categories:** Build, Generation, Application, Verification, Compression, Backup System, Advanced Scenarios, Custom Paths, Self-Contained Executables, File Exclusion, Silent Mode, Reverse Patches, Scan Cache  
 **Test Data:** Auto-generated on first run (versions 1.0.0, 1.0.1, 1.0.2)
+
+**Recent Additions:**
+- Tests 40-43: Backup exclusion, .cyberignore support, silent mode, reverse patches
+- Tests 44-50: Comprehensive scan cache testing (caching, custom directory, force rescan, performance, validation, invalidation)
 
 ---
 
@@ -1263,9 +1267,208 @@ Testing: Verify complex directory structure... ✗ FAILED
 
 ---
 
+## Scan Cache Tests (Tests 44-50)
+
+### Test 44: Scan Cache - Basic Functionality
+**Purpose:** Verify scan cache creation and loading with `--savescans` flag  
+**Commands:**
+```bash
+# First generation: Create cache
+patch-gen --versions-dir ./versions --from 1.0.0 --to 1.0.1 --output ./patches --savescans
+
+# Second generation: Load from cache
+patch-gen --versions-dir ./versions --from 1.0.0 --to 1.0.1 --output ./patches --savescans
+```
+
+**Expected Output:**
+```
+Testing: Verify scan cache basic functionality with --savescans
+  ✓ Cache directory created: .data
+  ✓ Cache files created: 2 files
+  ✓ Cache save message found in output
+  ✓ Cache hit: Loaded scan from cache
+✓ PASSED
+```
+
+**What This Tests:**
+- Cache directory creation (`.data/`)
+- Cache file generation for each version
+- Cache save messages in generator output
+- Cache hit detection on subsequent runs
+- Cache provides instant version loading
+
+---
+
+### Test 45: Scan Cache - Custom Directory
+**Purpose:** Verify `--scandata` flag for custom cache location  
+**Command:**
+```bash
+patch-gen --versions-dir ./versions --from 1.0.0 --to 1.0.1 --output ./patches --savescans --scandata ./testdata/my-custom-cache
+```
+
+**Expected Output:**
+```
+Testing: Verify scan cache custom directory with --scandata
+  ✓ Custom cache directory created: .\testdata\my-custom-cache
+  ✓ Cache files created in custom directory: 2 files
+✓ PASSED
+```
+
+**What This Tests:**
+- Custom cache directory creation
+- Cache files stored in specified location
+- Useful for shared cache or specific storage
+
+---
+
+### Test 46: Scan Cache - Force Rescan
+**Purpose:** Verify `--rescan` flag bypasses cache  
+**Commands:**
+```bash
+# Create initial cache
+patch-gen --versions-dir ./versions --from 1.0.0 --to 1.0.1 --output ./patches --savescans
+
+# Force rescan with --rescan flag
+patch-gen --versions-dir ./versions --from 1.0.0 --to 1.0.1 --output ./patches --savescans --rescan
+```
+
+**Expected Output:**
+```
+Testing: Verify force rescan with --rescan flag
+  ✓ Force rescan mode enabled
+  ✓ Cache not loaded (rescanned as expected)
+  ✓ Cache files updated with fresh scan
+✓ PASSED
+```
+
+**What This Tests:**
+- `--rescan` flag forces fresh directory scan
+- Cache is bypassed even when available
+- Cache files are updated with new scan data
+- Useful when files changed and need to rebuild cache
+
+---
+
+### Test 47: Scan Cache - Performance Benefit
+**Purpose:** Measure performance improvement from caching  
+**Commands:**
+```bash
+# First scan (no cache)
+Measure-Command { patch-gen ... }
+
+# Second scan (with cache)
+Measure-Command { patch-gen ... --savescans }
+```
+
+**Expected Output:**
+```
+Testing: Verify scan cache performance improvement
+  First scan time: 37 ms
+  Second scan time: 30 ms
+  Cache impact: saved 7 ms
+  ✓ Cache used in second run
+✓ PASSED
+```
+
+**What This Tests:**
+- Cache provides measurable performance improvement
+- Small projects: 5-10ms saved
+- Large projects: 15+ minutes → <1 second (massive improvement)
+- Example: War Thunder (34,650 files) - 15 min → instant
+
+---
+
+### Test 48: Scan Cache - Custom Paths Mode
+**Purpose:** Verify cache works with `--from-dir` and `--to-dir`  
+**Commands:**
+```bash
+# Custom paths with cache
+patch-gen --from-dir ./testdata/custom-paths/1.0.0 --to-dir ./testdata/custom-paths/1.0.1 --output ./patches --savescans
+
+# Load from cache
+patch-gen --from-dir ./testdata/custom-paths/1.0.0 --to-dir ./testdata/custom-paths/1.0.1 --output ./patches --savescans
+```
+
+**Expected Output:**
+```
+Testing: Verify scan cache works with custom paths mode
+  ✓ Cache created with custom paths mode
+  ✓ Cache hit with custom paths
+✓ PASSED
+```
+
+**What This Tests:**
+- Cache compatibility with custom paths mode
+- Cache matches directories regardless of access mode
+- Location hash ensures unique cache per path
+
+---
+
+### Test 49: Scan Cache - File Structure Validation
+**Purpose:** Verify cache JSON structure and content  
+**Validation:**
+```powershell
+$cacheFile = Get-Content ".data/scan_1.0.0_*.json" | ConvertFrom-Json
+# Verify: version, location, manifest, key_file, cached_at
+```
+
+**Expected Output:**
+```
+Testing: Verify scan cache file structure and content
+  ✓ Cache has version field: 1.0.0
+  ✓ Cache has location field
+  ✓ Cache has manifest field
+  ✓ Cache manifest has files array: 3 files
+  ✓ Cache file entries have complete metadata (path, checksum, size)
+  ✓ Cache has key file info
+  ✓ Cache has creation timestamp
+✓ PASSED
+```
+
+**What This Tests:**
+- Cache is valid JSON format
+- Contains version, location, manifest
+- Manifest has complete file metadata (path, checksum, size)
+- Includes key file hash for validation
+- Has `cached_at` timestamp field
+- Cache file naming: `scan_<version>_<hash>.json`
+
+---
+
+### Test 50: Scan Cache - Invalidation on Changes
+**Purpose:** Verify cache invalidation when key file changes  
+**Commands:**
+```bash
+# Create cache
+patch-gen --versions-dir ./versions --from 1.0.0 --to 1.0.1 --output ./patches --savescans
+
+# Modify key file (simulate version change)
+echo "modified" >> ./testdata/versions/1.0.0/program.exe
+
+# Try to use cache (should detect invalidation)
+patch-gen --versions-dir ./versions --from 1.0.0 --to 1.0.1 --output ./patches --savescans
+```
+
+**Expected Output:**
+```
+Testing: Verify scan cache invalidation on file changes
+  ✓ Initial cache created
+  ✓ Cache invalidation detected
+✓ PASSED
+```
+
+**What This Tests:**
+- Cache validates key file hash before use
+- Falls back to fresh scan if validation fails
+- Prevents using stale/incorrect cache data
+- Ensures cache accuracy and reliability
+
+---
+
 ## Related Documentation
 
 - [Testing Guide](testing-guide.md) - Running and understanding tests
 - [Generator Guide](generator-guide.md) - Using the generator tool
 - [Applier Guide](applier-guide.md) - Using the applier tool
+- [CLI Reference](cli-reference.md) - Complete command reference with scan cache flags
 - [Troubleshooting](troubleshooting.md) - Common issues and solutions

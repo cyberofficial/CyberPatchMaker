@@ -1,6 +1,6 @@
 # GUI Usage Guide
 
-> **🧪 EXPERIMENTAL FEATURE - IN DEVELOPMENT**
+> **EXPERIMENTAL FEATURE - IN DEVELOPMENT**
 > 
 > The GUI tools are currently experimental and not recommended for production use.
 > For production environments, please use the fully-supported CLI tools:
@@ -72,6 +72,27 @@ The Patch Generator GUI provides a user-friendly interface for creating binary p
   - Perfect for production deployments with rollback safety
   - See [Downgrade Guide](downgrade-guide.md) for details
   - Default: Disabled
+
+#### Scan Cache Options (Speeds up sequential patches)
+- **Use scan cache**: Enable caching of directory scans for faster subsequent patch generation
+  - Saves scan results to `.data/` directory as JSON files
+  - First generation: Scans and caches (normal speed)
+  - Subsequent generations: Loads from cache (instant, no rescanning)
+  - **Performance**: Small projects (5-10ms saved), Large projects (15+ minutes → <1 second)
+  - **Example**: War Thunder (34,650 files) - 15 minute scan → instant cache load
+  - Cache validates key file hash to prevent using stale data
+  - Works with both normal mode and custom paths mode
+  - Default: Disabled
+- **Force rescan**: Ignore cached data and force fresh scan
+  - Updates cache with latest file data
+  - Useful when files changed but need to rebuild cache
+  - Only enabled when "Use scan cache" is checked
+  - Default: Disabled
+- **Cache Dir**: Custom directory for cache storage
+  - Default: `.data` (in current working directory)
+  - Useful for shared cache locations or specific storage
+  - Only enabled when "Use scan cache" is checked
+  - Cache files named: `scan_<version>_<hash>.json`
 
 #### Patch Generation
 
@@ -210,6 +231,13 @@ The log area shows detailed information:
    - Consistent compression settings across all patches
    - Faster than manual single-patch generation
    - Works with self-contained executables (creates .exe for each patch)
+10. **Scan cache for large projects**:
+   - Enable "Use scan cache" for projects with many files (1000+ files)
+   - Massive time savings: 15+ minute scans become instant cache loads
+   - First generation caches, subsequent generations load instantly
+   - Use "Force rescan" when files change between patch generations
+   - Perfect for game updates, enterprise applications, large codebases
+   - Cache validates key file hash automatically (prevents stale data)
 
 ### Error Handling
 

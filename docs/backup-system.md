@@ -85,11 +85,11 @@ To rollback a patch manually:
 
 ## Benefits
 
-✅ **Selective**: Only backs up files that will change (saves disk space)  
-✅ **Mirror Structure**: Easy to understand and manually copy back  
-✅ **Preserved**: Backup stays after successful patching for safety  
-✅ **Quality of Life**: Simple drag-and-drop rollback if needed  
-✅ **Transparent**: Shows exactly which files were modified/deleted
+- **Selective**: Only backs up files that will change (saves disk space)
+- **Mirror Structure**: Easy to understand and manually copy back
+- **Preserved**: Backup stays after successful patching for safety
+- **Quality of Life**: Simple drag-and-drop rollback if needed
+- **Transparent**: Shows exactly which files were modified/deleted
 
 ## Notes
 

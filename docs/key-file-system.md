@@ -485,11 +485,11 @@ Patch Check:
 
 The Key File System is a **critical security feature** that:
 
-✅ **Prevents wrong patch application** (version mismatch detection)
-✅ **Detects tampering** (any modification changes hash)
-✅ **Works cross-platform** (SHA-256 is universal)
-✅ **Requires no external dependencies** (self-contained verification)
-✅ **Provides clear error messages** (users understand why patch failed)
+- **Prevents wrong patch application** (version mismatch detection)
+- **Detects tampering** (any modification changes hash)
+- **Works cross-platform** (SHA-256 is universal)
+- **Requires no external dependencies** (self-contained verification)
+- **Provides clear error messages** (users understand why patch failed)
 
 By using SHA-256 hashes of designated executables as version identifiers, CyberPatchMaker ensures **cryptographic-strength verification** that patches are applied to exactly the correct version.
 

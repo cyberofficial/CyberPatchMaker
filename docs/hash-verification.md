@@ -56,10 +56,10 @@ x9y8z7w6v5u4321fedcba9876543210fedcba9876543210fedcba9876543210
 
 | Algorithm | Hash Size | Security | Speed | Status |
 |-----------|-----------|----------|-------|--------|
-| **MD5** | 128-bit | ⚠️ BROKEN | Very Fast | ❌ DO NOT USE |
-| **SHA-1** | 160-bit | ⚠️ BROKEN | Fast | ❌ DEPRECATED |
-| **SHA-256** | 256-bit | ✅ SECURE | Fast | ✅ **RECOMMENDED** |
-| SHA-512 | 512-bit | ✅ SECURE | Medium | ✅ Overkill for files |
+| **MD5** | 128-bit | BROKEN | Very Fast | DO NOT USE |
+| **SHA-1** | 160-bit | BROKEN | Fast | DEPRECATED |
+| **SHA-256** | 256-bit | SECURE | Fast | **RECOMMENDED** |
+| SHA-512 | 512-bit | SECURE | Medium | Overkill for files |
 
 **CyberPatchMaker Choice**: SHA-256
 - **Secure**: No known practical attacks
@@ -118,10 +118,10 @@ CyberPatchMaker performs verification at three critical stages:
 ```
 
 **What Gets Verified**:
-- ✅ Key file (main executable)
-- ✅ ALL files that exist in source version
-- ✅ Complete directory structure
-- ✅ File sizes (secondary check)
+- Key file (main executable)
+- ALL files that exist in source version
+- Complete directory structure
+- File sizes (secondary check)
 
 **Failure Scenarios Detected**:
 - Wrong version (e.g., trying to patch 1.0.1 when patch expects 1.0.0)
@@ -195,10 +195,10 @@ CyberPatchMaker performs verification at three critical stages:
 ```
 
 **What Gets Verified**:
-- ✅ Source file hash before modification
-- ✅ Target file hash after modification
-- ✅ Binary diff integrity (reconstructed file matches expected hash)
-- ✅ File write success (disk operations succeeded)
+- Source file hash before modification
+- Target file hash after modification
+- Binary diff integrity (reconstructed file matches expected hash)
+- File write success (disk operations succeeded)
 
 ### 3. Post-Patch Verification (Target Version)
 
@@ -249,11 +249,11 @@ CyberPatchMaker performs verification at three critical stages:
 ```
 
 **What Gets Verified**:
-- ✅ Key file matches target version exactly
-- ✅ ALL modified files have correct target hashes
-- ✅ ALL added files exist and have correct hashes
-- ✅ ALL deleted files are gone
-- ✅ Complete version integrity
+- Key file matches target version exactly
+- ALL modified files have correct target hashes
+- ALL added files exist and have correct hashes
+- ALL deleted files are gone
+- Complete version integrity
 
 **Failure Scenarios Detected**:
 - Incomplete patch application (some operations failed silently)
@@ -419,7 +419,7 @@ CyberPatchMaker performs verification at three critical stages:
 → Calculate: SHA256(C:\MyApp\program.exe)
 → Result: modified999... ✗ MISMATCH
 
-[System] ❌ VERIFICATION FAILED
+[System] VERIFICATION FAILED
 → Error: "Key file 'program.exe' has been modified"
 → Expected hash: abc123...
 → Actual hash:   modified999...
@@ -595,7 +595,7 @@ func calculateSHA256Large(filePath string) (string, error) {
 **Feasibility**:
 - **Computational Cost**: 2^128 operations (~10^38 hashes)
 - **Time Required**: Trillions of years with all computers on Earth
-- **Status**: ✅ **IMPOSSIBLE WITH CURRENT TECHNOLOGY**
+- **Status**: **IMPOSSIBLE WITH CURRENT TECHNOLOGY**
 
 **Protection**: SHA-256 collision resistance makes this attack infeasible.
 
@@ -606,7 +606,7 @@ func calculateSHA256Large(filePath string) (string, error) {
 **Feasibility**:
 - **Computational Cost**: 2^256 operations
 - **Time Required**: Beyond lifetime of universe
-- **Status**: ✅ **IMPOSSIBLE**
+- **Status**: **IMPOSSIBLE**
 
 **Protection**: SHA-256 pre-image resistance protects against targeted attacks.
 
@@ -636,7 +636,7 @@ Tampered patch:
    - Actual hash: evil666... → ✗ VERIFICATION FAILS
    - Automatic rollback restores original
 
-**Result**: ✅ Attack detected and prevented.
+**Result**: Attack detected and prevented.
 
 #### Attack 4: Man-in-the-Middle (Download Tampering)
 
@@ -647,7 +647,7 @@ Tampered patch:
 2. **Patch checksum**: Verify downloaded patch hash
 3. **Post-patch verification**: Verify result even if malicious patch applied
 
-**Result**: ✅ Multiple layers of protection.
+**Result**: Multiple layers of protection.
 
 ### When to Skip Verification (NEVER RECOMMENDED)
 
@@ -827,12 +827,12 @@ Verifying source version...
 
 The Hash Verification System provides **cryptographic-strength integrity protection** throughout the patch lifecycle:
 
-✅ **Pre-Patch**: Ensures source version is exactly correct
-✅ **During-Patch**: Verifies each operation succeeds correctly
-✅ **Post-Patch**: Ensures target version is exactly correct
-✅ **Tamper Detection**: Any modification detected immediately
-✅ **Automatic Rollback**: Failed verification triggers rollback
-✅ **Zero Tolerance**: No corrupt or wrong patches accepted
+- **Pre-Patch**: Ensures source version is exactly correct
+- **During-Patch**: Verifies each operation succeeds correctly
+- **Post-Patch**: Ensures target version is exactly correct
+- **Tamper Detection**: Any modification detected immediately
+- **Automatic Rollback**: Failed verification triggers rollback
+- **Zero Tolerance**: No corrupt or wrong patches accepted
 
 **SHA-256 provides**:
 - 256-bit collision resistance (practically impossible to break)

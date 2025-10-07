@@ -26,6 +26,10 @@ patch-gen [options]
 | `--level <n>` | No | Compression level (default: 3) |
 | `--verify` | No | Verify patches after creation (default: true) |
 | `--create-exe` | No | Create self-contained CLI executable |
+| `--crp` | No | Create reverse patch for downgrades |
+| `--savescans` | No | Enable scan caching to `.data/` directory |
+| `--scandata <dir>` | No | Custom cache directory (default: `.data`) |
+| `--rescan` | No | Force rescan, ignoring cached data |
 | `--version` | No | Show version information |
 | `--help` | No | Display help information |
 
@@ -262,6 +266,44 @@ patch-gen --versions-dir ./versions \
 patch-apply --patch ./patches/1.0.0-to-1.0.3.patch \
         --current-dir ./test-app
 ```
+
+### Large Projects with Scan Cache
+
+```bash
+# First generation: Enable scan caching (scans and saves to cache)
+patch-gen --versions-dir ./versions \
+          --new-version 1.0.3 \
+          --output ./patches \
+          --savescans
+
+# Subsequent generations: Load from cache (instant, no rescanning)
+patch-gen --versions-dir ./versions \
+          --new-version 1.0.4 \
+          --output ./patches \
+          --savescans
+
+# Custom cache location
+patch-gen --versions-dir ./versions \
+          --new-version 1.0.3 \
+          --output ./patches \
+          --savescans \
+          --scandata ./shared-cache
+
+# Force rescan (update cache with latest file data)
+patch-gen --versions-dir ./versions \
+          --new-version 1.0.3 \
+          --output ./patches \
+          --savescans \
+          --rescan
+```
+
+**Benefits:**
+- **Small projects**: Minimal improvement (5-10ms saved)
+- **Large projects**: Massive improvement (15+ minute scan → <1 second load)
+- **Example**: War Thunder (34,650 files) - 15 min scan → instant cache load
+- Cache validates key file hash to prevent using stale data
+- Works with both `--versions-dir` and custom paths (`--from-dir`/`--to-dir`)
+- Cache files stored as JSON with complete file metadata
 
 ---
 

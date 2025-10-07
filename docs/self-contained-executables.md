@@ -1,6 +1,6 @@
 # Self-Contained Patch Executables
 
-> **✨ NEW FEATURE**
+> **NEW FEATURE**
 > 
 > Create standalone `.exe` files that embed patch data, making distribution simpler for end users.
 
@@ -45,7 +45,7 @@ User must:
    - Select versions directory
    - Choose from/to versions (or use batch mode)
    - Set compression and options
-3. **Check the "Create self-contained executable" checkbox** ☑
+3. **Check the "Create self-contained executable" checkbox**
 4. Click "Generate Patch"
 5. Both files are created:
    - `patch-1.0.0-to-1.0.1.patch` (standard patch file)
@@ -290,11 +290,11 @@ Need help? Visit: https://support.mygame.com/updates
 
 ### User Benefits
 
-- ✅ **Simple**: Only one file to download
-- ✅ **No tools needed**: Everything embedded
-- ✅ **No confusion**: Can't select wrong patch file
-- ✅ **Portable**: Single file can be shared easily
-- ✅ **Safe**: Still includes all verification and backup features
+- **Simple**: Only one file to download
+- **No tools needed**: Everything embedded
+- **No confusion**: Can't select wrong patch file
+- **Portable**: Single file can be shared easily
+- **Safe**: Still includes all verification and backup features
 
 ### Automation Mode (Silent Flag)
 
@@ -379,7 +379,7 @@ See [Applier Guide - Automation Mode](applier-guide.md#automation-mode-silent-fl
 
 ## When to Use
 
-### ✅ Use Self-Contained Executables When:
+### Use Self-Contained Executables When:
 
 - Target audience is non-technical users
 - Simplicity is more important than bandwidth
@@ -388,7 +388,7 @@ See [Applier Guide - Automation Mode](applier-guide.md#automation-mode-silent-fl
 - Users have reasonable internet speeds
 - You want one-click update experience
 
-### ❌ Use Traditional Patches When:
+### Use Traditional Patches When:
 
 - Bandwidth/hosting costs are a concern
 - Target users have slow internet

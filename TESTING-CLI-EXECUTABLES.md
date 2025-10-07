@@ -151,7 +151,7 @@ Select option 2, then type "no" when prompted - should cancel gracefully.
 
 ## Expected Results
 
-### ✅ Success Criteria
+### Success Criteria
 
 1. **Generation:**
    - Both `.patch` and `.exe` files created

@@ -473,7 +473,7 @@ if ($LASTEXITCODE -eq 0) {
 ```markdown
 ## Before Downgrading
 
-⚠️ Downgrading will:
+**WARNING** - Downgrading will:
 - Revert application files to older version
 - Remove features added in newer version
 - May cause data compatibility issues
