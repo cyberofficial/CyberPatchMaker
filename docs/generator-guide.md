@@ -147,6 +147,15 @@ This requires both versions to already be registered in the system.
 - See [Self-Contained Executables Guide](self-contained-executables.md) for details
 - Works with all generation modes (single, batch, custom paths)
 
+**`--crp`** (Create Reverse Patch)
+- Automatically create reverse patch for downgrades
+- Generates both forward patch (A→B) and reverse patch (B→A)
+- Enables easy version rollback without manual patch creation
+- Works with `--create-exe` to generate reverse executables too
+- Example: Generates `1.0.0-to-1.0.1.patch` AND `1.0.1-to-1.0.0.patch`
+- Compatible with all generation modes (single, batch, custom paths)
+- See [Downgrade Guide](downgrade-guide.md) for usage details
+
 **`--help`**
 - Display usage information
 - Shows all available options
@@ -416,6 +425,41 @@ patches/
 - No need to download separate patch files or tools
 
 See [Self-Contained Executables Guide](self-contained-executables.md) for complete documentation.
+
+---
+
+### Example 7: Create Reverse Patches for Easy Downgrades
+
+Automatically generate reverse patches to enable version rollback:
+
+```bash
+# Single patch with reverse patch
+patch-gen --from-dir "C:\releases\1.0.0" --to-dir "C:\releases\1.0.1" --output ./patches --crp --create-exe
+
+# Batch mode with reverse patches for all versions
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --crp --create-exe
+```
+
+**Result:**
+```
+patches/
+├── 1.0.0-to-1.0.1.patch     ← Forward patch (upgrade)
+├── 1.0.0-to-1.0.1.exe       ← Forward executable
+├── 1.0.1-to-1.0.0.patch     ← Reverse patch (downgrade)
+├── 1.0.1-to-1.0.0.exe       ← Reverse executable
+├── 1.0.2-to-1.0.3.patch
+├── 1.0.2-to-1.0.3.exe
+├── 1.0.3-to-1.0.2.patch     ← Reverse patch
+└── 1.0.3-to-1.0.2.exe       ← Reverse executable
+```
+
+**Benefits:**
+- Users can easily rollback if issues occur
+- No need to manually create downgrade patches
+- Both upgrade and downgrade executables ready to distribute
+- Automatic version safety net for production deployments
+
+See [Downgrade Guide](downgrade-guide.md) for complete documentation.
 
 ---
 

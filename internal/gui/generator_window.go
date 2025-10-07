@@ -32,22 +32,23 @@ type GeneratorWindow struct {
 	window fyne.Window
 
 	// UI Components
-	versionsDir      string
-	fromVersion      string
-	toVersion        string
-	fromDir          string // Custom path for from version (different drive support)
-	toDir            string // Custom path for to version (different drive support)
-	useCustomPaths   bool   // Toggle between legacy mode and custom paths mode
-	outputDir        string
-	compression      string
-	compressionLevel int
-	verifyAfter      bool
-	skipIdentical    bool
-	batchMode        bool
-	createExecutable bool
-	ignore1GB        bool
-	fromKeyFile      string
-	toKeyFile        string
+	versionsDir          string
+	fromVersion          string
+	toVersion            string
+	fromDir              string // Custom path for from version (different drive support)
+	toDir                string // Custom path for to version (different drive support)
+	useCustomPaths       bool   // Toggle between legacy mode and custom paths mode
+	outputDir            string
+	compression          string
+	compressionLevel     int
+	verifyAfter          bool
+	skipIdentical        bool
+	batchMode            bool
+	createExecutable     bool
+	createReversePatches bool
+	ignore1GB            bool
+	fromKeyFile          string
+	toKeyFile            string
 
 	versionsDirEntry   *widget.Entry
 	fromDirEntry       *widget.Entry // Custom from directory path
@@ -65,6 +66,7 @@ type GeneratorWindow struct {
 	skipIdenticalCheck *widget.Check
 	batchModeCheck     *widget.Check
 	createExeCheck     *widget.Check
+	crpCheck           *widget.Check
 	ignore1GBCheck     *widget.Check
 	generateBtn        *widget.Button
 	statusLabel        *widget.Label
@@ -78,13 +80,14 @@ type GeneratorWindow struct {
 // NewGeneratorWindow creates a new generator window
 func NewGeneratorWindow() *GeneratorWindow {
 	gw := &GeneratorWindow{
-		compression:      "zstd",
-		compressionLevel: 3,
-		verifyAfter:      true,
-		skipIdentical:    true,
-		batchMode:        false,
-		fromKeyFile:      "program.exe",
-		toKeyFile:        "program.exe",
+		compression:          "zstd",
+		compressionLevel:     3,
+		verifyAfter:          true,
+		skipIdentical:        true,
+		batchMode:            false,
+		createReversePatches: false,
+		fromKeyFile:          "program.exe",
+		toKeyFile:            "program.exe",
 	}
 	gw.ExtendBaseWidget(gw)
 	return gw
@@ -329,6 +332,11 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	})
 	gw.createExeCheck.SetChecked(false)
 
+	gw.crpCheck = widget.NewCheck("Create reverse patch (for downgrades)", func(checked bool) {
+		gw.createReversePatches = checked
+	})
+	gw.crpCheck.SetChecked(false)
+
 	gw.ignore1GBCheck = widget.NewCheck("Ignore 1GB limit (use with caution)", func(checked bool) {
 		gw.ignore1GB = checked
 	})
@@ -343,6 +351,7 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		gw.verifyCheck,
 		gw.skipIdenticalCheck,
 		gw.createExeCheck,
+		gw.crpCheck,
 		gw.ignore1GBCheck,
 	)
 
@@ -830,6 +839,59 @@ func (gw *GeneratorWindow) generatePatch() {
 		}
 	}
 
+	// Create reverse patch if requested (for downgrades)
+	if gw.createReversePatches {
+		gw.appendLog("\n--- Creating reverse patch (for downgrades) ---")
+		reversePatchPath := filepath.Join(gw.outputDir, fmt.Sprintf("%s-to-%s.patch", toVersion, fromVersion))
+		gw.appendLog(fmt.Sprintf("Reverse patch: %s → %s", toVersion, fromVersion))
+
+		// Generate reverse patch (swap from and to)
+		reverseGenerator := patcher.NewGenerator()
+		reversePatch, err := reverseGenerator.GeneratePatch(toVer, fromVer, options)
+		if err != nil {
+			gw.appendLog("ERROR: Failed to generate reverse patch: " + err.Error())
+		} else {
+			// Validate reverse patch
+			if err := reverseGenerator.ValidatePatch(reversePatch); err != nil {
+				gw.appendLog("ERROR: Reverse patch validation failed: " + err.Error())
+			} else {
+				// Save reverse patch
+				if err := gw.savePatch(reversePatch, reversePatchPath, options); err != nil {
+					gw.appendLog("ERROR: Failed to save reverse patch: " + err.Error())
+				} else {
+					// Get reverse patch file size
+					info, err := os.Stat(reversePatchPath)
+					if err == nil {
+						sizeKB := float64(info.Size()) / 1024.0
+						sizeMB := sizeKB / 1024.0
+						if sizeMB >= 1.0 {
+							gw.appendLog(fmt.Sprintf("Reverse patch size: %.2f MB", sizeMB))
+						} else {
+							gw.appendLog(fmt.Sprintf("Reverse patch size: %.2f KB", sizeKB))
+						}
+					}
+					gw.appendLog(fmt.Sprintf("✓ Reverse patch saved: %s", reversePatchPath))
+
+					// Create reverse exe if requested
+					if gw.createExecutable {
+						reverseExePath := strings.TrimSuffix(reversePatchPath, ".patch") + ".exe"
+						gw.appendLog("Creating reverse executable...")
+						if err := gw.createStandaloneExe(reversePatchPath, reverseExePath); err != nil {
+							gw.appendLog("ERROR: Failed to create reverse executable: " + err.Error())
+						} else {
+							info, err := os.Stat(reverseExePath)
+							if err == nil {
+								sizeMB := float64(info.Size()) / (1024.0 * 1024.0)
+								gw.appendLog(fmt.Sprintf("Reverse executable size: %.2f MB", sizeMB))
+							}
+							gw.appendLog(fmt.Sprintf("✓ Created: %s", reverseExePath))
+						}
+					}
+				}
+			}
+		}
+	}
+
 	gw.generateBtn.Enable()
 
 	// Show success dialog
@@ -838,6 +900,14 @@ func (gw *GeneratorWindow) generatePatch() {
 		if gw.createExecutable {
 			exePath := strings.TrimSuffix(outputPath, ".patch") + ".exe"
 			successMsg += fmt.Sprintf("\nExecutable: %s", exePath)
+		}
+		if gw.createReversePatches {
+			reversePatchPath := filepath.Join(gw.outputDir, fmt.Sprintf("%s-to-%s.patch", toVersion, fromVersion))
+			successMsg += fmt.Sprintf("\nReverse patch: %s", reversePatchPath)
+			if gw.createExecutable {
+				reverseExePath := strings.TrimSuffix(reversePatchPath, ".patch") + ".exe"
+				successMsg += fmt.Sprintf("\nReverse executable: %s", reverseExePath)
+			}
 		}
 		dialog.ShowInformation("Success", successMsg, gw.window)
 	}
@@ -978,7 +1048,76 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 			}
 		}
 
+		// Create self-contained executable if requested
+		if gw.createExecutable {
+			exePath := strings.TrimSuffix(outputPath, ".patch") + ".exe"
+			gw.appendLog("Creating self-contained executable...")
+			if err := gw.createStandaloneExe(outputPath, exePath); err != nil {
+				gw.appendLog("ERROR: Failed to create executable: " + err.Error())
+			} else {
+				info, err := os.Stat(exePath)
+				if err == nil {
+					sizeMB := float64(info.Size()) / (1024.0 * 1024.0)
+					gw.appendLog(fmt.Sprintf("Executable size: %.2f MB", sizeMB))
+				}
+				gw.appendLog(fmt.Sprintf("✓ Created: %s", exePath))
+			}
+		}
+
 		patchCount++
+
+		// Create reverse patch if requested (for downgrades)
+		if gw.createReversePatches {
+			gw.appendLog(fmt.Sprintf("Creating reverse patch: %s → %s", gw.toVersion, fromVersion))
+			reversePatchPath := filepath.Join(gw.outputDir, fmt.Sprintf("%s-to-%s.patch", gw.toVersion, fromVersion))
+
+			// Generate reverse patch (swap from and to)
+			reverseGenerator := patcher.NewGenerator()
+			reversePatch, err := reverseGenerator.GeneratePatch(toVer, fromVer, options)
+			if err != nil {
+				gw.appendLog(fmt.Sprintf("ERROR: Failed to generate reverse patch: %v", err))
+			} else {
+				// Validate reverse patch
+				if err := reverseGenerator.ValidatePatch(reversePatch); err != nil {
+					gw.appendLog(fmt.Sprintf("ERROR: Reverse patch validation failed: %v", err))
+				} else {
+					// Save reverse patch
+					if err := gw.savePatch(reversePatch, reversePatchPath, options); err != nil {
+						gw.appendLog(fmt.Sprintf("ERROR: Failed to save reverse patch: %v", err))
+					} else {
+						// Get reverse patch file size
+						info, err := os.Stat(reversePatchPath)
+						if err == nil {
+							sizeKB := float64(info.Size()) / 1024.0
+							sizeMB := sizeKB / 1024.0
+							if sizeMB >= 1.0 {
+								gw.appendLog(fmt.Sprintf("✓ Reverse patch saved: %.2f MB", sizeMB))
+							} else {
+								gw.appendLog(fmt.Sprintf("✓ Reverse patch saved: %.2f KB", sizeKB))
+							}
+						}
+
+						// Create reverse exe if requested
+						if gw.createExecutable {
+							reverseExePath := strings.TrimSuffix(reversePatchPath, ".patch") + ".exe"
+							gw.appendLog("Creating reverse executable...")
+							if err := gw.createStandaloneExe(reversePatchPath, reverseExePath); err != nil {
+								gw.appendLog("ERROR: Failed to create reverse executable: " + err.Error())
+							} else {
+								info, err := os.Stat(reverseExePath)
+								if err == nil {
+									sizeMB := float64(info.Size()) / (1024.0 * 1024.0)
+									gw.appendLog(fmt.Sprintf("Reverse executable size: %.2f MB", sizeMB))
+								}
+								gw.appendLog(fmt.Sprintf("✓ Created: %s", reverseExePath))
+							}
+						}
+
+						patchCount++
+					}
+				}
+			}
+		}
 	}
 
 	gw.appendLog("\n=== BATCH COMPLETE ===")

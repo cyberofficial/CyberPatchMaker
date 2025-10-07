@@ -23,6 +23,12 @@ $needsBuild = $false
 $generatorExists = Test-Path ".\patch-gen.exe"
 $applierExists = Test-Path ".\patch-apply.exe"
 
+# If the exe exist then rebuild
+if ($generatorExists) {
+    Write-Host "  patch-gen.exe exists, rebuilding..." -ForegroundColor Yellow
+    $needsBuild = $true
+}
+
 if (-not $generatorExists) {
     Write-Host "  patch-gen.exe not found" -ForegroundColor Yellow
     $needsBuild = $true
@@ -1847,7 +1853,7 @@ Test-Step "Verify self-contained executable --silent flag for automation" {
     
     # Create test executable with embedded patch
     Write-Host "  Creating self-contained executable..." -ForegroundColor Gray
-    $output = & patch-gen.exe --from-dir .\testdata\versions\1.0.0 --to-dir .\testdata\versions\1.0.1 --output .\testdata\advanced-output\silent-test --create-exe 2>&1 | Out-String
+    $output = & .\patch-gen.exe --from-dir .\testdata\versions\1.0.0 --to-dir .\testdata\versions\1.0.1 --output .\testdata\advanced-output\silent-test --create-exe 2>&1 | Out-String
     
     $exePath = ".\testdata\advanced-output\silent-test\1.0.0-to-1.0.1.exe"
     if (-not (Test-Path $exePath)) {
@@ -1928,6 +1934,130 @@ Test-Step "Verify self-contained executable --silent flag for automation" {
     Write-Host "    • Suitable for automation and scripting" -ForegroundColor Gray
 }
 
+# Test 43: Create Reverse Patch (--crp flag)
+Test-Step "Verify --crp flag creates reverse patches for downgrades" {
+    Write-Host "  Testing reverse patch generation with --crp flag..." -ForegroundColor Gray
+    
+    # Create test directory for CRP test
+    $crpTestDir = ".\testdata\advanced-output\crp-test"
+    if (Test-Path $crpTestDir) {
+        Remove-Item $crpTestDir -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force -Path $crpTestDir | Out-Null
+    
+    # Test 1: Generate patch with --crp flag
+    Write-Host "  Generating patches with --crp flag..." -ForegroundColor Gray
+    $output = & .\patch-gen.exe --from-dir .\testdata\versions\1.0.0 --to-dir .\testdata\versions\1.0.1 --output $crpTestDir --crp 2>&1 | Out-String
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Patch generation with --crp failed: $output"
+    }
+    
+    # Verify forward patch created
+    if (-not (Test-Path "$crpTestDir\1.0.0-to-1.0.1.patch")) {
+        throw "Forward patch (1.0.0-to-1.0.1.patch) not created"
+    }
+    Write-Host "  ✓ Forward patch created: 1.0.0-to-1.0.1.patch" -ForegroundColor Green
+    
+    # Verify reverse patch created
+    if (-not (Test-Path "$crpTestDir\1.0.1-to-1.0.0.patch")) {
+        throw "Reverse patch (1.0.1-to-1.0.0.patch) not created"
+    }
+    Write-Host "  ✓ Reverse patch created: 1.0.1-to-1.0.0.patch" -ForegroundColor Green
+    
+    # Test 2: Verify reverse patch content
+    Write-Host "  Verifying reverse patch operations..." -ForegroundColor Gray
+    if ($output -match "Generating reverse patch") {
+        Write-Host "  ✓ Reverse patch generation logged" -ForegroundColor Green
+    } else {
+        throw "No reverse patch generation logged in output"
+    }
+    
+    # Test 3: Generate with --crp and --create-exe
+    Write-Host "  Testing --crp with --create-exe..." -ForegroundColor Gray
+    $crpExeDir = ".\testdata\advanced-output\crp-exe-test"
+    if (Test-Path $crpExeDir) {
+        Remove-Item $crpExeDir -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force -Path $crpExeDir | Out-Null
+    
+    $output = & .\patch-gen.exe --from-dir .\testdata\versions\1.0.0 --to-dir .\testdata\versions\1.0.1 --output $crpExeDir --crp --create-exe 2>&1 | Out-String
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Patch generation with --crp --create-exe failed"
+    }
+    
+    # Verify all 4 files created
+    $expectedFiles = @(
+        "$crpExeDir\1.0.0-to-1.0.1.patch",
+        "$crpExeDir\1.0.0-to-1.0.1.exe",
+        "$crpExeDir\1.0.1-to-1.0.0.patch",
+        "$crpExeDir\1.0.1-to-1.0.0.exe"
+    )
+    
+    foreach ($file in $expectedFiles) {
+        if (-not (Test-Path $file)) {
+            throw "Missing file: $file"
+        }
+        $fileName = Split-Path $file -Leaf
+        Write-Host "  ✓ Created: $fileName" -ForegroundColor Green
+    }
+    
+    # Test 4: Apply forward patch then reverse patch
+    Write-Host "  Testing forward and reverse patch application..." -ForegroundColor Gray
+    $applyTestDir = ".\testdata\advanced-output\crp-apply-test"
+    if (Test-Path $applyTestDir) {
+        Remove-Item $applyTestDir -Recurse -Force
+    }
+    Copy-Item -Path .\testdata\versions\1.0.0 -Destination $applyTestDir -Recurse -Force
+    
+    # Apply forward patch (1.0.0 → 1.0.1)
+    Write-Host "  Applying forward patch (1.0.0 → 1.0.1)..." -ForegroundColor Gray
+    Copy-Item "$crpTestDir\1.0.0-to-1.0.1.patch" "$applyTestDir\forward.patch"
+    $output = & .\patch-apply.exe --patch "$applyTestDir\forward.patch" --current-dir $applyTestDir 2>&1 | Out-String
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Forward patch application failed: $output"
+    }
+    
+    # Verify version changed to 1.0.1
+    $programContent = Get-Content "$applyTestDir\program.exe"
+    if ($programContent -notmatch "v1\.0\.1") {
+        throw "Forward patch did not update to v1.0.1"
+    }
+    Write-Host "  ✓ Forward patch applied successfully (v1.0.0 → v1.0.1)" -ForegroundColor Green
+    
+    # Apply reverse patch (1.0.1 → 1.0.0)
+    Write-Host "  Applying reverse patch (1.0.1 → 1.0.0)..." -ForegroundColor Gray
+    Copy-Item "$crpTestDir\1.0.1-to-1.0.0.patch" "$applyTestDir\reverse.patch"
+    $output = & .\patch-apply.exe --patch "$applyTestDir\reverse.patch" --current-dir $applyTestDir 2>&1 | Out-String
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Reverse patch application failed: $output"
+    }
+    
+    # Verify version rolled back to 1.0.0
+    $programContent = Get-Content "$applyTestDir\program.exe"
+    if ($programContent -notmatch "v1\.0\.0") {
+        throw "Reverse patch did not rollback to v1.0.0"
+    }
+    Write-Host "  ✓ Reverse patch applied successfully (v1.0.1 → v1.0.0)" -ForegroundColor Green
+    
+    # Verify newfeature.dll removed
+    if (Test-Path "$applyTestDir\libs\newfeature.dll") {
+        throw "Reverse patch did not remove newfeature.dll"
+    }
+    Write-Host "  ✓ Reverse patch correctly removed added files" -ForegroundColor Green
+    
+    Write-Host "  ✓ Create Reverse Patch (--crp) verified!" -ForegroundColor Green
+    Write-Host "    • --crp creates both forward and reverse patches" -ForegroundColor Gray
+    Write-Host "    • Works with --create-exe to generate all 4 files" -ForegroundColor Gray
+    Write-Host "    • Forward patch upgrades correctly" -ForegroundColor Gray
+    Write-Host "    • Reverse patch downgrades correctly" -ForegroundColor Gray
+    Write-Host "    • Reverse patch removes added files properly" -ForegroundColor Gray
+    Write-Host "    • Enables easy version rollback without manual work" -ForegroundColor Gray
+}
+
 # Final summary
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
@@ -1938,7 +2068,7 @@ Write-Host "Failed: $failed" -ForegroundColor Red
 Write-Host ""
 
 if ($failed -eq 0) {
-    $totalTests = if ($1gbtest) { 43 } else { 42 }
+    $totalTests = if ($1gbtest) { 44 } else { 43 }
     Write-Host "✓ All $totalTests advanced tests passed!" -ForegroundColor Green
     Write-Host ""
     Write-Host "Advanced Features Verified:" -ForegroundColor Cyan
