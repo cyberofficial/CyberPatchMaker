@@ -42,6 +42,7 @@ func main() {
 	verify := flag.Bool("verify", true, "Verify file hashes before and after patching")
 	backup := flag.Bool("backup", true, "Create backup before patching")
 	ignore1GB := flag.Bool("ignore1gb", false, "Bypass 1GB patch size limit (use with caution)")
+	silent := flag.Bool("silent", false, "Silent mode: apply patch automatically without prompts (for automation)")
 	versionFlag := flag.Bool("version", false, "Show version information")
 	help := flag.Bool("help", false, "Show help message")
 
@@ -62,6 +63,11 @@ func main() {
 	patch, targetDir, isEmbedded := checkEmbeddedPatch(*ignore1GB)
 
 	if isEmbedded && patch != nil {
+		if *silent {
+			// Silent mode: apply patch automatically
+			runSilentMode(patch, targetDir, *currentDir, *keyFile)
+			return
+		}
 		// Interactive console mode for embedded patch
 		fmt.Println("==============================================")
 		fmt.Println("  CyberPatchMaker - Self-Contained Patch")
@@ -449,6 +455,37 @@ func checkEmbeddedPatch(ignore1GB bool) (*utils.Patch, string, bool) {
 	return patch, targetDir, true
 }
 
+// runSilentMode applies the patch automatically without user interaction (for automation)
+func runSilentMode(patch *utils.Patch, defaultTargetDir string, customTargetDir string, customKeyFile string) {
+	// Use custom target directory if provided, otherwise use default (current directory)
+	targetDir := defaultTargetDir
+	if customTargetDir != "" {
+		targetDir = customTargetDir
+	}
+
+	// Check if directory exists
+	if !utils.FileExists(targetDir) {
+		fmt.Fprintf(os.Stderr, "Error: Target directory not found: %s\n", targetDir)
+		os.Exit(1)
+	}
+
+	// Override key file path if custom one is provided
+	if customKeyFile != "" {
+		patch.FromKeyFile.Path = customKeyFile
+	}
+
+	// Apply patch with default settings (verify=true, backup=true)
+	applier := patcher.NewApplier()
+	if err := applier.ApplyPatch(patch, targetDir, true, true, true); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Patch application failed: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Success - output minimal message
+	fmt.Printf("Patch applied successfully: %s → %s\n", patch.FromVersion, patch.ToVersion)
+	os.Exit(0)
+}
+
 // runInteractiveMode runs the interactive console interface for embedded patches
 func runInteractiveMode(patch *utils.Patch, defaultTargetDir string, ignore1GB bool) {
 	reader := bufio.NewReader(os.Stdin)
@@ -626,11 +663,13 @@ func printHelp() {
 	fmt.Println("  --verify        Verify file hashes before and after patching (default: true)")
 	fmt.Println("  --backup        Create backup before patching (default: true)")
 	fmt.Println("  --ignore1gb     Bypass 1GB patch size limit (use with caution)")
+	fmt.Println("  --silent        Silent mode: apply patch automatically without prompts")
 	fmt.Println("  --version       Show version information")
 	fmt.Println("  --help          Show this help message")
 	fmt.Println("\nSelf-Contained Executable Mode:")
 	fmt.Println("  When run as a self-contained executable, an interactive console")
 	fmt.Println("  interface will guide you through the patch application process.")
+	fmt.Println("  Use --silent flag for automated patching without user interaction.")
 	fmt.Println("\nExamples:")
 	fmt.Println("  # Apply patch")
 	fmt.Println("  patch-apply --patch 1.0.0-to-1.0.3.patch --current-dir C:\\MyApp")
@@ -638,4 +677,8 @@ func printHelp() {
 	fmt.Println("  patch-apply --patch 1.0.0-to-1.0.3.patch --current-dir C:\\MyApp --dry-run")
 	fmt.Println("\n  # Run self-contained executable with 1GB bypass")
 	fmt.Println("  1.0.0-to-1.0.1.exe --ignore1gb")
+	fmt.Println("\n  # Run self-contained executable in silent mode (automation)")
+	fmt.Println("  1.2.4-to-1.2.5.exe --silent")
+	fmt.Println("\n  # Silent mode with custom target directory")
+	fmt.Println("  1.2.4-to-1.2.5.exe --silent --current-dir C:\\MyApp")
 }

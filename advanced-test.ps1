@@ -1841,6 +1841,93 @@ config/secrets.json
     Write-Host "    • .cyberignore itself automatically excluded" -ForegroundColor Gray
 }
 
+# Test 42: Self-Contained Executable Silent Mode
+Test-Step "Verify self-contained executable --silent flag for automation" {
+    Write-Host "  Testing silent mode for automated patching..." -ForegroundColor Gray
+    
+    # Create test executable with embedded patch
+    Write-Host "  Creating self-contained executable..." -ForegroundColor Gray
+    $output = & patch-gen.exe --from-dir .\testdata\versions\1.0.0 --to-dir .\testdata\versions\1.0.1 --output .\testdata\advanced-output\silent-test --create-exe 2>&1 | Out-String
+    
+    $exePath = ".\testdata\advanced-output\silent-test\1.0.0-to-1.0.1.exe"
+    if (-not (Test-Path $exePath)) {
+        throw "Self-contained executable not created"
+    }
+    Write-Host "  ✓ Self-contained executable created" -ForegroundColor Green
+    
+    # Copy test directory for silent patching
+    Write-Host "  Preparing test directory..." -ForegroundColor Gray
+    $testDir = ".\testdata\advanced-output\silent-mode-test"
+    if (Test-Path $testDir) {
+        Remove-Item $testDir -Recurse -Force
+    }
+    Copy-Item -Path .\testdata\versions\1.0.0 -Destination $testDir -Recurse -Force
+    
+    # Test 1: Basic silent mode with --current-dir
+    Write-Host "  Testing silent mode with explicit directory..." -ForegroundColor Gray
+    $output = & $exePath --silent --current-dir $testDir 2>&1 | Out-String
+    $exitCode = $LASTEXITCODE
+    
+    if ($exitCode -ne 0) {
+        throw "Silent mode failed with exit code $exitCode"
+    }
+    Write-Host "  ✓ Silent mode executed successfully (exit code 0)" -ForegroundColor Green
+    
+    # Verify patch was applied
+    $programContent = Get-Content "$testDir\program.exe"
+    if ($programContent -notmatch "v1\.0\.1") {
+        throw "Patch not applied correctly in silent mode"
+    }
+    Write-Host "  ✓ Patch applied successfully (v1.0.0 → v1.0.1)" -ForegroundColor Green
+    
+    # Verify backup was created
+    if (-not (Test-Path "$testDir\backup.cyberpatcher")) {
+        throw "Backup not created in silent mode"
+    }
+    Write-Host "  ✓ Backup created automatically" -ForegroundColor Green
+    
+    # Test 2: Silent mode from executable's directory (default current dir)
+    Write-Host "  Testing silent mode with default directory..." -ForegroundColor Gray
+    $testDir2 = ".\testdata\advanced-output\silent-mode-test2"
+    if (Test-Path $testDir2) {
+        Remove-Item $testDir2 -Recurse -Force
+    }
+    Copy-Item -Path .\testdata\versions\1.0.0 -Destination $testDir2 -Recurse -Force
+    
+    # Copy executable to test directory and run from there
+    Copy-Item $exePath "$testDir2\patch.exe"
+    Push-Location $testDir2
+    $output = & .\patch.exe --silent 2>&1 | Out-String
+    $exitCode = $LASTEXITCODE
+    Pop-Location
+    
+    if ($exitCode -ne 0) {
+        throw "Silent mode with default directory failed with exit code $exitCode"
+    }
+    Write-Host "  ✓ Silent mode works with default directory" -ForegroundColor Green
+    
+    # Test 3: Silent mode error handling (non-existent directory)
+    Write-Host "  Testing silent mode error handling..." -ForegroundColor Gray
+    $output = & $exePath --silent --current-dir ".\nonexistent-directory-12345" 2>&1 | Out-String
+    $exitCode = $LASTEXITCODE
+    
+    if ($exitCode -eq 0) {
+        throw "Silent mode should fail with non-existent directory"
+    }
+    if ($output -notmatch "Error.*not found") {
+        throw "Silent mode should output error message for invalid directory"
+    }
+    Write-Host "  ✓ Silent mode error handling verified (exit code $exitCode)" -ForegroundColor Green
+    
+    Write-Host "  ✓ Self-contained executable --silent flag verified!" -ForegroundColor Green
+    Write-Host "    • Silent mode applies patch without prompts" -ForegroundColor Gray
+    Write-Host "    • Works with explicit --current-dir flag" -ForegroundColor Gray
+    Write-Host "    • Works with default directory (executable location)" -ForegroundColor Gray
+    Write-Host "    • Creates backup automatically" -ForegroundColor Gray
+    Write-Host "    • Returns proper exit codes (0=success, 1=error)" -ForegroundColor Gray
+    Write-Host "    • Suitable for automation and scripting" -ForegroundColor Gray
+}
+
 # Final summary
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
@@ -1851,7 +1938,7 @@ Write-Host "Failed: $failed" -ForegroundColor Red
 Write-Host ""
 
 if ($failed -eq 0) {
-    $totalTests = if ($1gbtest) { 42 } else { 41 }
+    $totalTests = if ($1gbtest) { 43 } else { 42 }
     Write-Host "✓ All $totalTests advanced tests passed!" -ForegroundColor Green
     Write-Host ""
     Write-Host "Advanced Features Verified:" -ForegroundColor Cyan
@@ -1882,6 +1969,7 @@ if ($failed -eq 0) {
     Write-Host "  • CLI applier verification (not GUI)" -ForegroundColor Gray
     Write-Host "  • Backup directory exclusion (backup.cyberpatcher ignored)" -ForegroundColor Gray
     Write-Host "  • .cyberignore file support (wildcard, directory, exact path patterns)" -ForegroundColor Gray
+    Write-Host "  • Self-contained executable silent mode (--silent flag for automation)" -ForegroundColor Gray
     if ($1gbtest) {
         Write-Host "  • 1GB bypass mode with large patches (>1GB)" -ForegroundColor Gray
     }
