@@ -99,12 +99,23 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 	}
 
 	// Process added files
-	for _, file := range added {
+	totalAdded := len(added)
+	if totalAdded > 0 {
+		fmt.Printf("Processing %d added files...\n", totalAdded)
+	}
+	for i, file := range added {
+		if totalAdded > 10 {
+			fmt.Printf("\rAdding files: %d/%d (%d%%)...", i+1, totalAdded, ((i+1)*100)/totalAdded)
+		}
+
 		fullPath := filepath.Join(toVersion.Location, file.Path)
 
 		// Read new file
 		fileData, err := os.ReadFile(fullPath)
 		if err != nil {
+			if totalAdded > 10 {
+				fmt.Println()
+			}
 			return nil, fmt.Errorf("failed to read new file %s: %w", file.Path, err)
 		}
 
@@ -116,11 +127,25 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 			Size:        file.Size,
 		})
 
-		fmt.Printf("  Add: %s (%d bytes)\n", file.Path, file.Size)
+		if totalAdded <= 10 {
+			fmt.Printf("  Add: %s (%d bytes)\n", file.Path, file.Size)
+		}
+	}
+	if totalAdded > 10 {
+		fmt.Println()
 	}
 
 	// Process modified files
-	for _, file := range modified {
+	totalModified := len(modified)
+	if totalModified > 0 {
+		fmt.Printf("Processing %d modified files (generating diffs)...\n", totalModified)
+	}
+	processedCount := 0
+	for idx, file := range modified {
+		if totalModified > 10 {
+			fmt.Printf("\rGenerating diffs: %d/%d (%d%%)...", idx+1, totalModified, ((idx+1)*100)/totalModified)
+		}
+
 		// Find corresponding source file
 		var sourceFile *utils.FileEntry
 		for i := range fromVersion.Manifest.Files {
@@ -131,6 +156,9 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 		}
 
 		if sourceFile == nil {
+			if totalModified > 10 {
+				fmt.Println()
+			}
 			return nil, fmt.Errorf("source file not found: %s", file.Path)
 		}
 
@@ -145,6 +173,9 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 
 		diffData, err := g.differ.GenerateDiff(oldPath, newPath)
 		if err != nil {
+			if totalModified > 10 {
+				fmt.Println()
+			}
 			return nil, fmt.Errorf("failed to generate diff for %s: %w", file.Path, err)
 		}
 
@@ -157,8 +188,14 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 			Size:        int64(len(diffData)),
 		})
 
-		fmt.Printf("  Modify (diff): %s (diff: %d bytes, orig: %d bytes, new: %d bytes)\n",
-			file.Path, len(diffData), sourceFile.Size, file.Size)
+		if totalModified <= 10 {
+			fmt.Printf("  Modify (diff): %s (diff: %d bytes, orig: %d bytes, new: %d bytes)\n",
+				file.Path, len(diffData), sourceFile.Size, file.Size)
+		}
+		processedCount++
+	}
+	if totalModified > 10 {
+		fmt.Println()
 	}
 
 	// Create patch header

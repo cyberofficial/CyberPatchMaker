@@ -47,6 +47,9 @@ type GeneratorWindow struct {
 	createExecutable     bool
 	createReversePatches bool
 	ignore1GB            bool
+	useScanCache         bool   // Enable scan caching
+	forceRescan          bool   // Force rescan despite cache
+	cacheDir             string // Custom cache directory
 	fromKeyFile          string
 	toKeyFile            string
 
@@ -68,6 +71,9 @@ type GeneratorWindow struct {
 	createExeCheck     *widget.Check
 	crpCheck           *widget.Check
 	ignore1GBCheck     *widget.Check
+	useScanCacheCheck  *widget.Check
+	forceRescanCheck   *widget.Check
+	cacheDirEntry      *widget.Entry
 	generateBtn        *widget.Button
 	statusLabel        *widget.Label
 	logText            *widget.Entry
@@ -86,6 +92,9 @@ func NewGeneratorWindow() *GeneratorWindow {
 		skipIdentical:        true,
 		batchMode:            false,
 		createReversePatches: false,
+		useScanCache:         false,
+		forceRescan:          false,
+		cacheDir:             ".data",
 		fromKeyFile:          "program.exe",
 		toKeyFile:            "program.exe",
 	}
@@ -108,6 +117,11 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	// Create versions directory selector
 	gw.versionsDirEntry = widget.NewEntry()
 	gw.versionsDirEntry.SetPlaceHolder("Select versions directory...")
+	gw.versionsDirEntry.OnChanged = func(text string) {
+		if text != "" {
+			gw.versionsDir = text
+		}
+	}
 	gw.versionsDirEntry.OnSubmitted = func(text string) {
 		if text != "" {
 			gw.versionsDir = text
@@ -119,8 +133,11 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		gw.selectVersionsDirectory()
 	})
 
+	versionsDirHint := widget.NewLabel("Hint: Press [Enter] to scan after pasting a path")
+	versionsDirHint.TextStyle.Italic = true
+
 	versionsDirContainer := container.NewBorder(
-		nil, nil,
+		nil, versionsDirHint,
 		widget.NewLabel("Versions Directory:"),
 		versionsDirBrowse,
 		gw.versionsDirEntry,
@@ -154,6 +171,10 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	// Create custom from directory selector
 	gw.fromDirEntry = widget.NewEntry()
 	gw.fromDirEntry.SetPlaceHolder("Select source version directory...")
+	gw.fromDirEntry.OnChanged = func(text string) {
+		gw.fromDir = text
+		gw.updateGenerateButton()
+	}
 	gw.fromDirEntry.OnSubmitted = func(text string) {
 		if text != "" {
 			gw.fromDir = text
@@ -177,6 +198,10 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	// Create custom to directory selector
 	gw.toDirEntry = widget.NewEntry()
 	gw.toDirEntry.SetPlaceHolder("Select target version directory...")
+	gw.toDirEntry.OnChanged = func(text string) {
+		gw.toDir = text
+		gw.updateGenerateButton()
+	}
 	gw.toDirEntry.OnSubmitted = func(text string) {
 		if text != "" {
 			gw.toDir = text
@@ -258,11 +283,9 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	// Create output directory selector
 	gw.outputDirEntry = widget.NewEntry()
 	gw.outputDirEntry.SetPlaceHolder("Select output directory...")
-	gw.outputDirEntry.OnSubmitted = func(text string) {
-		if text != "" {
-			gw.outputDir = text
-			gw.updateGenerateButton()
-		}
+	gw.outputDirEntry.OnChanged = func(text string) {
+		gw.outputDir = text
+		gw.updateGenerateButton()
 	}
 
 	outputDirBrowse := widget.NewButton("Browse", func() {
@@ -342,6 +365,39 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	})
 	gw.ignore1GBCheck.SetChecked(false)
 
+	// Scan cache checkbox
+	gw.useScanCacheCheck = widget.NewCheck("Use scan cache (faster subsequent patches)", func(checked bool) {
+		gw.useScanCache = checked
+		if checked {
+			gw.forceRescanCheck.Enable()
+			gw.cacheDirEntry.Enable()
+		} else {
+			gw.forceRescanCheck.Disable()
+			gw.cacheDirEntry.Disable()
+		}
+	})
+	gw.useScanCacheCheck.SetChecked(false)
+
+	// Force rescan checkbox
+	gw.forceRescanCheck = widget.NewCheck("Force rescan (ignore cache)", func(checked bool) {
+		gw.forceRescan = checked
+	})
+	gw.forceRescanCheck.SetChecked(false)
+	gw.forceRescanCheck.Disable() // Disabled until cache is enabled
+
+	// Cache directory entry
+	gw.cacheDirEntry = widget.NewEntry()
+	gw.cacheDirEntry.SetPlaceHolder(".data")
+	gw.cacheDirEntry.SetText(".data")
+	gw.cacheDirEntry.OnChanged = func(text string) {
+		if text != "" {
+			gw.cacheDir = text
+		} else {
+			gw.cacheDir = ".data"
+		}
+	}
+	gw.cacheDirEntry.Disable() // Disabled until cache is enabled
+
 	// Right column: Options
 	rightColumn := container.NewVBox(
 		widget.NewLabel("Compression:"),
@@ -355,10 +411,21 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		gw.ignore1GBCheck,
 	)
 
-	// Create two-column layout for version/options
-	twoColumnLayout := container.NewGridWithColumns(2,
+	// Third column: Cache options
+	cacheColumn := container.NewVBox(
+		widget.NewLabel("Scan Cache:"),
+		widget.NewLabel("(speeds up sequential patches)"),
+		widget.NewSeparator(),
+		gw.useScanCacheCheck,
+		gw.forceRescanCheck,
+		container.NewBorder(nil, nil, widget.NewLabel("Cache Dir:"), nil, gw.cacheDirEntry),
+	)
+
+	// Create three-column layout for version/options/cache
+	threeColumnLayout := container.NewGridWithColumns(3,
 		leftColumn,
 		rightColumn,
+		cacheColumn,
 	)
 
 	// Create generate button
@@ -396,7 +463,7 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		widget.NewSeparator(),
 		gw.batchModeCheck,
 		widget.NewSeparator(),
-		twoColumnLayout,
+		threeColumnLayout,
 		widget.NewSeparator(),
 		outputDirContainer,
 		container.NewBorder(nil, nil, nil, gw.generateBtn, gw.statusLabel),
@@ -707,6 +774,15 @@ func (gw *GeneratorWindow) generatePatch() {
 	versionMgr := version.NewManager()
 	gw.manifestMgr = manifest.NewManager()
 
+	// Enable scan cache if requested
+	if gw.useScanCache {
+		versionMgr.EnableScanCache(gw.cacheDir, gw.forceRescan)
+		gw.appendLog(fmt.Sprintf("✓ Scan caching enabled (cache dir: %s)", gw.cacheDir))
+		if gw.forceRescan {
+			gw.appendLog("  Force rescan: enabled")
+		}
+	}
+
 	// Register and scan source version
 	gw.appendLog("Scanning source version...")
 	gw.appendLog(fmt.Sprintf("Using from key file: %s", gw.fromKeyFile))
@@ -922,6 +998,15 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 	// Create version manager
 	versionMgr := version.NewManager()
 	gw.manifestMgr = manifest.NewManager()
+
+	// Enable scan cache if requested
+	if gw.useScanCache {
+		versionMgr.EnableScanCache(gw.cacheDir, gw.forceRescan)
+		gw.appendLog(fmt.Sprintf("✓ Scan caching enabled (cache dir: %s)", gw.cacheDir))
+		if gw.forceRescan {
+			gw.appendLog("  Force rescan: enabled")
+		}
+	}
 
 	// Register target version
 	toPath := filepath.Join(gw.versionsDir, gw.toVersion)

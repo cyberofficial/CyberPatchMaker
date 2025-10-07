@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cyberofficial/cyberpatchmaker/internal/core/cache"
 	"github.com/cyberofficial/cyberpatchmaker/internal/core/manifest"
 	"github.com/cyberofficial/cyberpatchmaker/internal/core/scanner"
 	"github.com/cyberofficial/cyberpatchmaker/pkg/utils"
@@ -16,6 +17,9 @@ import (
 type Manager struct {
 	registry        *Registry
 	manifestManager *manifest.Manager
+	scanCache       *cache.ScanCache
+	useScanCache    bool
+	forceRescan     bool
 	mu              sync.RWMutex
 }
 
@@ -32,7 +36,25 @@ func NewManager() *Manager {
 			Versions: make(map[string]*utils.Version),
 		},
 		manifestManager: manifest.NewManager(),
+		scanCache:       nil,
+		useScanCache:    false,
+		forceRescan:     false,
 	}
+}
+
+// EnableScanCache enables scan caching with the specified cache directory
+func (m *Manager) EnableScanCache(cacheDir string, forceRescan bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.scanCache = cache.NewScanCache(cacheDir)
+	m.useScanCache = true
+	m.forceRescan = forceRescan
+}
+
+// GetScanCache returns the scan cache instance
+func (m *Manager) GetScanCache() *cache.ScanCache {
+	return m.scanCache
 }
 
 // RegisterVersion registers a new version with key file
@@ -50,6 +72,34 @@ func (m *Manager) RegisterVersion(versionNumber, location, keyFilePath string) (
 		return nil, fmt.Errorf("version location does not exist: %s", location)
 	}
 
+	// Try to load from cache if enabled and not forcing rescan
+	if m.useScanCache && !m.forceRescan && m.scanCache != nil {
+		if m.scanCache.HasCachedScan(versionNumber, location) {
+			fmt.Printf("Loading cached scan for version %s...\n", versionNumber)
+			cachedVersion, err := m.scanCache.LoadScan(versionNumber, location)
+			if err == nil {
+				// Verify key file still matches
+				keyFilePath := cachedVersion.KeyFile.Path
+				fullKeyPath := filepath.Join(location, keyFilePath)
+				if utils.FileExists(fullKeyPath) {
+					match, _ := utils.VerifyFileChecksum(fullKeyPath, cachedVersion.KeyFile.Checksum)
+					if match {
+						// Cache is valid, use it
+						m.registry.Versions[versionNumber] = cachedVersion
+						fmt.Printf("✓ Loaded from cache: %d files, %d directories\n",
+							len(cachedVersion.Manifest.Files), len(cachedVersion.Manifest.Directories))
+						fmt.Printf("Version %s registered: %d files, %d directories\n",
+							versionNumber, len(cachedVersion.Manifest.Files), len(cachedVersion.Manifest.Directories))
+						return cachedVersion, nil
+					}
+				}
+				fmt.Printf("Cache invalid (key file changed), rescanning...\n")
+			} else {
+				fmt.Printf("Failed to load cache: %v, rescanning...\n", err)
+			}
+		}
+	}
+
 	// Scan the directory
 	scan := scanner.NewScanner(location)
 	if err := scan.ValidatePath(); err != nil {
@@ -57,10 +107,32 @@ func (m *Manager) RegisterVersion(versionNumber, location, keyFilePath string) (
 	}
 
 	fmt.Printf("Scanning version %s at %s...\n", versionNumber, location)
-	files, directories, err := scan.ScanDirectory()
+
+	// Track scanning start time for ETA calculation
+	startTime := time.Now()
+
+	// Use progress callback to show scan progress with percentage, ETA and elapsed time
+	files, directories, err := scan.ScanDirectoryWithProgress(func(current, total int, currentFile string) {
+		elapsed := time.Since(startTime).Seconds()
+		elapsedStr := formatDuration(elapsed)
+		percentage := 0
+		if total > 0 {
+			percentage = (current * 100) / total
+		}
+		if current > 0 && elapsed > 0 {
+			rate := float64(current) / elapsed
+			remaining := float64(total-current) / rate
+			eta := formatDuration(remaining)
+			fmt.Printf("\rScanning: %d/%d files (%d%%) | Elapsed: %s | ETA: %s                    ", current, total, percentage, elapsedStr, eta)
+		} else {
+			fmt.Printf("\rScanning: %d/%d files (%d%%) | Elapsed: %s                    ", current, total, percentage, elapsedStr)
+		}
+	})
 	if err != nil {
+		fmt.Println() // New line after progress
 		return nil, fmt.Errorf("failed to scan version directory: %w", err)
 	}
+	fmt.Println() // New line after progress completes
 
 	// Find and verify key file
 	keyFileEntry, err := scan.FindFile(keyFilePath)
@@ -94,6 +166,15 @@ func (m *Manager) RegisterVersion(versionNumber, location, keyFilePath string) (
 
 	fmt.Printf("Version %s registered: %d files, %d directories\n",
 		versionNumber, len(files), len(directories))
+
+	// Save to cache if enabled
+	if m.useScanCache && m.scanCache != nil {
+		if err := m.scanCache.SaveScan(version); err != nil {
+			fmt.Printf("Warning: Failed to save scan to cache: %v\n", err)
+		} else {
+			fmt.Printf("✓ Scan cached for future use\n")
+		}
+	}
 
 	return version, nil
 }
@@ -151,10 +232,32 @@ func (m *Manager) RescanVersion(versionNumber string) error {
 
 	// Scan the directory
 	scan := scanner.NewScanner(version.Location)
-	files, directories, err := scan.ScanDirectory()
+
+	// Track scanning start time for ETA calculation
+	startTime := time.Now()
+
+	// Use progress callback to show scan progress with percentage, ETA and elapsed time
+	files, directories, err := scan.ScanDirectoryWithProgress(func(current, total int, currentFile string) {
+		elapsed := time.Since(startTime).Seconds()
+		elapsedStr := formatDuration(elapsed)
+		percentage := 0
+		if total > 0 {
+			percentage = (current * 100) / total
+		}
+		if current > 0 && elapsed > 0 {
+			rate := float64(current) / elapsed
+			remaining := float64(total-current) / rate
+			eta := formatDuration(remaining)
+			fmt.Printf("\rScanning: %d/%d files (%d%%) | Elapsed: %s | ETA: %s", current, total, percentage, elapsedStr, eta)
+		} else {
+			fmt.Printf("\rScanning: %d/%d files (%d%%) | Elapsed: %s", current, total, percentage, elapsedStr)
+		}
+	})
 	if err != nil {
+		fmt.Println() // New line after progress
 		return fmt.Errorf("failed to scan version directory: %w", err)
 	}
+	fmt.Println() // New line after progress completes
 
 	// Verify key file still matches
 	keyFileEntry, err := scan.FindFile(version.KeyFile.Path)
@@ -283,4 +386,27 @@ func (m *Manager) LoadRegistry(filePath string) error {
 // GetRegistry returns the version registry
 func (m *Manager) GetRegistry() *Registry {
 	return m.registry
+}
+
+// formatDuration formats seconds into a human-readable duration string
+func formatDuration(seconds float64) string {
+	if seconds < 1 {
+		return "<1s"
+	} else if seconds < 60 {
+		return fmt.Sprintf("%ds", int(seconds))
+	} else if seconds < 3600 {
+		minutes := int(seconds / 60)
+		secs := int(seconds) % 60
+		if secs > 0 {
+			return fmt.Sprintf("%dm %ds", minutes, secs)
+		}
+		return fmt.Sprintf("%dm", minutes)
+	} else {
+		hours := int(seconds / 3600)
+		minutes := int(seconds/60) % 60
+		if minutes > 0 {
+			return fmt.Sprintf("%dh %dm", hours, minutes)
+		}
+		return fmt.Sprintf("%dh", hours)
+	}
 }
