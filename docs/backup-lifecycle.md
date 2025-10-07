@@ -11,15 +11,15 @@ CyberPatchMaker creates **selective backups** of your installation **only when n
 Backups are created **AFTER pre-verification passes** but **BEFORE any operations are applied**.
 
 This timing is critical because:
-- ✅ Pre-verification ensures the backup captures a **verified clean state**
-- ✅ Backup exists before any modifications, enabling restoration if operations fail
-- ✅ Only files being changed are backed up (selective strategy)
-- ❌ Never backs up corrupted or unverified state
-- ❌ New files being added are NOT backed up (they don't exist yet)
+- Pre-verification ensures the backup captures a **verified clean state**
+- Backup exists before any modifications, enabling restoration if operations fail
+- Only files being changed are backed up (selective strategy)
+- Never backs up corrupted or unverified state
+- New files being added are NOT backed up (they don't exist yet)
 
 ## The Three Scenarios
 
-### Scenario 1: Successful Patch Application ✅
+### Scenario 1: Successful Patch Application
 
 **Flow:**
 ```
@@ -65,7 +65,7 @@ Backup preserved in: C:\MyApp\backup.cyberpatcher
 
 ---
 
-### Scenario 2: Pre-Verification Failure ❌ (Corrupted Installation)
+### Scenario 2: Pre-Verification Failure (Corrupted Installation)
 
 **Flow:**
 ```
@@ -108,7 +108,7 @@ Your installation may be corrupted or modified
 
 ---
 
-### Scenario 3: Operation/Post-Verification Failure ❌ (Mid-Patch Failure)
+### Scenario 3: Operation/Post-Verification Failure (Mid-Patch Failure)
 
 **Flow:**
 ```
@@ -229,20 +229,20 @@ if createBackup {
 ### Design Evolution
 
 **Initial Design (Incorrect)**:
-❌ Backup created in `main.go` **BEFORE** calling `ApplyPatch`
+Backup created in `main.go` **BEFORE** calling `ApplyPatch`
 - **Problem**: Backup captured **unverified state** (potentially corrupted)
 - **Problem**: If source was corrupted, backup was corrupted
 - **Problem**: "Restoration" would restore corrupted state
 
 **Improved Design (Better)**:
-✅ Backup created in `applier.go` **AFTER** pre-verification passes
+Backup created in `applier.go` **AFTER** pre-verification passes
 - **Fixed**: Backup captures **verified clean state**
 - **Fixed**: Restoration truly restores clean version
 - **Fixed**: Never backs up corrupted installations
 - **Problem**: Full directory copy wasted disk space
 
 **Current Design (Optimal)**:
-✅ **Selective backup** created **AFTER** pre-verification passes
+**Selective backup** created **AFTER** pre-verification passes
 - **Guarantee**: Backup captures **verified clean state**
 - **Guarantee**: Only backs up files being changed (OpModify + OpDelete)
 - **Guarantee**: Mirror structure makes manual rollback intuitive

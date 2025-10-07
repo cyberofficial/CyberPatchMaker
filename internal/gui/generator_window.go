@@ -9,6 +9,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strings"
 
@@ -45,38 +46,43 @@ type GeneratorWindow struct {
 	skipIdentical        bool
 	batchMode            bool
 	createExecutable     bool
+	exeType              string // "gui" or "console" for self-contained executable type
 	createReversePatches bool
 	ignore1GB            bool
 	useScanCache         bool   // Enable scan caching
 	forceRescan          bool   // Force rescan despite cache
 	cacheDir             string // Custom cache directory
+	workerThreads        int    // Number of worker threads for parallel operations
 	fromKeyFile          string
 	toKeyFile            string
 
-	versionsDirEntry   *widget.Entry
-	fromDirEntry       *widget.Entry // Custom from directory path
-	toDirEntry         *widget.Entry // Custom to directory path
-	customPathCheck    *widget.Check // Toggle for custom paths mode
-	fromKeyFileEntry   *widget.Entry
-	toKeyFileEntry     *widget.Entry
-	fromVersionSelect  *widget.Select
-	toVersionSelect    *widget.Select
-	outputDirEntry     *widget.Entry
-	compressionRadio   *widget.RadioGroup
-	compressionSlider  *widget.Slider
-	compressionLabel   *widget.Label
-	verifyCheck        *widget.Check
-	skipIdenticalCheck *widget.Check
-	batchModeCheck     *widget.Check
-	createExeCheck     *widget.Check
-	crpCheck           *widget.Check
-	ignore1GBCheck     *widget.Check
-	useScanCacheCheck  *widget.Check
-	forceRescanCheck   *widget.Check
-	cacheDirEntry      *widget.Entry
-	generateBtn        *widget.Button
-	statusLabel        *widget.Label
-	logText            *widget.Entry
+	versionsDirEntry    *widget.Entry
+	fromDirEntry        *widget.Entry // Custom from directory path
+	toDirEntry          *widget.Entry // Custom to directory path
+	customPathCheck     *widget.Check // Toggle for custom paths mode
+	fromKeyFileEntry    *widget.Entry
+	toKeyFileEntry      *widget.Entry
+	fromVersionSelect   *widget.Select
+	toVersionSelect     *widget.Select
+	outputDirEntry      *widget.Entry
+	compressionRadio    *widget.RadioGroup
+	compressionSlider   *widget.Slider
+	compressionLabel    *widget.Label
+	verifyCheck         *widget.Check
+	skipIdenticalCheck  *widget.Check
+	batchModeCheck      *widget.Check
+	createExeCheck      *widget.Check
+	exeTypeRadio        *widget.RadioGroup
+	crpCheck            *widget.Check
+	ignore1GBCheck      *widget.Check
+	useScanCacheCheck   *widget.Check
+	forceRescanCheck    *widget.Check
+	cacheDirEntry       *widget.Entry
+	workerThreadsSlider *widget.Slider
+	workerThreadsLabel  *widget.Label
+	generateBtn         *widget.Button
+	statusLabel         *widget.Label
+	logText             *widget.Entry
 
 	// Data
 	availableVersions []string
@@ -91,10 +97,12 @@ func NewGeneratorWindow() *GeneratorWindow {
 		verifyAfter:          true,
 		skipIdentical:        true,
 		batchMode:            false,
+		exeType:              "gui",
 		createReversePatches: false,
 		useScanCache:         false,
 		forceRescan:          false,
 		cacheDir:             ".data",
+		workerThreads:        0, // 0 = auto-detect
 		fromKeyFile:          "program.exe",
 		toKeyFile:            "program.exe",
 	}
@@ -352,8 +360,25 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 
 	gw.createExeCheck = widget.NewCheck("Create self-contained executable", func(checked bool) {
 		gw.createExecutable = checked
+		if checked {
+			gw.exeTypeRadio.Enable()
+		} else {
+			gw.exeTypeRadio.Disable()
+		}
 	})
 	gw.createExeCheck.SetChecked(false)
+
+	// Executable type selector
+	gw.exeTypeRadio = widget.NewRadioGroup([]string{"GUI (Windows)", "Console Host (Interactive CLI)"}, func(selected string) {
+		if selected == "GUI (Windows)" {
+			gw.exeType = "gui"
+		} else {
+			gw.exeType = "console"
+		}
+	})
+	gw.exeTypeRadio.Horizontal = true
+	gw.exeTypeRadio.SetSelected("GUI (Windows)")
+	gw.exeTypeRadio.Disable() // Disabled until createExeCheck is enabled
 
 	gw.crpCheck = widget.NewCheck("Create reverse patch (for downgrades)", func(checked bool) {
 		gw.createReversePatches = checked
@@ -398,6 +423,18 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	}
 	gw.cacheDirEntry.Disable() // Disabled until cache is enabled
 
+	// Worker threads slider - max is CPU core count
+	cpuCores := runtime.NumCPU()
+	gw.workerThreadsSlider = widget.NewSlider(0, float64(cpuCores))
+	gw.workerThreadsSlider.Value = 0 // 0 = auto-detect (use all cores)
+	gw.workerThreadsSlider.Step = 1
+	gw.workerThreadsSlider.OnChanged = func(value float64) {
+		gw.workerThreads = int(value)
+		gw.updateWorkerThreadsLabel()
+	}
+
+	gw.workerThreadsLabel = widget.NewLabel(fmt.Sprintf("Auto (%d)", cpuCores))
+
 	// Right column: Options
 	rightColumn := container.NewVBox(
 		widget.NewLabel("Compression:"),
@@ -407,6 +444,7 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		gw.verifyCheck,
 		gw.skipIdenticalCheck,
 		gw.createExeCheck,
+		container.NewHBox(widget.NewLabel("  Type:"), gw.exeTypeRadio),
 		gw.crpCheck,
 		gw.ignore1GBCheck,
 	)
@@ -419,6 +457,10 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		gw.useScanCacheCheck,
 		gw.forceRescanCheck,
 		container.NewBorder(nil, nil, widget.NewLabel("Cache Dir:"), nil, gw.cacheDirEntry),
+		widget.NewSeparator(),
+		widget.NewLabel("Parallel Operations:"),
+		widget.NewLabel("(faster for large projects)"),
+		container.NewBorder(nil, nil, widget.NewLabel("Workers:"), gw.workerThreadsLabel, gw.workerThreadsSlider),
 	)
 
 	// Create three-column layout for version/options/cache
@@ -610,6 +652,16 @@ func (gw *GeneratorWindow) updateCompressionLabel() {
 	gw.compressionLabel.SetText(fmt.Sprintf("Level: %d", gw.compressionLevel))
 }
 
+// updateWorkerThreadsLabel updates the worker threads label
+func (gw *GeneratorWindow) updateWorkerThreadsLabel() {
+	if gw.workerThreads == 0 {
+		cpuCores := runtime.NumCPU()
+		gw.workerThreadsLabel.SetText(fmt.Sprintf("Auto (%d)", cpuCores))
+	} else {
+		gw.workerThreadsLabel.SetText(fmt.Sprintf("%d", gw.workerThreads))
+	}
+}
+
 // updateFromKeyFileOptions updates the from key file entry with auto-detected file if available
 func (gw *GeneratorWindow) updateFromKeyFileOptions() {
 	if gw.fromVersion == "" || gw.versionsDir == "" {
@@ -774,6 +826,19 @@ func (gw *GeneratorWindow) generatePatch() {
 	versionMgr := version.NewManager()
 	gw.manifestMgr = manifest.NewManager()
 
+	// Set worker threads for parallel operations
+	workerCount := gw.workerThreads
+	if workerCount == 0 {
+		// Auto-detect: use runtime.NumCPU()
+		workerCount = 0 // Will be set by config in manager
+	}
+	if workerCount > 0 {
+		versionMgr.SetWorkerThreads(workerCount)
+		if workerCount > 1 {
+			gw.appendLog(fmt.Sprintf("Using %d worker threads for parallel operations", workerCount))
+		}
+	}
+
 	// Enable scan cache if requested
 	if gw.useScanCache {
 		versionMgr.EnableScanCache(gw.cacheDir, gw.forceRescan)
@@ -812,6 +877,7 @@ func (gw *GeneratorWindow) generatePatch() {
 	fromVer.Manifest.Directories = fromDirs
 	fromVer.Manifest.Version = fromVersion
 	gw.appendLog(fmt.Sprintf("Source version: %d files, %d directories", len(fromFiles), len(fromDirs)))
+	gw.appendLog("")
 
 	// Register and scan target version
 	gw.appendLog("Scanning target version...")
@@ -841,8 +907,18 @@ func (gw *GeneratorWindow) generatePatch() {
 	toVer.Manifest.Files = toFiles
 	toVer.Manifest.Directories = toDirs
 	toVer.Manifest.Version = toVersion
-	gw.appendLog(fmt.Sprintf("Target version: %d files, %d directories", len(toFiles), len(toDirs))) // Generate patch
-	gw.appendLog("Generating patch operations...")
+	gw.appendLog(fmt.Sprintf("Target version: %d files, %d directories", len(toFiles), len(toDirs)))
+	gw.appendLog("")
+	gw.appendLog("Preparing to compare versions...")
+	gw.setStatus("Preparing comparison...")
+
+	// Generate patch
+	gw.appendLog("")
+	gw.appendLog("=== Computing File Differences ===")
+	gw.appendLog("Analyzing differences between versions...")
+	gw.appendLog(fmt.Sprintf("Comparing %d source files with %d target files...", len(fromFiles), len(toFiles)))
+	gw.appendLog("Please wait - this may take several minutes for large projects")
+	gw.setStatus("Computing differences...")
 	compressionStr := "zstd"
 	switch gw.compression {
 	case "gzip":
@@ -867,7 +943,29 @@ func (gw *GeneratorWindow) generatePatch() {
 		return
 	}
 
+	// Report what was found
+	gw.appendLog("\n=== Patch Operations Summary ===")
+	addedCount := 0
+	modifiedCount := 0
+	deletedCount := 0
+	for _, op := range patch.Operations {
+		switch op.Type {
+		case utils.OpAdd:
+			addedCount++
+		case utils.OpModify:
+			modifiedCount++
+		case utils.OpDelete:
+			deletedCount++
+		}
+	}
+	gw.appendLog(fmt.Sprintf("Files to add: %d", addedCount))
+	gw.appendLog(fmt.Sprintf("Files to modify: %d", modifiedCount))
+	gw.appendLog(fmt.Sprintf("Files to delete: %d", deletedCount))
+	gw.appendLog(fmt.Sprintf("Total operations: %d", len(patch.Operations)))
+
 	// Validate patch
+	gw.appendLog("\nValidating patch structure...")
+	gw.setStatus("Validating patch...")
 	if err := generator.ValidatePatch(patch); err != nil {
 		gw.setStatus("Error: Patch validation failed")
 		gw.appendLog("ERROR: " + err.Error())
@@ -902,8 +1000,12 @@ func (gw *GeneratorWindow) generatePatch() {
 	// Create self-contained executable if requested
 	if gw.createExecutable {
 		exePath := strings.TrimSuffix(outputPath, ".patch") + ".exe"
-		gw.appendLog("Creating self-contained executable...")
-		if err := gw.createStandaloneExe(outputPath, exePath); err != nil {
+		if gw.exeType == "console" {
+			gw.appendLog("Creating self-contained Console Host executable...")
+		} else {
+			gw.appendLog("Creating self-contained GUI executable...")
+		}
+		if err := gw.createStandaloneExe(outputPath, exePath, gw.exeType); err != nil {
 			gw.appendLog("ERROR: Failed to create executable: " + err.Error())
 		} else {
 			info, err := os.Stat(exePath)
@@ -952,7 +1054,7 @@ func (gw *GeneratorWindow) generatePatch() {
 					if gw.createExecutable {
 						reverseExePath := strings.TrimSuffix(reversePatchPath, ".patch") + ".exe"
 						gw.appendLog("Creating reverse executable...")
-						if err := gw.createStandaloneExe(reversePatchPath, reverseExePath); err != nil {
+						if err := gw.createStandaloneExe(reversePatchPath, reverseExePath, gw.exeType); err != nil {
 							gw.appendLog("ERROR: Failed to create reverse executable: " + err.Error())
 						} else {
 							info, err := os.Stat(reverseExePath)
@@ -999,6 +1101,20 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 	versionMgr := version.NewManager()
 	gw.manifestMgr = manifest.NewManager()
 
+	// Set worker threads for parallel operations
+	workerCount := gw.workerThreads
+	if workerCount == 0 {
+		// Auto-detect: use runtime.NumCPU()
+		workerCount = runtime.NumCPU()
+	}
+	if workerCount < 1 {
+		workerCount = 1
+	}
+	versionMgr.SetWorkerThreads(workerCount)
+	if workerCount > 1 {
+		gw.appendLog(fmt.Sprintf("Using %d worker threads for parallel operations", workerCount))
+	}
+
 	// Enable scan cache if requested
 	if gw.useScanCache {
 		versionMgr.EnableScanCache(gw.cacheDir, gw.forceRescan)
@@ -1038,6 +1154,10 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 	toVer.Manifest.Directories = toDirs
 	toVer.Manifest.Version = gw.toVersion
 	gw.appendLog(fmt.Sprintf("Target version: %d files, %d directories", len(toFiles), len(toDirs)))
+	gw.appendLog("")
+	gw.appendLog("Target scan complete - ready for batch generation")
+	gw.appendLog("Preparing to compare versions...")
+	gw.setStatus("Preparing batch comparison...")
 
 	// Process each source version
 	patchCount := 0
@@ -1049,6 +1169,7 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 		}
 
 		gw.appendLog(fmt.Sprintf("\n--- Processing %s → %s ---", fromVersion, gw.toVersion))
+		gw.setStatus(fmt.Sprintf("Processing %s → %s...", fromVersion, gw.toVersion))
 
 		fromPath := filepath.Join(gw.versionsDir, fromVersion)
 
@@ -1136,8 +1257,12 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 		// Create self-contained executable if requested
 		if gw.createExecutable {
 			exePath := strings.TrimSuffix(outputPath, ".patch") + ".exe"
-			gw.appendLog("Creating self-contained executable...")
-			if err := gw.createStandaloneExe(outputPath, exePath); err != nil {
+			if gw.exeType == "console" {
+				gw.appendLog("Creating self-contained Console Host executable...")
+			} else {
+				gw.appendLog("Creating self-contained GUI executable...")
+			}
+			if err := gw.createStandaloneExe(outputPath, exePath, gw.exeType); err != nil {
 				gw.appendLog("ERROR: Failed to create executable: " + err.Error())
 			} else {
 				info, err := os.Stat(exePath)
@@ -1186,7 +1311,7 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 						if gw.createExecutable {
 							reverseExePath := strings.TrimSuffix(reversePatchPath, ".patch") + ".exe"
 							gw.appendLog("Creating reverse executable...")
-							if err := gw.createStandaloneExe(reversePatchPath, reverseExePath); err != nil {
+							if err := gw.createStandaloneExe(reversePatchPath, reverseExePath, gw.exeType); err != nil {
 								gw.appendLog("ERROR: Failed to create reverse executable: " + err.Error())
 							} else {
 								info, err := os.Stat(reverseExePath)
@@ -1272,15 +1397,21 @@ func (gw *GeneratorWindow) savePatch(patch *utils.Patch, filename string, option
 	return nil
 }
 
-// createStandaloneExe creates a self-contained executable by appending patch data to applier-gui.exe
-func (gw *GeneratorWindow) createStandaloneExe(patchPath, exePath string) error {
-	// Get path to patch-apply-gui.exe (same directory as patch-gen-gui.exe)
+// createStandaloneExe creates a self-contained executable by appending patch data to the chosen applier
+func (gw *GeneratorWindow) createStandaloneExe(patchPath, exePath, exeType string) error {
+	// Get path to the appropriate applier (same directory as patch-gen-gui.exe)
 	genExe, err := os.Executable()
 	if err != nil {
 		return fmt.Errorf("failed to get executable path: %w", err)
 	}
 
-	applierPath := filepath.Join(filepath.Dir(genExe), "patch-apply-gui.exe")
+	// Choose applier based on exe type
+	var applierPath string
+	if exeType == "console" {
+		applierPath = filepath.Join(filepath.Dir(genExe), "patch-apply.exe")
+	} else {
+		applierPath = filepath.Join(filepath.Dir(genExe), "patch-apply-gui.exe")
+	}
 
 	// Read the applier GUI executable
 	applierData, err := os.ReadFile(applierPath)

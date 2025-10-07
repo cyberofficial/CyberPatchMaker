@@ -6,7 +6,7 @@ Complete guide to using the CyberPatchMaker generator tool for creating delta pa
 
 The generator tool creates efficient binary patches between software versions. It compares two complete directory trees and generates a small patch file containing only the changes.
 
-> **💡 GUI Alternative Available**
+> **NOTE: GUI Alternative Available**
 > 
 > For a visual interface with additional features like self-contained executables, see the [GUI Usage Guide](gui-usage.md).
 > 
@@ -155,6 +155,30 @@ This requires both versions to already be registered in the system.
 - Example: Generates `1.0.0-to-1.0.1.patch` AND `1.0.1-to-1.0.0.patch`
 - Compatible with all generation modes (single, batch, custom paths)
 - See [Downgrade Guide](downgrade-guide.md) for usage details
+
+**`--savescans`** (Enable Scan Caching)
+- Save directory scan results to cache for faster subsequent patch generation
+- Cache stored in `.data/` directory (or custom location with `--scandata`)
+- First generation: Scans and caches (normal speed)
+- Subsequent generations: Loads from cache (instant, no rescanning)
+- **Performance**: Small projects (5-10ms saved), Large projects (15+ minutes → <1 second)
+- **Example**: War Thunder (34,650 files) - 15 minute scan → instant cache load
+- Cache validates key file hash to prevent using stale data
+- Works with all generation modes (batch, single, custom paths)
+
+**`--scandata <directory>`**
+- Specify custom directory for scan cache storage
+- Default: `.data` (in current working directory)
+- Useful for shared cache locations or specific storage needs
+- Only meaningful when used with `--savescans`
+- Cache files named: `scan_<version>_<hash>.json`
+
+**`--rescan`**
+- Force fresh directory scan, ignoring cached data
+- Updates cache with latest file data
+- Useful when files changed but need to rebuild cache
+- Only meaningful when used with `--savescans`
+- Ensures cache is up-to-date after file modifications
 
 **`--help`**
 - Display usage information
@@ -499,6 +523,56 @@ For a 5GB application:
 2. **Sufficient RAM**: Generation uses ~500MB max
 3. **Fast Storage**: SSD recommended for large version folders
 
+### For Large Projects (1000+ Files) - Use Scan Cache
+
+**Enable scan caching** for massive time savings on projects with many files:
+
+```bash
+# First generation: Enable caching (scans and saves to cache)
+patch-gen --versions-dir ./versions \
+          --new-version 1.0.3 \
+          --output ./patches \
+          --savescans
+
+# Subsequent generations: Load from cache (instant)
+patch-gen --versions-dir ./versions \
+          --new-version 1.0.4 \
+          --output ./patches \
+          --savescans
+```
+
+**Performance Benefits:**
+- **Small projects** (< 1,000 files): 5-10ms saved (minimal benefit)
+- **Medium projects** (1,000-10,000 files): 1-5 seconds saved
+- **Large projects** (10,000+ files): 15+ minutes → <1 second (massive improvement)
+- **Example**: War Thunder (34,650 files) - 15 minute scan → instant cache load
+
+**How it Works:**
+- Cache stored in `.data/` directory as JSON files
+- Cache file format: `scan_<version>_<hash>.json`
+- Validates key file hash before using cache (prevents stale data)
+- Works with all generation modes (batch, single, custom paths)
+
+**Custom Cache Location:**
+```bash
+# Shared cache for multiple developers
+patch-gen --versions-dir ./versions \
+          --new-version 1.0.3 \
+          --output ./patches \
+          --savescans \
+          --scandata /shared/cache
+```
+
+**Force Rescan (Update Cache):**
+```bash
+# Files changed, need to update cache
+patch-gen --versions-dir ./versions \
+          --new-version 1.0.3 \
+          --output ./patches \
+          --savescans \
+          --rescan
+```
+
 ### For Many Versions
 
 If you have 10+ versions:
@@ -506,6 +580,7 @@ If you have 10+ versions:
 - Each patch is independent
 - No extra memory usage
 - Time = (number of versions) × (time per patch)
+- **Use scan cache** to speed up each patch dramatically
 
 ---
 

@@ -1,6 +1,6 @@
 # Self-Contained Patch Executables
 
-> **✨ NEW FEATURE**
+> **NEW FEATURE**
 > 
 > Create standalone `.exe` files that embed patch data, making distribution simpler for end users.
 
@@ -45,11 +45,14 @@ User must:
    - Select versions directory
    - Choose from/to versions (or use batch mode)
    - Set compression and options
-3. **Check the "Create self-contained executable" checkbox** ☑
-4. Click "Generate Patch"
-5. Both files are created:
+3. **Check the "Create self-contained executable" checkbox**
+4. **Choose executable type:**
+   - **GUI (Windows)**: Creates graphical executable with windows interface
+   - **Console Host (Interactive CLI)**: Creates interactive command-line executable
+5. Click "Generate Patch"
+6. Both files are created:
    - `patch-1.0.0-to-1.0.1.patch` (standard patch file)
-   - `patch-1.0.0-to-1.0.1.exe` (self-contained GUI executable)
+   - `patch-1.0.0-to-1.0.1.exe` (self-contained executable with chosen type)
 
 ### Using the CLI Generator
 
@@ -66,10 +69,17 @@ patch-gen --versions-dir "C:\versions" --from "1.0.0" --to "1.0.1" --output patc
 patch-gen --versions-dir "C:\versions" --new-version "1.0.3" --output patches --create-exe
 ```
 
-**CLI vs GUI Executables:**
-- GUI-created executables use `patch-apply-gui.exe` (graphical interface)
-- CLI-created executables use `patch-apply.exe` (console interface)
-- Both work identically for patching, but have different user interfaces
+**Executable Type Options:**
+- **GUI Type**: Uses `patch-apply-gui.exe` (graphical windows interface)
+  - Best for non-technical end users
+  - Point-and-click interface with buttons
+  - Available from both GUI generator and CLI generator
+- **Console Host Type**: Uses `patch-apply.exe` (interactive command-line interface)
+  - Best for technical users or automated scenarios
+  - Interactive menu in terminal/console
+  - Supports silent mode for automation
+  - Available from both GUI generator and CLI generator (CLI default)
+- Both types work identically for patching and use the same verification system
 
 **CLI Self-Contained Features:**
 - Interactive console menu with options
@@ -290,11 +300,11 @@ Need help? Visit: https://support.mygame.com/updates
 
 ### User Benefits
 
-- ✅ **Simple**: Only one file to download
-- ✅ **No tools needed**: Everything embedded
-- ✅ **No confusion**: Can't select wrong patch file
-- ✅ **Portable**: Single file can be shared easily
-- ✅ **Safe**: Still includes all verification and backup features
+- **Simple**: Only one file to download
+- **No tools needed**: Everything embedded
+- **No confusion**: Can't select wrong patch file
+- **Portable**: Single file can be shared easily
+- **Safe**: Still includes all verification and backup features
 
 ### Automation Mode (Silent Flag)
 
@@ -379,7 +389,7 @@ See [Applier Guide - Automation Mode](applier-guide.md#automation-mode-silent-fl
 
 ## When to Use
 
-### ✅ Use Self-Contained Executables When:
+### Use Self-Contained Executables When:
 
 - Target audience is non-technical users
 - Simplicity is more important than bandwidth
@@ -388,7 +398,7 @@ See [Applier Guide - Automation Mode](applier-guide.md#automation-mode-silent-fl
 - Users have reasonable internet speeds
 - You want one-click update experience
 
-### ❌ Use Traditional Patches When:
+### Use Traditional Patches When:
 
 - Bandwidth/hosting costs are a concern
 - Target users have slow internet

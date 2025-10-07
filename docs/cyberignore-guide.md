@@ -393,10 +393,10 @@ Files like `secret.key`, `*.log`, and `config/secrets.json` won't be in the patc
 
 The `.cyberignore` file provides fine-grained control over which files are included in patches:
 
-✅ **Simple Syntax**: Comment lines start with `::`
-✅ **Flexible Patterns**: Exact names, wildcards, directories, nested paths
-✅ **Automatic**: Just place `.cyberignore` in source directory
-✅ **Safe**: `.cyberignore` and `backup.cyberpatcher/` always excluded
-✅ **Performance**: Directory exclusions skip entire trees efficiently
+- **Simple Syntax**: Comment lines start with `::`
+- **Flexible Patterns**: Exact names, wildcards, directories, nested paths
+- **Automatic**: Just place `.cyberignore` in source directory
+- **Safe**: `.cyberignore` and `backup.cyberpatcher/` always excluded
+- **Performance**: Directory exclusions skip entire trees efficiently
 
 Use `.cyberignore` to keep sensitive data out of patches and reduce patch size!

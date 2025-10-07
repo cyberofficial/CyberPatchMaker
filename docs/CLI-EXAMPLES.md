@@ -450,7 +450,7 @@ patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patch
 ```
 Generating patch...
 Patch created: .\patches\1.0.0-to-1.0.1.patch
-⚠ Verification skipped (not recommended for production)
+WARNING: Verification skipped (not recommended for production)
 ```
 
 #### Example 4: Verification with Multiple Patches
@@ -577,17 +577,17 @@ Select option [1-5]:
 ```
 
 **Benefits:**
-- ✅ Users only need one file
-- ✅ No separate tools required
-- ✅ Interactive console interface
-- ✅ Can't select wrong patch file
-- ✅ Includes dry-run option
-- ✅ 1GB bypass toggle available
+- Users only need one file
+- No separate tools required
+- Interactive console interface
+- Can't select wrong patch file
+- Includes dry-run option
+- 1GB bypass toggle available
 
 **Considerations:**
-- ⚠ Larger file size (~50 MB base + patch data)
-- ⚠ Higher bandwidth for distribution
-- ⚠ Requires `patch-apply.exe` in same directory as generator
+- Larger file size (~50 MB base + patch data)
+- Higher bandwidth for distribution
+- Requires `patch-apply.exe` in same directory as generator
 
 ---
 
@@ -913,10 +913,10 @@ patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --
 **Output:**
 ```
 Loading patch file...
-⚠ Verification disabled
+WARNING: Verification disabled
 Applying patch...
 ✓ Patch applied
-⚠ Post-verification skipped
+WARNING: Post-verification skipped
 
 WARNING: Verification was disabled. Use --verify=true for production.
 ```
@@ -1044,14 +1044,14 @@ Warning: Large patches may consume significant memory!
 ```
 
 **When to Use:**
-- ✅ Large game updates with many assets
-- ✅ Systems with 8GB+ RAM
-- ✅ Deploying to known hardware configurations
+- Large game updates with many assets
+- Systems with 8GB+ RAM
+- Deploying to known hardware configurations
 
 **When NOT to Use:**
-- ❌ Low-memory systems (< 4GB RAM)
-- ❌ Unknown target hardware
-- ❌ When patch can be split into smaller updates
+- Low-memory systems (< 4GB RAM)
+- Unknown target hardware
+- When patch can be split into smaller updates
 
 **Considerations:**
 - Large patches require significant RAM to decompress and process
@@ -1117,7 +1117,7 @@ patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --
 **Output:**
 ```
 Loading patch file...
-⚠ Backup disabled
+WARNING: Backup disabled
 Applying patch...
 ✓ Patch applied
 

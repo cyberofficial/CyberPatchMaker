@@ -11,8 +11,8 @@ Imagine you have a 5GB application. You make some small changes and release vers
 **Real-world example:**
 - Version 1.0.0: 5GB application
 - Version 1.0.1: 5GB application (only a few files changed)
-- **Traditional update:** Download 5GB again 😞
-- **With CyberPatchMaker:** Download 5MB patch file 🎉
+- **Traditional update:** Download 5GB again
+- **With CyberPatchMaker:** Download 5MB patch file
 
 Perfect for:
 - Game developers releasing updates
@@ -21,14 +21,15 @@ Perfect for:
 
 ## Key Features
 
-✅ **Safe & Reliable** - Automatic verification and rollback if anything goes wrong  
-✅ **Efficient** - Smart compression reduces patch sizes by ~60%  
-✅ **Bidirectional** - Generate both upgrade and downgrade patches for version flexibility  
-✅ **Cross-Platform** - Works on Windows, macOS, and Linux  
-✅ **Developer-Friendly** - Simple command-line tools  
-✅ **Production-Ready** - Built-in backup and recovery systems  
-✨ **Self-Contained Executables** - Create standalone `.exe` files for easy end-user distribution **(New!)**  
-✨ **Smart File Exclusion** - Use `.cyberignore` to exclude sensitive files and reduce patch size **(New!)**
+- **Safe & Reliable** - Automatic verification and rollback if anything goes wrong
+- **Efficient** - Smart compression reduces patch sizes by ~60%
+- **Bidirectional** - Generate both upgrade and downgrade patches for version flexibility
+- **Cross-Platform** - Works on Windows, macOS, and Linux
+- **Developer-Friendly** - Simple command-line tools
+- **Production-Ready** - Built-in backup and recovery systems
+- **Self-Contained Executables** - Create standalone `.exe` files for easy end-user distribution
+- **Smart File Exclusion** - Use `.cyberignore` to exclude sensitive files and reduce patch size
+- **Scan Caching** - Cache directory scans for instant patch generation (15+ min → <1 sec for large projects) **(New!)**
 
 ## Quick Start
 
@@ -44,7 +45,7 @@ go build -o patch-gen ./cmd/generator
 go build -o patch-apply ./cmd/applier
 ```
 
-📖 **Detailed setup:** See [Development Setup Guide](docs/development-setup.md)
+**Detailed setup:** See [Development Setup Guide](docs/development-setup.md)
 
 ## Basic Usage
 
@@ -72,14 +73,14 @@ patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./app --verify
 
 The `--verify` flag ensures everything is checked before and after patching, with automatic rollback if anything goes wrong.
 
-📖 **More examples and options:**
+**More examples and options:**
 - [Generator Guide](docs/generator-guide.md) - All patch creation options
 - [Applier Guide](docs/applier-guide.md) - All patch application options
 - [CLI Reference](docs/cli-reference.md) - Complete command reference
 - [CLI Examples](docs/CLI-EXAMPLES.md) - Common usage patterns
 - [Downgrade Guide](docs/downgrade-guide.md) - Rollback to previous versions
 
-### Excluding Files with .cyberignore ✨ New!
+### Excluding Files with .cyberignore (New!)
 
 Control which files are included in patches using a `.cyberignore` file (similar to `.gitignore`):
 
@@ -104,7 +105,7 @@ user_config.json
 
 The generator automatically excludes matching files from patches. Perfect for keeping API keys, certificates, and user data out of updates!
 
-📖 **Complete guide:** [.cyberignore File Guide](docs/cyberignore-guide.md)
+**Complete guide:** [.cyberignore File Guide](docs/cyberignore-guide.md)
 
 ### Downgrade Patches (Rolling Back)
 
@@ -120,7 +121,7 @@ patch-apply --patch ./patches/downgrade/1.0.3-to-1.0.2.patch --current-dir ./app
 
 This allows users to safely revert to an earlier version if needed.
 
-📖 **Complete downgrade documentation:** [Downgrade Guide](docs/downgrade-guide.md)
+**Complete downgrade documentation:** [Downgrade Guide](docs/downgrade-guide.md)
 
 ## How It Works (Simple Version)
 
@@ -132,12 +133,12 @@ CyberPatchMaker compares two versions of your software and creates a small patch
 3. **Apply:** Users run the patch → Their software updates safely
 
 **Safety features:**
-- ✅ Verifies files before patching (catches corruption early)
-- ✅ Creates automatic backup
-- ✅ Verifies files after patching
-- ✅ Automatic rollback if anything fails
+- Verifies files before patching (catches corruption early)
+- Creates automatic backup
+- Verifies files after patching
+- Automatic rollback if anything fails
 
-📖 **Want technical details?**
+**Want technical details?**
 - [How It Works](docs/how-it-works.md) - Deep dive into the internals
 - [Architecture](docs/architecture.md) - System design and components
 - [Hash Verification](docs/hash-verification.md) - Security and verification
@@ -169,11 +170,11 @@ patch-apply --patch 1.0.0-to-1.0.2.patch --current-dir ./myapp --verify
 # Done! Their version 1.0.0 is now version 1.0.2
 ```
 
-📖 **More examples:** [CLI Examples](docs/CLI-EXAMPLES.md)
+**More examples:** [CLI Examples](docs/CLI-EXAMPLES.md)
 
 ## What's Included
 
-✅ **Production-Ready CLI Tools**
+**Production-Ready CLI Tools:**
 - **Patch Generator** (`patch-gen.exe` / `patch-gen`) - Create update files
 - **Patch Applier** (`patch-apply.exe` / `patch-apply`) - Install updates
 - Comprehensive verification and automatic rollback
@@ -181,12 +182,12 @@ patch-apply --patch 1.0.0-to-1.0.2.patch --current-dir ./myapp --verify
 - Handles files from 1KB to 5GB+
 - Multiple compression formats (zstd, gzip)
 
-🧪 **Experimental GUI (In Development)**
+**Experimental GUI (In Development):**
 - Basic graphical interface available for patch generation
 - Not yet recommended for production use
 - CLI tools are the primary, supported interface
 
-📖 **Documentation:** [Full Documentation Index](docs/README.md)
+**Documentation:** [Full Documentation Index](docs/README.md)
 
 ## Testing
 
@@ -198,14 +199,14 @@ Want to verify everything works? Run the test suite:
 ```
 
 The test suite automatically validates:
-- ✅ Patch generation and application
-- ✅ Multiple compression formats
-- ✅ Wrong version detection
-- ✅ File corruption detection
-- ✅ Backup and rollback systems
-- ✅ Complex directory structures
+- Patch generation and application
+- Multiple compression formats
+- Wrong version detection
+- File corruption detection
+- Backup and rollback systems
+- Complex directory structures
 
-📖 **Testing documentation:**
+**Testing documentation:**
 - [Testing Guide](docs/testing-guide.md) - How to test your patches
 - [Advanced Test Summary](docs/ADVANCED-TEST-SUMMARY.md) - Detailed test results
 
@@ -225,7 +226,7 @@ The test suite automatically validates:
 - Automatic backup and rollback
 - Prevents applying wrong patches
 
-📖 **Technical details:**
+**Technical details:**
 - [Architecture](docs/architecture.md) - System design
 - [Compression Guide](docs/compression-guide.md) - Compression options
 - [Version Management](docs/version-management.md) - How versions are tracked
@@ -265,7 +266,8 @@ Created by [CyberOfficial](https://github.com/cyberofficial)
 
 ---
 
-⭐ **Like this project?** Give it a star on GitHub!
+**Like this project?** Give it a star on GitHub!
+
 ## Support the project
 
 If you'd like to support continued development, consider sponsoring on GitHub: [Sponsor Me](https://github.com/sponsors/cyberofficial)

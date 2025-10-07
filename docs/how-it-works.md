@@ -296,39 +296,39 @@ If **ANY file is wrong** → Patch rejected, no changes made
 ### Compared to Other Update Systems
 
 **Full Downloads (Traditional):**
-- ❌ Wastes bandwidth (download everything)
-- ❌ Wastes time (5GB vs 10MB)
-- ❌ Wastes storage (keep multiple full versions)
-- ✅ Simple (just overwrite)
+- Wastes bandwidth (download everything)
+- Wastes time (5GB vs 10MB)
+- Wastes storage (keep multiple full versions)
+- Simple (just overwrite)
 
 **Incremental Patches (Our System):**
-- ✅ Minimal bandwidth (10MB patch vs 5GB download)
-- ✅ Fast updates (seconds vs hours)
-- ✅ Efficient storage (small patches)
-- ✅ Safe (verification + rollback)
-- ⚠️ More complex (but worth it!)
+- Minimal bandwidth (10MB patch vs 5GB download)
+- Fast updates (seconds vs hours)
+- Efficient storage (small patches)
+- Safe (verification + rollback)
+- More complex (but worth it!)
 
 ---
 
 **rsync-style sync:**
-- ✅ Good for file synchronization
-- ❌ Not designed for versioned software
-- ❌ No version verification
-- ❌ No atomic operations
-- ❌ Can break on interruption
+- Good for file synchronization
+- Not designed for versioned software
+- No version verification
+- No atomic operations
+- Can break on interruption
 
 **Git-style version control:**
-- ✅ Excellent for source code
-- ❌ Not optimized for binary files
-- ❌ Overhead of full repository
-- ❌ Complex for end users
+- Excellent for source code
+- Not optimized for binary files
+- Overhead of full repository
+- Complex for end users
 
 **Our System (Delta Patches):**
-- ✅ Optimized for binary applications
-- ✅ Versioned and verified
-- ✅ Atomic and safe
-- ✅ Simple user experience
-- ✅ Production-ready
+- Optimized for binary applications
+- Versioned and verified
+- Atomic and safe
+- Simple user experience
+- Production-ready
 
 ---
 
