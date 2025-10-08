@@ -5,13 +5,14 @@ This document provides an in-depth explanation of the CyberPatchMaker Advanced T
 ## Overview
 
 **Test Suite:** `advanced-test.ps1`  
-**Total Tests:** 51 comprehensive tests (50 standard + 1 optional 1GB test)  
-**Test Categories:** Build, Generation, Application, Verification, Compression, Backup System, Advanced Scenarios, Custom Paths, Self-Contained Executables, File Exclusion, Silent Mode, Reverse Patches, Scan Cache  
+**Total Tests:** 57 comprehensive tests (56 standard + 1 optional 1GB test)  
+**Test Categories:** Build, Generation, Application, Verification, Compression, Backup System, Advanced Scenarios, Custom Paths, Self-Contained Executables, File Exclusion, Silent Mode, Reverse Patches, Scan Cache, Simple Mode  
 **Test Data:** Auto-generated on first run (versions 1.0.0, 1.0.1, 1.0.2)
 
 **Recent Additions:**
-- Tests 40-43: Backup exclusion, .cyberignore support, silent mode, reverse patches
+- Tests 40-43: Backup exclusion, .cyberignore support, silent mode (automation), reverse patches
 - Tests 44-50: Comprehensive scan cache testing (caching, custom directory, force rescan, performance, validation, invalidation)
+- Tests 51-57: Simple Mode feature validation (simplified UI for end users, use case scenarios)
 
 ---
 

@@ -49,6 +49,7 @@ type GeneratorWindow struct {
 	exeType              string // "gui" or "console" for self-contained executable type
 	createReversePatches bool
 	ignore1GB            bool
+	simpleModeForUsers   bool   // Enable simplified UI for end users
 	useScanCache         bool   // Enable scan caching
 	forceRescan          bool   // Force rescan despite cache
 	cacheDir             string // Custom cache directory
@@ -75,6 +76,7 @@ type GeneratorWindow struct {
 	exeTypeRadio        *widget.RadioGroup
 	crpCheck            *widget.Check
 	ignore1GBCheck      *widget.Check
+	simpleModeCheck     *widget.Check
 	useScanCacheCheck   *widget.Check
 	forceRescanCheck    *widget.Check
 	cacheDirEntry       *widget.Entry
@@ -103,8 +105,8 @@ func NewGeneratorWindow() *GeneratorWindow {
 		forceRescan:          false,
 		cacheDir:             ".data",
 		workerThreads:        0, // 0 = auto-detect
-		fromKeyFile:          "program.exe",
-		toKeyFile:            "program.exe",
+		fromKeyFile:          "",
+		toKeyFile:            "",
 	}
 	gw.ExtendBaseWidget(gw)
 	return gw
@@ -394,6 +396,11 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	})
 	gw.ignore1GBCheck.SetChecked(false)
 
+	gw.simpleModeCheck = widget.NewCheck("Enable Simple Mode for End Users", func(checked bool) {
+		gw.simpleModeForUsers = checked
+	})
+	gw.simpleModeCheck.SetChecked(false)
+
 	// Scan cache checkbox
 	gw.useScanCacheCheck = widget.NewCheck("Use scan cache (faster subsequent patches)", func(checked bool) {
 		gw.useScanCache = checked
@@ -451,6 +458,7 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		container.NewHBox(widget.NewLabel("  Type:"), gw.exeTypeRadio),
 		gw.crpCheck,
 		gw.ignore1GBCheck,
+		gw.simpleModeCheck,
 	)
 
 	// Third column: Cache options
@@ -947,6 +955,9 @@ func (gw *GeneratorWindow) generatePatch() {
 		return
 	}
 
+	// Set simple mode if enabled
+	patch.SimpleMode = gw.simpleModeForUsers
+
 	// Report what was found
 	gw.appendLog("\n=== Patch Operations Summary ===")
 	addedCount := 0
@@ -1033,6 +1044,9 @@ func (gw *GeneratorWindow) generatePatch() {
 		if err != nil {
 			gw.appendLog("ERROR: Failed to generate reverse patch: " + err.Error())
 		} else {
+			// Set simple mode if enabled
+			reversePatch.SimpleMode = gw.simpleModeForUsers
+
 			// Validate reverse patch
 			if err := reverseGenerator.ValidatePatch(reversePatch); err != nil {
 				gw.appendLog("ERROR: Reverse patch validation failed: " + err.Error())
@@ -1177,13 +1191,34 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 
 		fromPath := filepath.Join(gw.versionsDir, fromVersion)
 
-		// Register source version (use from key file or fall back to to key file)
-		keyFile := gw.fromKeyFile
-		if keyFile == "" {
-			keyFile = gw.toKeyFile
+		// Auto-detect key file for this source version independently
+		var fromKeyFile string
+		if gw.fromKeyFile != "" {
+			// Use custom key file if specified by user
+			fromKeyFile = gw.fromKeyFile
+		} else {
+			// Auto-detect key file from common names
+			keyFiles := []string{"program.exe", "game.exe", "app.exe", "main.exe"}
+			for _, kf := range keyFiles {
+				if utils.FileExists(filepath.Join(fromPath, kf)) {
+					fromKeyFile = kf
+					break
+				}
+			}
+			if fromKeyFile == "" {
+				// If auto-detection failed, try using the same key file as the target version
+				if gw.toKeyFile != "" && utils.FileExists(filepath.Join(fromPath, gw.toKeyFile)) {
+					fromKeyFile = gw.toKeyFile
+					gw.appendLog(fmt.Sprintf("Using target key file for %s: %s", fromVersion, gw.toKeyFile))
+				} else {
+					gw.appendLog(fmt.Sprintf("WARNING: Skipping %s: could not find key file (tried: program.exe, game.exe, app.exe, main.exe)", fromVersion))
+					failCount++
+					continue
+				}
+			}
 		}
 
-		fromVer, err := versionMgr.RegisterVersion(fromVersion, fromPath, keyFile)
+		fromVer, err := versionMgr.RegisterVersion(fromVersion, fromPath, fromKeyFile)
 		if err != nil {
 			gw.appendLog(fmt.Sprintf("WARNING: Skipping %s: %v", fromVersion, err))
 			failCount++
@@ -1231,6 +1266,9 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 			failCount++
 			continue
 		}
+
+		// Set simple mode if enabled
+		patch.SimpleMode = gw.simpleModeForUsers
 
 		// Validate patch
 		if err := generator.ValidatePatch(patch); err != nil {
@@ -1291,6 +1329,9 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 			if err != nil {
 				gw.appendLog(fmt.Sprintf("ERROR: Failed to generate reverse patch: %v", err))
 			} else {
+				// Set simple mode if enabled
+				reversePatch.SimpleMode = gw.simpleModeForUsers
+
 				// Validate reverse patch
 				if err := reverseGenerator.ValidatePatch(reversePatch); err != nil {
 					gw.appendLog(fmt.Sprintf("ERROR: Reverse patch validation failed: %v", err))

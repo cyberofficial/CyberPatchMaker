@@ -29,6 +29,8 @@ func main() {
 	verify := flag.Bool("verify", true, "Verify patches after creation")
 	createExe := flag.Bool("create-exe", false, "Create self-contained CLI executable")
 	crp := flag.Bool("crp", false, "Create reverse patch (for downgrades)")
+	// TODO: Implement silent mode flag support for CLI generator (currently only GUI supports this)
+	_ = flag.Bool("silent-mode", false, "Enable simplified UI for end users (silent mode)")
 	saveScans := flag.Bool("savescans", false, "Save directory scans to cache for faster subsequent patches")
 	rescan := flag.Bool("rescan", false, "Force rescan of cached versions")
 	scanData := flag.String("scandata", "", "Custom directory for scan cache (default: .data)")
@@ -177,7 +179,27 @@ func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, ou
 
 		fmt.Printf("\nProcessing version %s...\n", fromVersion)
 
-		fromVer, err := versionMgr.RegisterVersion(fromVersion, fromPath, keyFile)
+		// Auto-detect key file for this source version (may differ from target)
+		var fromKeyFile string
+		if customKeyFile != "" {
+			// Use custom key file if specified
+			fromKeyFile = customKeyFile
+		} else {
+			// Auto-detect key file from common names for this version
+			keyFiles := []string{"program.exe", "game.exe", "app.exe", "main.exe"}
+			for _, kf := range keyFiles {
+				if utils.FileExists(filepath.Join(fromPath, kf)) {
+					fromKeyFile = kf
+					break
+				}
+			}
+			if fromKeyFile == "" {
+				fmt.Printf("Warning: skipping %s - no key file found (tried: program.exe, game.exe, app.exe, main.exe)\n", fromVersion)
+				continue
+			}
+		}
+
+		fromVer, err := versionMgr.RegisterVersion(fromVersion, fromPath, fromKeyFile)
 		if err != nil {
 			fmt.Printf("Warning: failed to register version %s: %v\n", fromVersion, err)
 			continue
@@ -240,44 +262,58 @@ func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, ou
 func generateSinglePatch(versionMgr *version.Manager, versionsDir, from, to, outputDir, customKeyFile, compression string, level int, verify, createExe, crp bool) {
 	fmt.Printf("Generating patch from %s to %s\n", from, to)
 
-	// Determine key file to use
+	// Determine key file for FROM version
 	fromPath := filepath.Join(versionsDir, from)
-	var keyFile string
+	var fromKeyFile string
 	if customKeyFile != "" {
 		// Use custom key file if provided
-		if utils.FileExists(filepath.Join(fromPath, customKeyFile)) {
-			keyFile = customKeyFile
-			fmt.Printf("Using custom key file: %s\n", keyFile)
-		} else {
-			fmt.Printf("Error: custom key file not found: %s\n", customKeyFile)
-			os.Exit(1)
-		}
+		fromKeyFile = customKeyFile
 	} else {
 		// Auto-detect key file from common names
 		keyFiles := []string{"program.exe", "game.exe", "app.exe", "main.exe"}
 		for _, kf := range keyFiles {
 			if utils.FileExists(filepath.Join(fromPath, kf)) {
-				keyFile = kf
+				fromKeyFile = kf
 				break
 			}
 		}
-		if keyFile == "" {
-			fmt.Println("Error: could not find key file (program.exe, game.exe, app.exe, or main.exe)")
+		if fromKeyFile == "" {
+			fmt.Println("Error: could not find key file in source version (program.exe, game.exe, app.exe, or main.exe)")
 			fmt.Println("Hint: Use --key-file to specify a custom key file")
 			os.Exit(1)
 		}
-		fmt.Printf("Auto-detected key file: %s\n", keyFile)
+		fmt.Printf("Auto-detected source key file: %s\n", fromKeyFile)
 	}
 
-	// Register versions
-	fromVer, err := versionMgr.RegisterVersion(from, fromPath, keyFile)
+	// Register source version
+	fromVer, err := versionMgr.RegisterVersion(from, fromPath, fromKeyFile)
 	if err != nil {
 		fmt.Printf("Error: failed to register source version: %v\n", err)
 		os.Exit(1)
 	}
 
+	// Determine key file for TO version (may differ from source)
 	toPath := filepath.Join(versionsDir, to)
-	toVer, err := versionMgr.RegisterVersion(to, toPath, keyFile)
+	var toKeyFile string
+	if customKeyFile != "" {
+		toKeyFile = customKeyFile
+	} else {
+		keyFiles := []string{"program.exe", "game.exe", "app.exe", "main.exe"}
+		for _, kf := range keyFiles {
+			if utils.FileExists(filepath.Join(toPath, kf)) {
+				toKeyFile = kf
+				break
+			}
+		}
+		if toKeyFile == "" {
+			fmt.Println("Error: could not find key file in target version (program.exe, game.exe, app.exe, or main.exe)")
+			fmt.Println("Hint: Use --key-file to specify a custom key file")
+			os.Exit(1)
+		}
+		fmt.Printf("Auto-detected target key file: %s\n", toKeyFile)
+	}
+
+	toVer, err := versionMgr.RegisterVersion(to, toPath, toKeyFile)
 	if err != nil {
 		fmt.Printf("Error: failed to register target version: %v\n", err)
 		os.Exit(1)
@@ -341,45 +377,59 @@ func generateSinglePatchCustomPaths(versionMgr *version.Manager, fromPath, toPat
 
 	fmt.Printf("Generating patch from %s (%s) to %s (%s)...\n", fromVersion, fromPath, toVersion, toPath)
 
-	// Determine key file to use
-	var keyFile string
+	// Determine key file for FROM version
+	var fromKeyFile string
 	if customKeyFile != "" {
 		// Use custom key file if provided
-		if utils.FileExists(filepath.Join(fromPath, customKeyFile)) {
-			keyFile = customKeyFile
-			fmt.Printf("Using custom key file: %s\n", keyFile)
-		} else {
-			fmt.Printf("Error: custom key file not found: %s\n", customKeyFile)
-			os.Exit(1)
-		}
+		fromKeyFile = customKeyFile
 	} else {
 		// Auto-detect key file from common names
 		keyFiles := []string{"program.exe", "game.exe", "app.exe", "main.exe"}
 		for _, kf := range keyFiles {
 			if utils.FileExists(filepath.Join(fromPath, kf)) {
-				keyFile = kf
+				fromKeyFile = kf
 				break
 			}
 		}
-		if keyFile == "" {
+		if fromKeyFile == "" {
 			fmt.Println("Error: could not find key file in source directory (program.exe, game.exe, app.exe, or main.exe)")
 			fmt.Println("Hint: Use --key-file to specify a custom key file")
 			os.Exit(1)
 		}
-		fmt.Printf("Auto-detected key file: %s\n", keyFile)
+		fmt.Printf("Auto-detected source key file: %s\n", fromKeyFile)
 	}
 
 	// Register source version
 	fmt.Printf("Registering source version %s...\n", fromVersion)
-	fromVer, err := versionMgr.RegisterVersion(fromVersion, fromPath, keyFile)
+	fromVer, err := versionMgr.RegisterVersion(fromVersion, fromPath, fromKeyFile)
 	if err != nil {
 		fmt.Printf("Error: failed to register source version: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Register target version (should use same key file)
+	// Determine key file for TO version (may differ from source)
+	var toKeyFile string
+	if customKeyFile != "" {
+		toKeyFile = customKeyFile
+	} else {
+		keyFiles := []string{"program.exe", "game.exe", "app.exe", "main.exe"}
+		for _, kf := range keyFiles {
+			if utils.FileExists(filepath.Join(toPath, kf)) {
+				toKeyFile = kf
+				break
+			}
+		}
+		if toKeyFile == "" {
+			fmt.Println("Error: could not find key file in target directory (program.exe, game.exe, app.exe, or main.exe)")
+			fmt.Println("Hint: Use --key-file to specify a custom key file")
+			os.Exit(1)
+		}
+		fmt.Printf("Auto-detected target key file: %s\n", toKeyFile)
+	}
+
+	// Register target version
 	fmt.Printf("Registering target version %s...\n", toVersion)
-	toVer, err := versionMgr.RegisterVersion(toVersion, toPath, keyFile)
+	toVer, err := versionMgr.RegisterVersion(toVersion, toPath, toKeyFile)
 	if err != nil {
 		fmt.Printf("Error: failed to register target version: %v\n", err)
 		os.Exit(1)

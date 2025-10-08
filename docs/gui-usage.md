@@ -75,6 +75,22 @@ The Patch Generator GUI provides a user-friendly interface for creating binary p
   - Perfect for production deployments with rollback safety
   - See [Downgrade Guide](downgrade-guide.md) for details
   - Default: Disabled
+- **Enable Simple Mode for End Users**: Provides simplified interface for end users with basic options (NEW in v1.0.9)
+  - Creates patches with simplified, user-friendly interface
+  - Hides advanced technical options from end users
+  - Perfect for distributing to non-technical users or clients
+  - **Benefits:**
+    - Simplified message: "You are about to patch from X to Y"
+    - Only shows essential options (backup checkbox, dry run button, apply button)
+    - Advanced options hidden/disabled automatically
+    - Reduces support burden and user confusion
+  - **Use cases:**
+    - Client distributions with limited technical support
+    - Enterprise deployments requiring simple UX
+    - Patches for non-technical end users
+  - Works with both GUI and CLI executables
+  - See [Generator Guide - Silent Mode](generator-guide.md#example-8-silent-mode-for-end-users) for complete details
+  - Default: Disabled
 
 #### Scan Cache Options (Speeds up sequential patches)
 - **Use scan cache**: Enable caching of directory scans for faster subsequent patch generation
