@@ -25,7 +25,7 @@ func main() {
 	output := flag.String("output", "", "Output directory for patches")
 	keyFile := flag.String("key-file", "", "Specific key file to use (e.g., app.exe, game.exe)")
 	compression := flag.String("compression", "zstd", "Compression algorithm (zstd, gzip, none)")
-	level := flag.Int("level", 3, "Compression level (1-4 for zstd, 1-9 for gzip)")
+	level := flag.Int("level", 3, "Compression level (1-4 for zstd, 1-3 for gzip)")
 	verify := flag.Bool("verify", true, "Verify patches after creation")
 	createExe := flag.Bool("create-exe", false, "Create self-contained CLI executable")
 	crp := flag.Bool("crp", false, "Create reverse patch (for downgrades)")

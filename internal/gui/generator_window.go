@@ -330,7 +330,11 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 				gw.compressionSlider.Value = 3
 			}
 		case "gzip":
-			gw.compressionSlider.Max = 9
+			gw.compressionSlider.Max = 3
+			if gw.compressionLevel > 3 {
+				gw.compressionLevel = 2
+				gw.compressionSlider.Value = 2
+			}
 		case "none":
 			gw.compressionSlider.Disable()
 			return
