@@ -49,7 +49,7 @@ User must:
 4. Click "Generate Patch"
 5. Both files are created:
    - `patch-1.0.0-to-1.0.1.patch` (standard patch file)
-   - `patch-1.0.0-to-1.0.1.exe` (self-contained GUI executable)
+   - `patch-1.0.0-to-1.0.1.exe` (self-contained executable with chosen type)
 
 ### Using the CLI Generator
 
@@ -66,10 +66,17 @@ patch-gen --versions-dir "C:\versions" --from "1.0.0" --to "1.0.1" --output patc
 patch-gen --versions-dir "C:\versions" --new-version "1.0.3" --output patches --create-exe
 ```
 
-**CLI vs GUI Executables:**
-- GUI-created executables use `patch-apply-gui.exe` (graphical interface)
-- CLI-created executables use `patch-apply.exe` (console interface)
-- Both work identically for patching, but have different user interfaces
+**Executable Type Options:**
+- **GUI Type**: Uses `patch-apply-gui.exe` (graphical windows interface)
+  - Best for non-technical end users
+  - Point-and-click interface with buttons
+  - Available from both GUI generator and CLI generator
+- **Console Host Type**: Uses `patch-apply.exe` (interactive command-line interface)
+  - Best for technical users or automated scenarios
+  - Interactive menu in terminal/console
+  - Supports silent mode for automation
+  - Available from both GUI generator and CLI generator (CLI default)
+- Both types work identically for patching and use the same verification system
 
 **CLI Self-Contained Features:**
 - Interactive console menu with options
