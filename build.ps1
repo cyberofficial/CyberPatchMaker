@@ -150,7 +150,7 @@ Write-Info "Building components..."
 Write-Info ""
 
 # Build CLI Generator
-Write-Info "[1/5] Building patch generator (CLI)..."
+Write-Info "[1/4] Building patch generator (CLI)..."
 $generatorPath = Join-Path $versionDir "patch-gen.exe"
 & go build @buildFlags $generatorPath ./cmd/generator
 if ($LASTEXITCODE -eq 0) {
@@ -161,7 +161,7 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 # Build CLI Applier
-Write-Info "[2/5] Building patch applier (CLI)..."
+Write-Info "[2/4] Building patch applier (CLI)..."
 $applierPath = Join-Path $versionDir "patch-apply.exe"
 & go build @buildFlags $applierPath ./cmd/applier
 if ($LASTEXITCODE -eq 0) {
@@ -172,7 +172,7 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 # Build Generator GUI
-Write-Info "[3/5] Building patch generator GUI..."
+Write-Info "[3/4] Building patch generator GUI..."
 $genGuiPath = Join-Path $versionDir "patch-gen-gui.exe"
 & go build @buildFlags $genGuiPath ./cmd/patch-gui
 if ($LASTEXITCODE -eq 0) {
@@ -183,7 +183,7 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 # Build Applier GUI
-Write-Info "[4/5] Building patch applier GUI..."
+Write-Info "[4/4] Building patch applier GUI..."
 $appGuiPath = Join-Path $versionDir "patch-apply-gui.exe"
 & go build @buildFlags $appGuiPath ./cmd/applier-gui
 if ($LASTEXITCODE -eq 0) {

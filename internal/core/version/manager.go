@@ -20,13 +20,13 @@ type Manager struct {
 	scanCache       *cache.ScanCache
 	useScanCache    bool
 	forceRescan     bool
+	workerThreads   int // Number of worker threads for parallel operations
 	mu              sync.RWMutex
 }
 
 // Registry stores registered versions
 type Registry struct {
 	Versions map[string]*utils.Version
-	mu       sync.RWMutex
 }
 
 // NewManager creates a new version manager
@@ -39,7 +39,19 @@ func NewManager() *Manager {
 		scanCache:       nil,
 		useScanCache:    false,
 		forceRescan:     false,
+		workerThreads:   1, // Default to single-threaded
 	}
+}
+
+// SetWorkerThreads sets the number of worker threads for parallel operations
+func (m *Manager) SetWorkerThreads(threads int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if threads < 1 {
+		threads = 1
+	}
+	m.workerThreads = threads
 }
 
 // EnableScanCache enables scan caching with the specified cache directory
@@ -90,6 +102,7 @@ func (m *Manager) RegisterVersion(versionNumber, location, keyFilePath string) (
 							len(cachedVersion.Manifest.Files), len(cachedVersion.Manifest.Directories))
 						fmt.Printf("Version %s registered: %d files, %d directories\n",
 							versionNumber, len(cachedVersion.Manifest.Files), len(cachedVersion.Manifest.Directories))
+						fmt.Printf("Preparing to compare versions...\n")
 						return cachedVersion, nil
 					}
 				}
@@ -111,23 +124,50 @@ func (m *Manager) RegisterVersion(versionNumber, location, keyFilePath string) (
 	// Track scanning start time for ETA calculation
 	startTime := time.Now()
 
-	// Use progress callback to show scan progress with percentage, ETA and elapsed time
-	files, directories, err := scan.ScanDirectoryWithProgress(func(current, total int, currentFile string) {
-		elapsed := time.Since(startTime).Seconds()
-		elapsedStr := formatDuration(elapsed)
-		percentage := 0
-		if total > 0 {
-			percentage = (current * 100) / total
-		}
-		if current > 0 && elapsed > 0 {
-			rate := float64(current) / elapsed
-			remaining := float64(total-current) / rate
-			eta := formatDuration(remaining)
-			fmt.Printf("\rScanning: %d/%d files (%d%%) | Elapsed: %s | ETA: %s                    ", current, total, percentage, elapsedStr, eta)
-		} else {
-			fmt.Printf("\rScanning: %d/%d files (%d%%) | Elapsed: %s                    ", current, total, percentage, elapsedStr)
-		}
-	})
+	// Choose scanning method based on worker threads
+	var files []utils.FileEntry
+	var directories []string
+	var err error
+
+	if m.workerThreads > 1 {
+		fmt.Printf("Using parallel scanning with %d workers...\n", m.workerThreads)
+		// Use progress callback to show scan progress with percentage, ETA and elapsed time
+		files, directories, err = scan.ScanDirectoryParallelWithProgress(m.workerThreads, func(current, total int, currentFile string) {
+			elapsed := time.Since(startTime).Seconds()
+			elapsedStr := formatDuration(elapsed)
+			percentage := 0
+			if total > 0 {
+				percentage = (current * 100) / total
+			}
+			if current > 0 && elapsed > 0 {
+				rate := float64(current) / elapsed
+				remaining := float64(total-current) / rate
+				eta := formatDuration(remaining)
+				fmt.Printf("\rScanning: %d/%d files (%d%%) | Elapsed: %s | ETA: %s | Workers: %d     ", current, total, percentage, elapsedStr, eta, m.workerThreads)
+			} else {
+				fmt.Printf("\rScanning: %d/%d files (%d%%) | Elapsed: %s | Workers: %d     ", current, total, percentage, elapsedStr, m.workerThreads)
+			}
+		})
+	} else {
+		// Single-threaded scanning
+		files, directories, err = scan.ScanDirectoryWithProgress(func(current, total int, currentFile string) {
+			elapsed := time.Since(startTime).Seconds()
+			elapsedStr := formatDuration(elapsed)
+			percentage := 0
+			if total > 0 {
+				percentage = (current * 100) / total
+			}
+			if current > 0 && elapsed > 0 {
+				rate := float64(current) / elapsed
+				remaining := float64(total-current) / rate
+				eta := formatDuration(remaining)
+				fmt.Printf("\rScanning: %d/%d files (%d%%) | Elapsed: %s | ETA: %s                    ", current, total, percentage, elapsedStr, eta)
+			} else {
+				fmt.Printf("\rScanning: %d/%d files (%d%%) | Elapsed: %s                    ", current, total, percentage, elapsedStr)
+			}
+		})
+	}
+
 	if err != nil {
 		fmt.Println() // New line after progress
 		return nil, fmt.Errorf("failed to scan version directory: %w", err)
@@ -166,6 +206,7 @@ func (m *Manager) RegisterVersion(versionNumber, location, keyFilePath string) (
 
 	fmt.Printf("Version %s registered: %d files, %d directories\n",
 		versionNumber, len(files), len(directories))
+	fmt.Printf("Preparing to compare versions...\n")
 
 	// Save to cache if enabled
 	if m.useScanCache && m.scanCache != nil {
@@ -236,23 +277,50 @@ func (m *Manager) RescanVersion(versionNumber string) error {
 	// Track scanning start time for ETA calculation
 	startTime := time.Now()
 
-	// Use progress callback to show scan progress with percentage, ETA and elapsed time
-	files, directories, err := scan.ScanDirectoryWithProgress(func(current, total int, currentFile string) {
-		elapsed := time.Since(startTime).Seconds()
-		elapsedStr := formatDuration(elapsed)
-		percentage := 0
-		if total > 0 {
-			percentage = (current * 100) / total
-		}
-		if current > 0 && elapsed > 0 {
-			rate := float64(current) / elapsed
-			remaining := float64(total-current) / rate
-			eta := formatDuration(remaining)
-			fmt.Printf("\rScanning: %d/%d files (%d%%) | Elapsed: %s | ETA: %s", current, total, percentage, elapsedStr, eta)
-		} else {
-			fmt.Printf("\rScanning: %d/%d files (%d%%) | Elapsed: %s", current, total, percentage, elapsedStr)
-		}
-	})
+	// Choose scanning method based on worker threads
+	var files []utils.FileEntry
+	var directories []string
+	var err error
+
+	if m.workerThreads > 1 {
+		fmt.Printf("Using parallel scanning with %d workers...\n", m.workerThreads)
+		// Use progress callback with parallel scanning
+		files, directories, err = scan.ScanDirectoryParallelWithProgress(m.workerThreads, func(current, total int, currentFile string) {
+			elapsed := time.Since(startTime).Seconds()
+			elapsedStr := formatDuration(elapsed)
+			percentage := 0
+			if total > 0 {
+				percentage = (current * 100) / total
+			}
+			if current > 0 && elapsed > 0 {
+				rate := float64(current) / elapsed
+				remaining := float64(total-current) / rate
+				eta := formatDuration(remaining)
+				fmt.Printf("\rScanning: %d/%d files (%d%%) | Elapsed: %s | ETA: %s | Workers: %d     ", current, total, percentage, elapsedStr, eta, m.workerThreads)
+			} else {
+				fmt.Printf("\rScanning: %d/%d files (%d%%) | Elapsed: %s | Workers: %d     ", current, total, percentage, elapsedStr, m.workerThreads)
+			}
+		})
+	} else {
+		// Single-threaded scanning
+		files, directories, err = scan.ScanDirectoryWithProgress(func(current, total int, currentFile string) {
+			elapsed := time.Since(startTime).Seconds()
+			elapsedStr := formatDuration(elapsed)
+			percentage := 0
+			if total > 0 {
+				percentage = (current * 100) / total
+			}
+			if current > 0 && elapsed > 0 {
+				rate := float64(current) / elapsed
+				remaining := float64(total-current) / rate
+				eta := formatDuration(remaining)
+				fmt.Printf("\rScanning: %d/%d files (%d%%) | Elapsed: %s | ETA: %s", current, total, percentage, elapsedStr, eta)
+			} else {
+				fmt.Printf("\rScanning: %d/%d files (%d%%) | Elapsed: %s", current, total, percentage, elapsedStr)
+			}
+		})
+	}
+
 	if err != nil {
 		fmt.Println() // New line after progress
 		return fmt.Errorf("failed to scan version directory: %w", err)

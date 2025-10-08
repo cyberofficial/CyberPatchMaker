@@ -62,8 +62,11 @@ The Patch Generator GUI provides a user-friendly interface for creating binary p
   - End users get single file that includes applier + patch data
   - Executable size: ~50 MB + patch size
   - Perfect for non-technical users (just double-click to apply)
+  - **Type options**:
+    - **GUI (Windows)**: Creates graphical executable (uses `patch-apply-gui.exe`)
+    - **Console Host (Interactive CLI)**: Creates interactive command-line executable (uses `patch-apply.exe`)
   - See [Self-Contained Executables Guide](self-contained-executables.md) for details
-  - Default: Disabled
+  - Default: Disabled (GUI type when enabled)
 - **Create reverse patch (for downgrades)**: Automatically generate reverse patch
   - Creates both forward patch (A→B) and reverse patch (B→A)
   - Enables easy version rollback without manual patch creation

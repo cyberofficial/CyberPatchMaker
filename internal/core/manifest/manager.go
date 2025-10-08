@@ -92,7 +92,12 @@ func (m *Manager) LoadManifest(filePath string) (*utils.Manifest, error) {
 
 // CompareManifests compares two manifests and returns the differences
 func (m *Manager) CompareManifests(source, target *utils.Manifest) (added, modified, deleted []utils.FileEntry) {
+	fmt.Printf("Computing file differences between versions...\n")
+	fmt.Printf("  Source: %d files, %d directories\n", len(source.Files), len(source.Directories))
+	fmt.Printf("  Target: %d files, %d directories\n", len(target.Files), len(target.Directories))
+
 	// Create maps for efficient lookup
+	fmt.Printf("Building file index for comparison...\n")
 	sourceFiles := make(map[string]utils.FileEntry)
 	targetFiles := make(map[string]utils.FileEntry)
 
@@ -105,7 +110,27 @@ func (m *Manager) CompareManifests(source, target *utils.Manifest) (added, modif
 	}
 
 	// Find added and modified files
+	fmt.Printf("Analyzing changes...\n")
+	processedCount := 0
+	totalTarget := len(targetFiles)
+	lastPercent := -1
+	updateInterval := totalTarget / 100 // Update every 1%
+	if updateInterval < 1 {
+		updateInterval = 1
+	}
+
 	for path, targetFile := range targetFiles {
+		processedCount++
+
+		// Show progress updates
+		if processedCount%updateInterval == 0 || processedCount == totalTarget {
+			currentPercent := (processedCount * 100) / totalTarget
+			if currentPercent != lastPercent {
+				fmt.Printf("\r  Progress: %d%% (%d/%d files analyzed)     ", currentPercent, processedCount, totalTarget)
+				lastPercent = currentPercent
+			}
+		}
+
 		sourceFile, exists := sourceFiles[path]
 		if !exists {
 			// File was added
@@ -115,8 +140,10 @@ func (m *Manager) CompareManifests(source, target *utils.Manifest) (added, modif
 			modified = append(modified, targetFile)
 		}
 	}
+	fmt.Println() // New line after progress
 
 	// Find deleted files
+	fmt.Printf("Checking for deleted files...\n")
 	for path, sourceFile := range sourceFiles {
 		if _, exists := targetFiles[path]; !exists {
 			// File was deleted
@@ -124,6 +151,7 @@ func (m *Manager) CompareManifests(source, target *utils.Manifest) (added, modif
 		}
 	}
 
+	fmt.Printf("Comparison complete: %d added, %d modified, %d deleted\n", len(added), len(modified), len(deleted))
 	return added, modified, deleted
 }
 
