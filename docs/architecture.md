@@ -89,6 +89,8 @@ CyberPatchMaker is designed as a modular, maintainable system with clear separat
 
 **Key Components:**
 - `scanner.go`: Directory traversal
+- `ignore.go`: .cyberignore pattern matching
+- `parallel.go`: Parallel scanning support
 - Recursive file discovery
 - SHA-256 hash calculation
 - Manifest generation
@@ -109,7 +111,7 @@ CyberPatchMaker is designed as a modular, maintainable system with clear separat
 **Purpose**: Create, load, and compare version manifests
 
 **Key Components:**
-- `manifest.go`: Manifest operations
+- `manager.go`: Manifest operations
 - JSON serialization/deserialization
 - Manifest comparison logic
 - Change detection
@@ -463,7 +465,7 @@ Output: Success/Error Message
 - `testdata/versions/` - Generated test versions (1.0.0, 1.0.1, 1.0.2)
 - `testdata/test-output/` - Test execution workspace
 
-### Test Coverage (28 Comprehensive Tests)
+### Test Coverage (59 Comprehensive Tests)
 1. Build validation (generator and applier)
 2. Test data auto-generation
 3. Basic patch generation (zstd compression)

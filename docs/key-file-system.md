@@ -57,7 +57,7 @@ Even if the filename is identical (`program.exe`), the **hash uniquely identifie
 
 ### Manual Selection Process
 
-In the GUI, when registering a version or generating patches, you manually select the key file:
+In the GUI, when registering a version or generating patches, you must manually specify the key file:
 
 #### File Selection
 
@@ -65,10 +65,10 @@ In the GUI, when registering a version or generating patches, you manually selec
 The GUI displays all files in the version directory:
 - All file types are shown (not just executables)
 - Files listed from root directory (non-recursive for key file selection)
-- You can choose any file: .exe, .dll, .so, .bin, .dat, .ini, etc.
+- You must manually select which file to use as the key file
 ```
 
-#### Auto-Selection Logic
+#### Auto-Population Logic
 
 ```
 If only one file exists in the directory:
@@ -77,83 +77,7 @@ If only one file exists in the directory:
 - Saves time for simple version structures
 ```
 
-**Rationale**: Key file should be a stable identifier that exists across all versions
-
-#### Best Practices for Key File Selection
-
-```
-Priority order (case-insensitive):
-1. program.exe, program, Program
-2. app.exe, app, App
-3. main.exe, main, Main
-4. [ApplicationName].exe (if known)
-5. game.exe, game (for games)
-6. launcher.exe, launcher
-7. Other executables (alphabetical)
-```
-
-**Rationale**: Common naming conventions for main executables
-
-#### Step 4: Size Filtering
-
-```
-Filter out likely non-main executables:
-- Too small: < 100KB (probably utility/script)
-- Too large: > 500MB (probably data/asset file)
-- Installers: Names containing "install", "setup", "uninstall"
-- Updaters: Names containing "update", "patch", "launcher"
-```
-
-**Rationale**: Main program typically 100KB-500MB
-
-#### Step 5: User Confirmation
-
-```
-Present top candidate to user:
-- Show detected file path
-- Show file size
-- Request confirmation or allow manual selection
-```
-
-### Detection Pseudo-Code
-
-```go
-func detectKeyFile(versionPath string) (KeyFileInfo, error) {
-    // Step 1: Find all executables
-    executables := scanForExecutables(versionPath)
-    if len(executables) == 0 {
-        return KeyFileInfo{}, ErrNoExecutablesFound
-    }
-    
-    // Step 2: Score by location
-    scored := scoreByLocation(executables)
-    
-    // Step 3: Apply naming priority
-    scored = applyNamingPriority(scored)
-    
-    // Step 4: Filter by size
-    filtered := filterBySize(scored, 100*KB, 500*MB)
-    
-    // Step 5: Get top candidate
-    if len(filtered) == 0 {
-        return KeyFileInfo{}, ErrNoSuitableCandidates
-    }
-    
-    candidate := filtered[0]
-    
-    // Calculate hash
-    hash, err := calculateSHA256(candidate.path)
-    if err != nil {
-        return KeyFileInfo{}, err
-    }
-    
-    return KeyFileInfo{
-        Path:     makeRelative(candidate.path, versionPath),
-        Checksum: hash,
-        Size:     candidate.size,
-    }, nil
-}
-```
+**Note**: There is no sophisticated automatic detection algorithm. The system requires manual key file specification for security and accuracy.
 
 ## Key File Verification Workflow
 

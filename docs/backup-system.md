@@ -64,7 +64,7 @@ To rollback a patch manually:
 
 - **Before Patching**: Backup is created automatically if enabled (default: enabled)
 - **After Successful Patching**: Backup is **preserved** for manual rollback
-- **After Failed Patching**: Backup remains untouched for troubleshooting
+- **After Failed Patching**: Backup remains untouched for manual rollback or investigation
 
 ## CLI Usage
 

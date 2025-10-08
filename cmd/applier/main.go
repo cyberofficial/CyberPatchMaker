@@ -119,22 +119,11 @@ func main() {
 		return
 	}
 
-	// Apply patch (backup will be created internally after verification)
-	fmt.Println("\nApplying patch...")
 	applier := patcher.NewApplier()
 	if err := applier.ApplyPatch(patch, *currentDir, *verify, *verify, *backup); err != nil {
 		fmt.Printf("Error: patch application failed: %v\n", err)
 		if *backup {
-			// Restore from backup if it exists
-			backupDir := *currentDir + ".backup"
-			if utils.FileExists(backupDir) {
-				fmt.Println("Restoring from backup...")
-				if restoreErr := restoreBackup(backupDir, *currentDir); restoreErr != nil {
-					fmt.Printf("Error: failed to restore backup: %v\n", restoreErr)
-				} else {
-					fmt.Println("Backup restored successfully")
-				}
-			}
+			fmt.Println("\nNote: If backup was created, automatic rollback may have been performed to restore original files.")
 		}
 		os.Exit(1)
 	}
@@ -623,17 +612,8 @@ func runSimpleMode(patch *utils.Patch, defaultTargetDir string, reader *bufio.Re
 				// Use default settings: verify before and after
 				if err := applier.ApplyPatch(patch, targetDir, true, true, createBackup); err != nil {
 					fmt.Printf("\nError: Patch application failed: %v\n", err)
-					// Try to restore backup if it was created
 					if createBackup {
-						backupDir := targetDir + ".backup"
-						if utils.FileExists(backupDir) {
-							fmt.Println("Attempting to restore from backup...")
-							if restoreErr := restoreBackup(backupDir, targetDir); restoreErr != nil {
-								fmt.Printf("Error: Failed to restore backup: %v\n", restoreErr)
-							} else {
-								fmt.Println("Backup restored successfully")
-							}
-						}
+						fmt.Println("\nNote: Automatic rollback may have been performed to restore original files.")
 					}
 					fmt.Println("\nPress Enter to exit...")
 					reader.ReadString('\n')
@@ -743,16 +723,7 @@ func runInteractiveMode(patch *utils.Patch, defaultTargetDir string, ignore1GB b
 				applier := patcher.NewApplier()
 				if err := applier.ApplyPatch(patch, targetDir, true, true, true); err != nil {
 					fmt.Printf("\nError: Patch application failed: %v\n", err)
-					// Try to restore backup
-					backupDir := targetDir + ".backup"
-					if utils.FileExists(backupDir) {
-						fmt.Println("Attempting to restore from backup...")
-						if restoreErr := restoreBackup(backupDir, targetDir); restoreErr != nil {
-							fmt.Printf("Error: Failed to restore backup: %v\n", restoreErr)
-						} else {
-							fmt.Println("Backup restored successfully")
-						}
-					}
+					fmt.Println("\nNote: Automatic rollback may have been performed to restore original files.")
 					fmt.Println("\nPress Enter to exit...")
 					reader.ReadString('\n')
 					os.Exit(1)

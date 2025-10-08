@@ -16,14 +16,14 @@ This guide helps you set up a development environment to:
 
 ### Required
 
-**1. Go 1.21 or later**
+**1. Go 1.24 or later**
 
 Download from [go.dev/dl](https://go.dev/dl/)
 
 **Verify installation:**
 ```bash
 go version
-# Should show: go version go1.21.0 or later
+# Should show: go version go1.24.0 or later
 ```
 
 **2. Git**
@@ -291,7 +291,7 @@ Version 1.0.2 created (11 files, 6 directories, 3 levels deep)
 Created 3 test version(s)
 
 === Test Results ===
-All 28 tests passed!
+All 59 tests passed!
 ```
 
 ---
@@ -372,7 +372,11 @@ CyberPatchMaker/
 ├── cmd/
 │   ├── generator/        # Generator CLI tool
 │   │   └── main.go       # Entry point
-│   └── applier/          # Applier CLI tool
+│   ├── applier/          # Applier CLI tool
+│   │   └── main.go       # Entry point
+│   ├── patch-bundler/    # Patch bundling tool
+│   │   └── main.go       # Entry point
+│   └── patch-gui/        # GUI patch tool
 │       └── main.go       # Entry point
 │
 ├── internal/
@@ -388,27 +392,30 @@ CyberPatchMaker/
 │       │   └── differ.go     # Diff implementation
 │       │
 │       ├── scanner/      # Directory scanning
+│       │   ├── ignore.go     # .cyberignore support
+│       │   ├── parallel.go   # Parallel scanning
 │       │   └── scanner.go    # Recursive scanning & hashing
 │       │
 │       ├── version/      # Version management
-│       │   └── manager.go    # Version operations
+│       │   ├── manager.go    # Version operations
+│       │   └── version.go    # Version utilities
 │       │
 │       └── config/       # Configuration management
 │           └── config.go     # App configuration
+│
+├── internal/gui/         # GUI components
+│   ├── applier_window.go # GUI applier interface
+│   ├── generator_window.go # GUI generator interface
+│   ├── components.go     # Shared GUI components
+│   └── styles.go         # GUI styling
 │
 ├── pkg/
 │   └── utils/            # Shared utilities
 │       ├── types.go      # Core data structures
 │       ├── checksum.go   # SHA-256 calculation
 │       ├── fileops.go    # File operations
-│       └── compress.go   # Compression utilities
-│
-├── testdata/             # Test version files
-│   ├── versions/         # Test versions
-│   │   ├── 1.0.0/        # Version 1.0.0
-│   │   ├── 1.0.1/        # Version 1.0.1
-│   │   └── 1.0.2/        # Version 1.0.2
-│   └── patches/          # Generated test patches
+│       ├── compress.go   # Compression utilities
+│       └── types.go      # Additional types
 │
 ├── docs/                 # Documentation
 │   ├── README.md         # Documentation hub
@@ -417,7 +424,7 @@ CyberPatchMaker/
 │
 ├── go.mod                # Go module definition
 ├── go.sum                # Dependency checksums
-├── advanced-test.ps1     # Comprehensive test suite (28 tests)
+├── advanced-test.ps1     # Comprehensive test suite (59 tests)
 ├── LICENSE               # Apache 2.0 license
 └── README.md             # Project README
 ```

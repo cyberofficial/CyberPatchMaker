@@ -8,7 +8,7 @@ Before diving into specific issues, run these quick checks:
 
 ```bash
 # Check tool versions
-go version          # Should be 1.21 or later
+go version          # Should be 1.24.0 or later
 
 # Build tools
 go build ./cmd/generator
@@ -18,7 +18,7 @@ go build ./cmd/applier
 .\advanced-test.ps1  # Windows only
 ```
 
-If all 28 tests pass, your setup is correct! Test data is auto-generated on first run.
+If all 58 tests pass, your setup is correct! Test data is auto-generated on first run.
 
 ---
 
@@ -373,8 +373,7 @@ Got:      abc123...
 **Cause:** Patch application failed or was interrupted
 
 **Solutions:**
-1. **Automatic rollback**: System should restore from backup automatically
-2. **Manual restore** from selective backup:
+1. **Manual restore** from selective backup:
    ```bash
    # Restore backed up files from mirror structure
    cp -r ./myapp/backup.cyberpatcher/* ./myapp/
@@ -386,11 +385,11 @@ Got:      abc123...
    
    **Note:** The mirror structure makes rollback intuitive - just copy files back to their exact original paths.
 
-3. **Try again** after restoration:
+2. **Try again** after restoration:
    - Check disk space (selective backup needs minimal space)
    - Close all programs accessing the installation
    - Verify patch file integrity (re-download if needed)
-4. **Report the issue**: This shouldn't happen - may be a bug
+3. **Report the issue**: This shouldn't happen - may be a bug
 
 ---
 
@@ -727,7 +726,7 @@ ls -la generator applier
 
 When reporting issues, include:
 
-1. **Platform**: Windows (Linux/macOS not currently supported)
+1. **Platform**: Windows, Linux, macOS
 2. **Go version**: `go version`
 3. **Command used**: Full command with all flags
 4. **Error message**: Complete error output
@@ -738,7 +737,7 @@ When reporting issues, include:
 Example:
 ```
 Platform: Windows 11
-Go version: go1.21.3 windows/amd64
+Go version: go1.24.0 windows/amd64
 Command: .\patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir .\myapp --verify
 Error: Pre-verification failed: key file checksum mismatch
 Test results: 20/20 passing

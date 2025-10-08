@@ -77,8 +77,8 @@ The generator automatically detects key files using this priority order:
 2. `game.exe`
 3. `app.exe`
 4. `main.exe`
-5. First `.exe` file found (Windows)
-6. First file without extension (Linux/macOS)
+
+**Note:** If none of these files are found, you must specify a key file manually using the `--key-file` option.
 
 **Example:**
 ```
@@ -295,7 +295,7 @@ When generating patches, versions are automatically registered:
 - ✓ Directory exists
 - ✓ Contains at least one file
 - ✓ Has detectable key file
-- ✓ Name is valid version number
+- ✓ Name follows semantic versioning format (recommended but not enforced)
 
 **Example validation:**
 ```bash
@@ -306,9 +306,9 @@ When generating patches, versions are automatically registered:
     └── config.json         # ✓ Has files
 
 # Invalid
-./versions/latest/          # ✗ "latest" not a version number
+./versions/latest/          # ✗ Not a semantic version
 ./versions/1.0.0/           # ✗ Directory empty
-./versions/v1.0.0/          # ✗ "v" prefix not allowed
+./versions/v1.0.0/          # ✗ "v" prefix not recommended
 ```
 
 ---

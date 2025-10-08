@@ -5,14 +5,14 @@ This document provides an in-depth explanation of the CyberPatchMaker Advanced T
 ## Overview
 
 **Test Suite:** `advanced-test.ps1`  
-**Total Tests:** 57 comprehensive tests (56 standard + 1 optional 1GB test)  
+**Total Tests:** 59 comprehensive tests (58 standard + 1 optional 1GB test)  
 **Test Categories:** Build, Generation, Application, Verification, Compression, Backup System, Advanced Scenarios, Custom Paths, Self-Contained Executables, File Exclusion, Silent Mode, Reverse Patches, Scan Cache, Simple Mode  
 **Test Data:** Auto-generated on first run (versions 1.0.0, 1.0.1, 1.0.2)
 
 **Recent Additions:**
 - Tests 40-43: Backup exclusion, .cyberignore support, silent mode (automation), reverse patches
 - Tests 44-50: Comprehensive scan cache testing (caching, custom directory, force rescan, performance, validation, invalidation)
-- Tests 51-57: Simple Mode feature validation (simplified UI for end users, use case scenarios)
+- Tests 51-58: Simple Mode feature validation (simplified UI for end users, use case scenarios)
 
 ---
 
@@ -820,6 +820,9 @@ patch-apply.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir .\test-incr
 **Test Actions:**
 ```powershell
 patch-apply.exe --patch .\patches\1.0.1-to-1.0.2.patch --current-dir .\test-backup --verify
+
+# Check backup existence
+Test-Path .\test-backup\backup.cyberpatcher
 ```
 
 **Expected Results:**
@@ -1074,7 +1077,7 @@ Measure-Command {
 - All three produce identical patching results
 
 ### ✓ Multi-Hop Patching
-- Sequential patch application (1.0.0 → 1.0.1 → 1.0.2)
+- Sequential patching (1.0.0 → 1.0.1 → 1.0.2)
 - Cumulative changes work correctly
 - Version tracking at each step
 - Final result matches direct patch
@@ -1374,7 +1377,7 @@ Testing: Verify scan cache performance improvement
 **What This Tests:**
 - Cache provides measurable performance improvement
 - Small projects: 5-10ms saved
-- Large projects: 15+ minutes → <1 second (massive improvement)
+- Large projects: 15+ minutes → instant (massive improvement)
 - Example: War Thunder (34,650 files) - 15 min → instant
 
 ---
@@ -1466,10 +1469,704 @@ Testing: Verify scan cache invalidation on file changes
 
 ---
 
-## Related Documentation
+## Custom Paths and Advanced Features Tests (Tests 29-43)
 
-- [Testing Guide](testing-guide.md) - Running and understanding tests
-- [Generator Guide](generator-guide.md) - Using the generator tool
-- [Applier Guide](applier-guide.md) - Using the applier tool
-- [CLI Reference](cli-reference.md) - Complete command reference with scan cache flags
-- [Troubleshooting](troubleshooting.md) - Common issues and solutions
+### Test 29: Apply Custom Paths Patch
+**Purpose:** Verify patch application works with custom directory paths (--from-dir, --to-dir)
+
+**Command-Line:**
+```
+Command: patch-gen.exe --from-dir .\testdata\advanced-output\custom-paths\1.0.1 --to-dir .\testdata\advanced-output\custom-paths\1.0.2 --output .\testdata\advanced-output\patches --compression zstd
+Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\custom-apply --verify
+```
+
+**Expected Output:**
+```
+Testing: Apply custom paths patch
+  Generating patch from custom directories...
+  Command: patch-gen.exe --from-dir .\testdata\advanced-output\custom-paths\1.0.1 --to-dir .\testdata\advanced-output\custom-paths\1.0.2 --output .\testdata\advanced-output\patches --compression zstd
+  Applying custom paths patch...
+  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\custom-apply --verify
+  Custom paths patch applied successfully
+✓ PASSED: Apply custom paths patch
+```
+
+**What This Tests:**
+- Generator can work with arbitrary directory paths (--from-dir, --to-dir)
+- Version numbers are extracted from directory names automatically
+- Patch application works with custom source directories
+- No dependency on versions/ subdirectory structure
+
+**Use Cases:**
+- Patching applications installed in custom locations
+- Working with non-standard directory structures
+- Integration with existing deployment workflows
+- Flexibility for different installation patterns
+
+---
+
+#### Test 30: Custom Paths with Complex Nested Structure
+**Purpose:** Verify custom paths mode handles complex directory hierarchies
+
+**Command-Line:**
+```
+Command: patch-gen.exe --from-dir .\testdata\advanced-output\custom-complex\1.0.1 --to-dir .\testdata\advanced-output\custom-complex\1.0.2 --output .\testdata\advanced-output\patches --compression zstd
+Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\custom-complex-apply --verify
+```
+
+**Expected Output:**
+```
+Testing: Custom paths with complex nested structure
+  Creating complex nested directory structure...
+  Generating patch with custom paths and complex structure...
+  Command: patch-gen.exe --from-dir .\testdata\advanced-output\custom-complex\1.0.1 --to-dir .\testdata\advanced-output\custom-complex\1.0.2 --output .\testdata\advanced-output\patches --compression zstd
+  Applying patch to complex custom structure...
+  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\custom-complex-apply --verify
+  Complex custom paths patch applied successfully
+✓ PASSED: Custom paths with complex nested structure
+```
+
+**What This Tests:**
+- Deep directory hierarchies (3+ levels) work with custom paths
+- Complex nested structures are handled correctly
+- Path resolution works with arbitrary directory depths
+- No limitations on directory complexity
+
+**Technical Details:**
+Creates structures like:
+```
+custom-complex/1.0.1/
+├── app/
+│   ├── bin/
+│   │   ├── core/
+│   │   │   └── modules/
+│   │   │       └── plugins/
+│   │   │           └── extensions/
+│   │   │               └── advanced.dll
+│   │   └── main.exe
+│   └── config/
+│       └── settings.json
+└── data/
+    └── user/
+        └── profiles/
+            └── default.json
+```
+
+---
+
+#### Test 31: Custom Paths - Version Number Extraction
+**Purpose:** Verify automatic version number extraction from custom directory names
+
+**Expected Output:**
+```
+Testing: Custom paths - version number extraction
+  Testing version extraction from various directory patterns...
+  ✓ Extracted version '2.1.3' from 'MyApp_v2.1.3_release'
+  ✓ Extracted version '1.0.0' from 'version-1.0.0'
+  ✓ Extracted version '3.2.1-beta' from 'app-3.2.1-beta'
+  ✓ Extracted version '1.5.0' from 'software_1.5.0_final'
+  Version extraction working correctly
+✓ PASSED: Custom paths - version number extraction
+```
+
+**What This Tests:**
+- Regex-based version extraction from directory names
+- Handles various naming patterns (underscores, hyphens, dots)
+- Supports semantic versioning with pre-release tags
+- Robust parsing of version strings in directory names
+
+**Supported Patterns:**
+- `MyApp_v2.1.3_release` → `2.1.3`
+- `version-1.0.0` → `1.0.0`
+- `app-3.2.1-beta` → `3.2.1-beta`
+- `software_1.5.0_final` → `1.5.0`
+
+---
+
+#### Test 32: Custom Paths - Compression Options
+**Purpose:** Verify all compression formats work with custom paths mode
+
+**Command-Line:**
+```
+Command: patch-gen.exe --from-dir .\testdata\advanced-output\custom-compress\1.0.1 --to-dir .\testdata\advanced-output\custom-compress\1.0.2 --output .\testdata\advanced-output\patches --compression zstd
+Command: patch-gen.exe --from-dir .\testdata\advanced-output\custom-compress\1.0.1 --to-dir .\testdata\advanced-output\custom-compress\1.0.2 --output .\testdata\advanced-output\patches-gzip --compression gzip
+Command: patch-gen.exe --from-dir .\testdata\advanced-output\custom-compress\1.0.1 --to-dir .\testdata\advanced-output\custom-compress\1.0.2 --output .\testdata\advanced-output\patches-none --compression none
+```
+
+**Expected Output:**
+```
+Testing: Custom paths - compression options
+  Testing all compression formats with custom paths...
+  ✓ Zstd compression with custom paths: 1627 bytes
+  ✓ Gzip compression with custom paths: 1612 bytes
+  ✓ No compression with custom paths: 4712 bytes
+  All compression formats work with custom paths
+✓ PASSED: Custom paths - compression options
+```
+
+**What This Tests:**
+- All compression options (zstd, gzip, none) work with --from-dir/--to-dir
+- Compression ratios are consistent with standard mode
+- Custom paths don't affect compression effectiveness
+- Patch generation succeeds with all compression types
+
+---
+
+#### Test 33: Custom Paths - Error Handling (Non-existent Directory)
+**Purpose:** Verify proper error handling for invalid custom directory paths
+
+**Command-Line:**
+```
+Command: patch-gen.exe --from-dir .\non-existent-source --to-dir .\non-existent-target --output .\testdata\advanced-output\patches
+```
+
+**Expected Output:**
+```
+Testing: Custom paths - error handling (non-existent directory)
+  Testing error handling for invalid custom paths...
+  Command: patch-gen.exe --from-dir .\non-existent-source --to-dir .\non-existent-target --output .\testdata\advanced-output\patches
+  Generator correctly failed with invalid directory error
+✓ PASSED: Custom paths - error handling (non-existent directory)
+```
+
+**What This Tests:**
+- Clear error messages for non-existent directories
+- Graceful failure instead of crashes
+- User-friendly error reporting
+- Prevents silent failures with invalid paths
+
+**Error Messages:**
+- "Source directory does not exist"
+- "Target directory does not exist"
+- "Cannot access directory: permission denied"
+
+---
+
+#### Test 34: Backward Compatibility - Legacy Mode Still Works
+**Purpose:** Verify traditional versions/ directory structure still works
+
+**Command-Line:**
+```
+Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches
+Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\legacy-test --verify
+```
+
+**Expected Output:**
+```
+Testing: Backward compatibility - legacy mode still works
+  Testing traditional versions directory structure...
+  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches
+  Applying patch with legacy mode...
+  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\legacy-test --verify
+  Legacy mode patch applied successfully
+✓ PASSED: Backward compatibility - legacy mode still works
+```
+
+**What This Tests:**
+- Original --versions-dir mode still functions
+- Existing workflows continue to work
+- No breaking changes to legacy usage
+- Backward compatibility maintained
+
+---
+
+#### Test 35: CLI Executable Creation
+**Purpose:** Verify --create-exe flag creates self-contained executable patches
+
+**Command-Line:**
+```
+Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\executables --create-exe --compression zstd
+```
+
+**Expected Output:**
+```
+Testing: CLI executable creation
+  Creating self-contained executable patch...
+  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\executables --create-exe --compression zstd
+  Self-contained executable created: 1.0.1-to-1.0.2.exe
+✓ PASSED: CLI executable creation
+```
+
+**What This Tests:**
+- --create-exe flag creates executable wrapper
+- Executable contains embedded patch data
+- CLI generator can create self-contained patches
+- Output file has .exe extension
+
+**Executable Features:**
+- Self-contained (no external dependencies)
+- Embeds patch data directly
+- Can be distributed as single file
+- Works on target systems without CyberPatchMaker installation
+
+---
+
+#### Test 36: Verify CLI Executable Structure
+**Purpose:** Verify self-contained executable has correct internal structure
+
+**Expected Output:**
+```
+Testing: Verify CLI executable structure
+  Analyzing executable structure...
+  ✓ Executable size: 18543 bytes
+  ✓ Magic bytes detected: CYBERPATCH
+  ✓ Header structure valid
+  ✓ Embedded patch data found
+  ✓ Executable is self-contained
+✓ PASSED: Verify CLI executable structure
+```
+
+**What This Tests:**
+- Executable has correct header format (128 bytes)
+- Contains "CYBERPATCH" magic bytes
+- Embedded patch data is intact
+- File size includes both executable code and patch data
+
+**Internal Structure:**
+```
+Offset 0-127: Executable header with metadata
+Offset 128+: Embedded patch data (compressed)
+Magic Bytes: "CYBERPATCH" at known offset
+```
+
+---
+
+#### Test 37: Batch Mode with CLI Executables
+**Purpose:** Verify batch creation of multiple executable patches
+
+**Command-Line:**
+```
+Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\batch-exe --create-exe
+Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\batch-exe --create-exe
+```
+
+**Expected Output:**
+```
+Testing: Batch mode with CLI executables
+  Creating multiple executable patches...
+  ✓ Executable 1: 1.0.0-to-1.0.1.exe created
+  ✓ Executable 2: 1.0.1-to-1.0.2.exe created
+  ✓ Both executables have valid structure
+✓ PASSED: Batch mode with CLI executables
+```
+
+**What This Tests:**
+- Multiple executables can be created in sequence
+- Each executable is independent and valid
+- Batch processing works correctly
+- No conflicts between multiple executable generations
+
+---
+
+#### Test 38: 1GB Bypass Test (only if -run1gbtest flag is set)
+**Purpose:** Verify handling of large patches (>1GB) with bypass mode
+
+**Command-Line:**
+```
+Command: patch-gen.exe --versions-dir .\testdata\large-versions --from 1.0.0 --to 2.0.0 --output .\testdata\advanced-output\large-patches --create-exe
+```
+
+**Expected Output:**
+```
+Testing: 1GB bypass test
+  Creating large patch (>1GB)...
+  ✓ Large patch generated successfully
+  ✓ Bypass mode activated for large files
+  ✓ Executable created despite size
+✓ PASSED: 1GB bypass test
+```
+
+**What This Tests:**
+- Large patch handling (>1GB limit)
+- Bypass mode for oversized patches
+- Executable creation works with large embedded data
+- Performance with large datasets
+
+**Note:** This test only runs when -run1gbtest flag is provided to advanced-test.ps1
+
+---
+
+#### Test 39: Verify All Executables Use CLI Applier
+**Purpose:** Confirm all generated executables use the CLI applier internally
+
+**Expected Output:**
+```
+Testing: Verify all executables use CLI applier
+  Testing executable applier selection...
+  ✓ Executable uses CLI applier (not GUI)
+  ✓ No GUI dependencies in executable
+  ✓ Command-line interface available
+✓ PASSED: Verify all executables use CLI applier
+```
+
+**What This Tests:**
+- Executables embed CLI applier code
+- No GUI dependencies in self-contained executables
+- CLI interface is available when running executable
+- Consistent behavior across all executable patches
+
+---
+
+#### Test 40: Backup Directory Exclusion
+**Purpose:** Verify backup.cyberpatcher directory is excluded from patches
+
+**Command-Line:**
+```
+Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches
+```
+
+**Expected Output:**
+```
+Testing: Backup directory exclusion
+  Testing backup.cyberpatcher exclusion...
+  ✓ Backup directory exists in source
+  ✓ Backup directory not included in patch
+  ✓ Patch operations exclude backup.cyberpatcher
+✓ PASSED: Backup directory exclusion
+```
+
+**What This Tests:**
+- backup.cyberpatcher directories are ignored during scanning
+- Backup files don't get included in patches
+- Prevents recursive backup inclusion
+- Clean patch generation without backup pollution
+
+**Why This Matters:**
+- Prevents infinite recursion (backups containing backups)
+- Keeps patches focused on actual application changes
+- Reduces patch size by excluding temporary files
+- Maintains clean version differences
+
+---
+
+#### Test 41: .cyberignore File Support
+**Purpose:** Verify .cyberignore file excludes specified files/patterns from patches
+
+**Setup:** Create .cyberignore file with patterns:
+```
+*.log
+temp/
+*.tmp
+cache/
+```
+
+**Command-Line:**
+```
+Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches
+```
+
+**Expected Output:**
+```
+Testing: .cyberignore file support
+  Testing file exclusion patterns...
+  ✓ .cyberignore file found and parsed
+  ✓ Log files excluded (*.log)
+  ✓ Temp directories excluded (temp/)
+  ✓ Cache files excluded (cache/)
+  ✓ Ignored files not in patch manifest
+✓ PASSED: .cyberignore file support
+```
+
+**What This Tests:**
+- .cyberignore file is read and parsed
+- Wildcard patterns work (*.log, *.tmp)
+- Directory patterns work (temp/, cache/)
+- Exact filename matches work
+- Ignored files are completely excluded from patches
+
+**Pattern Types:**
+- `*.log` - Wildcard file extension
+- `temp/` - Directory exclusion
+- `cache/` - Directory exclusion
+- `debug.txt` - Exact filename
+
+---
+
+#### Test 42: Self-Contained Executable Silent Mode
+**Purpose:** Verify --silent flag works with self-contained executables
+
+**Command-Line:**
+```
+Command: .\testdata\advanced-output\executables\1.0.1-to-1.0.2.exe --silent
+```
+
+**Expected Output:**
+```
+Testing: Self-contained executable silent mode
+  Testing --silent flag with executable...
+  ✓ Executable ran in silent mode
+  ✓ No console output during execution
+  ✓ Exit code 0 (success) or 1 (failure)
+  ✓ Automatic log file generated
+✓ PASSED: Self-contained executable silent mode
+```
+
+**What This Tests:**
+- --silent flag suppresses all console output
+- Executable still performs patch application
+- Returns appropriate exit codes (0=success, 1=failure)
+- Generates log file for audit trail
+
+**Silent Mode Behavior:**
+- No progress messages
+- No user prompts
+- Exit code indicates success/failure
+- Log file contains full execution details
+
+---
+
+#### Test 43: Silent Mode Log File Generation
+**Purpose:** Verify automatic log file creation in silent mode
+
+**Expected Output:**
+```
+Testing: Silent mode log file generation
+  Testing automatic log generation...
+  ✓ Log file created: cyberpatch-20231201-143022.log
+  ✓ Log contains execution details
+  ✓ Log includes timestamp and version info
+  ✓ Log shows success/failure status
+✓ PASSED: Silent mode log file generation
+```
+
+**What This Tests:**
+- Automatic log file naming (timestamp-based)
+- Log file contains complete execution trace
+- Timestamp format: YYYYMMDD-HHMMSS
+- Log includes all operations and results
+
+**Log File Contents:**
+```
+CyberPatchMaker Silent Mode Log
+Timestamp: 2023-12-01 14:30:22
+Version: 1.0.1 → 1.0.2
+Command: --silent
+Status: SUCCESS
+Operations: 7 added, 4 modified, 0 deleted
+Duration: 0.15 seconds
+```
+
+---
+
+### Simple Mode Feature Tests (Tests 51-56)
+
+#### Test 51: Simple Mode - Patch Generation with SimpleMode Flag
+**Purpose:** Verify SimpleMode field is set in patch structure when enabled
+
+**Command-Line:**
+```
+Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches --create-exe
+```
+
+**Expected Output:**
+```
+Testing: Simple mode - patch generation with SimpleMode flag
+  Testing SimpleMode field in patch structure...
+  ✓ Patch generated with SimpleMode=true
+  ✓ SimpleMode field found in patch header
+  ✓ GUI generator enables SimpleMode via checkbox
+  ✓ CLI generator enables SimpleMode via --simple-mode flag
+✓ PASSED: Simple mode - patch generation with SimpleMode flag
+```
+
+**What This Tests:**
+- SimpleMode boolean field in Patch struct (types.go)
+- GUI generator checkbox sets SimpleMode=true
+- CLI --simple-mode flag sets SimpleMode=true
+- Patch header contains SimpleMode metadata
+
+**Technical Details:**
+- SimpleMode field added to Patch structure
+- GUI generator has "Enable Simple Mode for End Users" checkbox
+- CLI generator has --simple-mode flag
+- Field is embedded in patch header for applier detection
+
+---
+
+#### Test 52: Simple Mode - GUI Applier Simplified Interface
+**Purpose:** Verify GUI applier shows simplified interface when SimpleMode=true
+
+**Expected Output:**
+```
+Testing: Simple mode - GUI applier simplified interface
+  Testing simplified GUI interface...
+  ✓ GUI detects SimpleMode field in patch
+  ✓ Simplified interface shown (3 options only)
+  ✓ Advanced options hidden (compression, verification checkboxes)
+  ✓ User sees: Simple message + basic backup option + 3-choice menu
+✓ PASSED: Simple mode - GUI applier simplified interface
+```
+
+**What This Tests:**
+- GUI applier enableSimpleMode() method
+- Patch.SimpleMode field detection
+- Interface simplification when SimpleMode=true
+- Hidden advanced options (compression, verification)
+
+**Simplified Interface:**
+- Simple message: "You are about to patch X to Y"
+- Basic backup option (default: Yes)
+- 3-choice menu: "Dry Run (1)", "Apply Patch (2)", "Exit (3)"
+- No technical settings visible
+
+---
+
+#### Test 53: Simple Mode - End-to-End Workflow
+**Purpose:** Verify complete Simple Mode workflow from generator to end user
+
+**Command-Line:**
+```
+Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\simple-workflow --create-exe
+```
+
+**Expected Output:**
+```
+Testing: Simple mode - end-to-end workflow
+  Testing complete Simple Mode workflow...
+  ✓ Self-contained exe created with SimpleMode=true
+  ✓ End user runs exe and sees simple 3-option menu
+  ✓ GUI version: Simple message + basic options only
+  ✓ CLI version: 3 options - Dry Run (1), Apply Patch (2), Exit (3)
+  ✓ Advanced options hidden/auto-enabled for safety
+✓ PASSED: Simple mode - end-to-end workflow
+```
+
+**What This Tests:**
+- Complete workflow: GUI generator → self-contained exe → end user
+- Patch creator enables Simple Mode checkbox
+- End user receives exe with embedded SimpleMode=true
+- End user sees simplified interface (GUI or CLI)
+- No advanced settings exposed to end user
+
+**Workflow Steps:**
+1. **Patch Creator:** Uses GUI generator, enables "Enable Simple Mode for End Users"
+2. **Patch Creator:** Creates self-contained exe with SimpleMode=true
+3. **End User:** Runs exe, sees simple 3-option menu
+4. **End User:** Can test with Dry Run, then Apply Patch
+5. **End User:** Simple, clear choices - no technical complexity
+
+---
+
+#### Test 54: Simple Mode - Feature Documentation Validation
+**Purpose:** Verify Simple Mode feature is properly documented and implemented
+
+**Expected Output:**
+```
+Testing: Simple mode - feature documentation validation
+  Validating Simple Mode implementation...
+  ✓ Documentation files exist (simple-mode-guide.md, generator-guide.md, etc.)
+  ✓ SimpleMode field in types.go Patch struct
+  ✓ GUI generator simpleModeForUsers checkbox
+  ✓ GUI applier enableSimpleMode method
+  ✓ CLI applier runSimpleMode function
+  ✓ Feature mentioned in README.md
+✓ PASSED: Simple mode - feature documentation validation
+```
+
+**What This Tests:**
+- All required documentation files exist
+- Code implementation is complete across all components
+- Feature is properly documented for users
+- Implementation follows design specifications
+
+**Validated Components:**
+- **Documentation:** simple-mode-guide.md, generator-guide.md, applier-guide.md, gui-usage.md
+- **Types:** SimpleMode bool field in Patch struct
+- **GUI Generator:** simpleModeCheck widget.Check with "Simple Mode for End Users" text
+- **GUI Applier:** enableSimpleMode() method detects patch.SimpleMode
+- **CLI Applier:** runSimpleMode() function for simplified CLI interface
+- **README:** Feature prominently mentioned
+
+---
+
+#### Test 55: Simple Mode - Use Case Scenarios
+**Purpose:** Verify Simple Mode addresses real-world distribution scenarios
+
+**Expected Output:**
+```
+Testing: Simple mode - use case scenarios
+  Validating Simple Mode use cases...
+  ✓ Software vendor scenario: Non-technical customers get simple exe
+  ✓ IT department scenario: Employees run exe from shared drive
+  ✓ Game modder scenario: Users see simple interface, reduces support burden
+  ✓ Automation scenario: --silent flag for CI/CD (fully automatic)
+✓ PASSED: Simple mode - use case scenarios
+```
+
+**What This Tests:**
+- Real-world applicability of Simple Mode
+- Different user personas and use cases
+- Problem-solving for distribution challenges
+- Integration with automation workflows
+
+**Validated Use Cases:**
+
+**Use Case 1: Software Vendor Updates**
+- Vendor creates patch with Simple Mode enabled
+- Customers receive self-contained exe with simple 3-option menu
+- Customers see: 'You are about to patch X to Y' message
+- Customers choose: Dry Run (test), Apply Patch, or Exit
+- No technical knowledge required
+
+**Use Case 2: IT Department Internal Updates**
+- IT creates patches with Simple Mode for all versions
+- Employees run exe from their version folder
+- Simple 3-option interface prevents confusion
+- Backup option available (default: Yes)
+
+**Use Case 3: Game/App Modders**
+- Modders enable Simple Mode for user-friendly patching
+- Users can test with 'Dry Run' before applying
+- Reduces support burden (fewer confused users)
+
+**Use Case 4: Automation Scripts (Silent Mode)**
+- CLI applier with --silent flag applies patch automatically
+- No user interaction required (fully automatic)
+- Returns exit code 0 on success, 1 on failure
+- Perfect for CI/CD pipelines or deployment scripts
+
+---
+
+#### Test 56: Automatic Rollback on Failed Patch Application
+**Purpose:** Verify automatic rollback when patch application fails
+
+**Command-Line:**
+```
+Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\rollback-test --verify
+```
+
+**Expected Output:**
+```
+Testing: Automatic rollback on failed patch application
+  Testing automatic rollback when patch fails...
+  ✓ Patch application failed as expected (corrupted target file)
+  ✓ Automatic rollback was triggered
+  ✓ Original files restored from backup
+  ✓ Backup directory preserved for inspection
+✓ PASSED: Automatic rollback on failed patch application
+```
+
+**What This Tests:**
+- Automatic rollback on patch failure
+- Backup restoration when verification fails
+- Corrupted file detection during patching
+- Backup preservation after rollback
+
+**Failure Scenario:**
+1. Apply patch to directory with corrupted target file
+2. Patch application starts and creates backup
+3. Verification fails due to file corruption
+4. Automatic rollback triggered
+5. Original files restored from backup.cyberpatcher/
+6. Backup directory kept for manual inspection
+
+**Error Messages:**
+- "automatically restoring from backup"
+- "Restored X files from backup"
+- Clear indication of rollback operation
+
+**Why This Matters:**
+- Prevents partial updates that could break applications
+- Automatic recovery from patch failures
+- Maintains system stability during updates
+- Provides safety net for critical deployments

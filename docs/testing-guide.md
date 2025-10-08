@@ -4,7 +4,7 @@ Guide to running and understanding CyberPatchMaker's comprehensive test suite.
 
 ## Overview
 
-CyberPatchMaker includes a comprehensive test suite with 28 tests that validate all core functionality including generation, application, verification, error handling, backup system, and advanced scenarios like multi-hop patching, bidirectional patching, downgrade testing, compression formats, and automatic rollback.
+CyberPatchMaker includes a comprehensive test suite with 59 tests that validate all core functionality including generation, application, verification, error handling, backup system, and advanced scenarios like multi-hop patching, bidirectional patching, downgrade testing, compression formats, and automatic rollback.
 
 **Key Feature:** Test data is automatically generated on first run - no bloat files committed to the repository!
 
@@ -15,7 +15,7 @@ CyberPatchMaker includes a comprehensive test suite with 28 tests that validate 
 **File:** `advanced-test.ps1`
 **Shell:** PowerShell 5.1 or later
 **Platform:** Windows (PowerShell)
-**Tests:** 24 comprehensive tests
+**Tests:** 59 comprehensive tests
 **Test Data:** Auto-generated on first run (1.0.0, 1.0.1, 1.0.2)
 **Command Visibility:** Shows exact command-line for each operation (displayed in cyan)
 **Bidirectional Testing:** Includes upgrade/downgrade cycle verification
@@ -64,7 +64,7 @@ Testing: Apply zstd patch to complex directory structure
 ========================================
 Advanced Test Results
 ========================================
-Passed: 28
+Passed: 59
 Failed: 0
 
 ✓ All advanced tests passed!
@@ -125,7 +125,7 @@ ls testdata/patches/
 
 ## Test Suite Overview
 
-The advanced test suite includes 24 comprehensive tests organized into several categories:
+The advanced test suite includes 59 comprehensive tests organized into several categories:
 
 ### Core Functionality Tests (Tests 1-6)
 1. **Build Generator Tool** - Verifies patch-gen.exe compiles correctly
@@ -416,7 +416,7 @@ jobs:
       - uses: actions/checkout@v3
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: '1.24.0'
       - name: Run advanced test suite
         run: .\advanced-test.ps1
         shell: pwsh
@@ -470,7 +470,7 @@ rm generator applier
 **Symptom:** Test 1 fails with compilation errors
 
 **Solutions:**
-1. Check Go version: `go version` (need 1.21+)
+1. Check Go version: `go version` (need 1.24.0+)
 2. Verify code compiles: `go build ./...`
 3. Check for syntax errors
 4. Update dependencies: `go mod tidy`

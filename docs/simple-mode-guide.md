@@ -338,7 +338,7 @@ patch-gen --from-dir ./v1 --to-dir ./v2 \
 patch-gen --from-dir ./v1 --to-dir ./v2 \
           --output ./patches/simple \
           --create-exe \
-          --silent-mode
+          --silent
 
 # Distribute:
 # - patches/simple/* to regular users

@@ -4,7 +4,7 @@ Get up and running with CyberPatchMaker in 5 minutes.
 
 ## Prerequisites
 
-- Go 1.21 or later installed
+- Go 1.24.0 installed
 - Basic command-line knowledge
 
 ## Installation
@@ -136,7 +136,7 @@ This will:
 2. Create a backup of your current files
 3. Update the files to version 1.0.1
 4. Check that everything updated correctly
-5. Keep the backup for safety (automatic undo if something goes wrong)
+5. Keep the backup for manual rollback if needed
 
 ### Step 5: Verify Success
 
@@ -168,4 +168,4 @@ Want to verify everything works? Run the comprehensive test suite:
 .\advanced-test.ps1
 ```
 
-This runs 28 automated tests to validate the entire system. Test data is automatically generated on first run, so there's no setup required!
+This runs 59 automated tests to validate the entire system. Test data is automatically generated on first run, so there's no setup required!

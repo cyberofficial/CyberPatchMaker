@@ -19,24 +19,32 @@ type BatchScriptWindow struct {
 	window fyne.Window
 
 	// UI Components
-	patchFileEntry   *widget.Entry
-	targetDirEntry   *widget.Entry
-	scriptNameEntry  *widget.Entry
-	dryRunCheck      *widget.Check
-	verifyCheck      *widget.Check
-	backupCheck      *widget.Check
-	customInstrEntry *widget.Entry
-	previewText      *widget.Entry
-	generateBtn      *widget.Button
-	statusLabel      *widget.Label
+	patchFileEntry    *widget.Entry
+	targetDirEntry    *widget.Entry
+	scriptNameEntry   *widget.Entry
+	customKeyEntry    *widget.Entry
+	dryRunCheck       *widget.Check
+	silentModeCheck   *widget.Check
+	verifyCheck       *widget.Check
+	backupCheck       *widget.Check
+	autoCloseCheck    *widget.Check
+	showProgressCheck *widget.Check
+	customInstrEntry  *widget.Entry
+	previewText       *widget.Entry
+	generateBtn       *widget.Button
+	statusLabel       *widget.Label
 
 	// Data
 	patchFile     string
 	targetDir     string
 	scriptName    string
+	customKeyFile string
 	includeDryRun bool
+	silentMode    bool
 	disableVerify bool
 	disableBackup bool
+	autoClose     bool
+	showProgress  bool
 	customInstr   string
 }
 
@@ -45,8 +53,11 @@ func NewBatchScriptWindow() *BatchScriptWindow {
 	bsw := &BatchScriptWindow{
 		scriptName:    "apply_patch.bat",
 		includeDryRun: false,
+		silentMode:    false,
 		disableVerify: false,
 		disableBackup: false,
+		autoClose:     true,
+		showProgress:  true,
 	}
 	bsw.ExtendBaseWidget(bsw)
 	return bsw
@@ -64,7 +75,13 @@ func (bsw *BatchScriptWindow) SetWindow(window fyne.Window) {
 
 // buildUI builds the complete UI layout
 func (bsw *BatchScriptWindow) buildUI() fyne.CanvasObject {
-	// Patch file selector
+	// Instructions label (compact)
+	instructionsLabel := widget.NewLabel(
+		"Generate batch scripts for end users. Choose options including silent mode for automated deployment.",
+	)
+	instructionsLabel.Wrapping = fyne.TextWrapWord
+
+	// Top row: Patch file and Target directory side by side
 	bsw.patchFileEntry = widget.NewEntry()
 	bsw.patchFileEntry.SetPlaceHolder("Select patch file...")
 	bsw.patchFileEntry.OnChanged = func(text string) {
@@ -84,9 +101,8 @@ func (bsw *BatchScriptWindow) buildUI() fyne.CanvasObject {
 		bsw.patchFileEntry,
 	)
 
-	// Target directory selector
 	bsw.targetDirEntry = widget.NewEntry()
-	bsw.targetDirEntry.SetPlaceHolder("Target directory (leave empty for current directory)")
+	bsw.targetDirEntry.SetPlaceHolder("Leave empty for current directory")
 	bsw.targetDirEntry.OnChanged = func(text string) {
 		bsw.targetDir = text
 		bsw.updatePreview()
@@ -98,12 +114,14 @@ func (bsw *BatchScriptWindow) buildUI() fyne.CanvasObject {
 
 	targetDirContainer := container.NewBorder(
 		nil, nil,
-		widget.NewLabel("Target Directory:"),
+		widget.NewLabel("Target Dir:"),
 		targetDirBrowse,
 		bsw.targetDirEntry,
 	)
 
-	// Script name entry
+	topRow := container.NewGridWithColumns(2, patchFileContainer, targetDirContainer)
+
+	// Second row: Script name and Custom key file side by side
 	bsw.scriptNameEntry = widget.NewEntry()
 	bsw.scriptNameEntry.SetText("apply_patch.bat")
 	bsw.scriptNameEntry.OnChanged = func(text string) {
@@ -117,44 +135,87 @@ func (bsw *BatchScriptWindow) buildUI() fyne.CanvasObject {
 		bsw.scriptNameEntry,
 	)
 
-	// Options checkboxes
-	bsw.dryRunCheck = widget.NewCheck("Include dry-run option (safe test run)", func(checked bool) {
+	bsw.customKeyEntry = widget.NewEntry()
+	bsw.customKeyEntry.SetPlaceHolder("Optional: Custom key file (e.g., MyApp.exe)")
+	bsw.customKeyEntry.OnChanged = func(text string) {
+		bsw.customKeyFile = text
+		bsw.updatePreview()
+	}
+
+	customKeyContainer := container.NewBorder(
+		nil, nil,
+		widget.NewLabel("Key File:"),
+		nil,
+		bsw.customKeyEntry,
+	)
+
+	secondRow := container.NewGridWithColumns(2, scriptNameContainer, customKeyContainer)
+
+	// Options in a more compact grid layout (2 columns)
+	bsw.dryRunCheck = widget.NewCheck("Dry-run mode", func(checked bool) {
 		bsw.includeDryRun = checked
 		bsw.updatePreview()
 	})
 
-	bsw.verifyCheck = widget.NewCheck("Disable verification (--verify=false)", func(checked bool) {
+	bsw.silentModeCheck = widget.NewCheck("Silent mode", func(checked bool) {
+		bsw.silentMode = checked
+		bsw.updatePreview()
+	})
+
+	bsw.verifyCheck = widget.NewCheck("Disable verify", func(checked bool) {
 		bsw.disableVerify = checked
 		bsw.updatePreview()
 	})
 
-	bsw.backupCheck = widget.NewCheck("Disable backup (--backup=false)", func(checked bool) {
+	bsw.backupCheck = widget.NewCheck("Disable backup", func(checked bool) {
 		bsw.disableBackup = checked
 		bsw.updatePreview()
 	})
 
-	// Custom instructions
+	bsw.autoCloseCheck = widget.NewCheck("Auto-close success", func(checked bool) {
+		bsw.autoClose = checked
+		bsw.updatePreview()
+	})
+
+	bsw.showProgressCheck = widget.NewCheck("Show progress", func(checked bool) {
+		bsw.showProgress = checked
+		bsw.updatePreview()
+	})
+
+	// Group options in 2 columns
+	leftOptions := container.NewVBox(
+		bsw.dryRunCheck,
+		bsw.silentModeCheck,
+		bsw.verifyCheck,
+	)
+	rightOptions := container.NewVBox(
+		bsw.backupCheck,
+		bsw.autoCloseCheck,
+		bsw.showProgressCheck,
+	)
+	optionsRow := container.NewGridWithColumns(2, leftOptions, rightOptions)
+
+	// Custom instructions (compact)
 	bsw.customInstrEntry = widget.NewMultiLineEntry()
-	bsw.customInstrEntry.SetPlaceHolder("Optional: Add custom instructions for end users...")
+	bsw.customInstrEntry.SetPlaceHolder("Optional: Custom instructions for end users...")
 	bsw.customInstrEntry.OnChanged = func(text string) {
 		bsw.customInstr = text
 		bsw.updatePreview()
 	}
 
 	customInstrContainer := container.NewBorder(
-		widget.NewLabel("Custom Instructions:"),
+		widget.NewLabel("Instructions:"),
 		nil, nil, nil,
-		bsw.customInstrEntry,
+		container.NewVScroll(bsw.customInstrEntry),
 	)
 
-	// Preview text area
+	// Preview text area (smaller, more compact)
 	bsw.previewText = widget.NewMultiLineEntry()
-	bsw.previewText.SetPlaceHolder("Batch script preview will appear here...")
+	bsw.previewText.SetPlaceHolder("Batch script preview...")
 	bsw.previewText.Wrapping = fyne.TextWrapOff
-	// Keep it visible but read-only by preventing text changes
 
 	previewScroll := container.NewVScroll(bsw.previewText)
-	previewScroll.SetMinSize(fyne.NewSize(0, 300)) // Set minimum height for better visibility
+	previewScroll.SetMinSize(fyne.NewSize(0, 200)) // Reduced from 300 to 200
 
 	previewContainer := container.NewBorder(
 		widget.NewLabel("Preview:"),
@@ -162,45 +223,40 @@ func (bsw *BatchScriptWindow) buildUI() fyne.CanvasObject {
 		previewScroll,
 	)
 
-	// Generate button
-	bsw.generateBtn = widget.NewButton("Generate Batch Script", func() {
+	// Set default values after all UI components are created
+	bsw.autoCloseCheck.SetChecked(true)
+	bsw.showProgressCheck.SetChecked(true)
+
+	// Bottom row: Status and generate button
+	bsw.generateBtn = widget.NewButton("Generate Script", func() {
 		bsw.generateBatchScript()
 	})
 	bsw.generateBtn.Importance = widget.HighImportance
 	bsw.generateBtn.Disable()
 
-	// Status label
 	bsw.statusLabel = widget.NewLabel("Ready")
 	bsw.statusLabel.Alignment = fyne.TextAlignLeading
 
-	// Instructions label
-	instructionsLabel := widget.NewLabel(
-		"This tool generates a Windows batch script (.bat) that end users can double-click to apply the patch.\n" +
-			"The script will be saved in the same directory as the patch file.",
+	bottomRow := container.NewBorder(
+		nil, nil,
+		bsw.statusLabel,
+		bsw.generateBtn,
+		nil,
 	)
-	instructionsLabel.Wrapping = fyne.TextWrapWord
 
-	// Assemble the UI
+	// Assemble the UI with better spacing
 	return container.NewVBox(
 		instructionsLabel,
 		widget.NewSeparator(),
-		patchFileContainer,
-		targetDirContainer,
-		scriptNameContainer,
+		topRow,
+		secondRow,
 		widget.NewSeparator(),
-		widget.NewLabel("Options:"),
-		bsw.dryRunCheck,
-		bsw.verifyCheck,
-		bsw.backupCheck,
+		container.NewBorder(widget.NewLabel("Options:"), nil, nil, nil, optionsRow),
 		widget.NewSeparator(),
 		customInstrContainer,
 		widget.NewSeparator(),
 		previewContainer,
-		container.NewHBox(
-			bsw.statusLabel,
-			widget.NewSeparator(),
-			bsw.generateBtn,
-		),
+		bottomRow,
 	)
 }
 
@@ -239,6 +295,10 @@ func (bsw *BatchScriptWindow) selectTargetDirectory() {
 
 // updatePreview updates the batch script preview
 func (bsw *BatchScriptWindow) updatePreview() {
+	if bsw.previewText == nil {
+		return // UI not fully initialized yet
+	}
+
 	if bsw.patchFile == "" {
 		bsw.previewText.SetText("")
 		return
@@ -284,6 +344,7 @@ func (bsw *BatchScriptWindow) generateBatchScriptContent() string {
 	sb.WriteString("echo CyberPatchMaker - Patch Application\n")
 	sb.WriteString("echo ========================================\n")
 	sb.WriteString("echo.\n")
+
 	if bsw.customInstr != "" {
 		lines := strings.Split(bsw.customInstr, "\n")
 		for _, line := range lines {
@@ -293,21 +354,31 @@ func (bsw *BatchScriptWindow) generateBatchScriptContent() string {
 		}
 		sb.WriteString("echo.\n")
 	}
-	sb.WriteString("echo This script will apply the patch to your installation.\n")
-	if bsw.includeDryRun {
+
+	if bsw.silentMode {
+		sb.WriteString("echo SILENT MODE: This will apply the patch automatically without prompts.\n")
 		sb.WriteString("echo.\n")
-		sb.WriteString("echo DRY RUN MODE: The script will test the patch without making changes.\n")
+	} else if bsw.includeDryRun {
+		sb.WriteString("echo DRY RUN MODE: This will test the patch without making changes.\n")
+		sb.WriteString("echo.\n")
+	} else {
+		sb.WriteString("echo This script will apply the patch to your installation.\n")
+		sb.WriteString("echo.\n")
 	}
-	sb.WriteString("echo.\n")
-	sb.WriteString("pause\n\n")
+
+	if !bsw.silentMode {
+		sb.WriteString("pause\n\n")
+	}
 
 	// Get patch filename
 	patchFileName := filepath.Base(bsw.patchFile)
 
 	// Build applier command
 	sb.WriteString("echo.\n")
-	sb.WriteString("echo Applying patch...\n")
-	sb.WriteString("echo.\n\n")
+	if bsw.showProgress {
+		sb.WriteString("echo Applying patch...\n")
+		sb.WriteString("echo.\n\n")
+	}
 
 	// Determine target directory
 	targetDir := ""
@@ -320,12 +391,22 @@ func (bsw *BatchScriptWindow) generateBatchScriptContent() string {
 	// Build command with options
 	command := fmt.Sprintf("applier.exe --patch \"%s\" --current-dir \"%s\"", patchFileName, targetDir)
 
+	if bsw.customKeyFile != "" {
+		command += fmt.Sprintf(" --key-file \"%s\"", bsw.customKeyFile)
+	}
+
 	if bsw.includeDryRun {
 		command += " --dry-run"
 	}
+
+	if bsw.silentMode {
+		command += " --silent"
+	}
+
 	if bsw.disableVerify {
 		command += " --verify=false"
 	}
+
 	if bsw.disableBackup {
 		command += " --backup=false"
 	}
@@ -334,6 +415,7 @@ func (bsw *BatchScriptWindow) generateBatchScriptContent() string {
 
 	// Check result
 	sb.WriteString("if %ERRORLEVEL% EQU 0 (\n")
+
 	if bsw.includeDryRun {
 		sb.WriteString("    echo.\n")
 		sb.WriteString("    echo ========================================\n")
@@ -350,6 +432,12 @@ func (bsw *BatchScriptWindow) generateBatchScriptContent() string {
 		sb.WriteString("    echo.\n")
 		sb.WriteString("    echo Your installation has been updated.\n")
 	}
+
+	if bsw.showProgress {
+		sb.WriteString("    echo.\n")
+		sb.WriteString("    echo Press any key to continue...\n")
+	}
+
 	sb.WriteString("    echo.\n")
 	sb.WriteString(") else (\n")
 	sb.WriteString("    echo.\n")
@@ -360,13 +448,21 @@ func (bsw *BatchScriptWindow) generateBatchScriptContent() string {
 	sb.WriteString("    echo Error code: %ERRORLEVEL%\n")
 	sb.WriteString("    echo.\n")
 	sb.WriteString("    echo Please check the error messages above.\n")
-	sb.WriteString("    echo If verification failed, your installation may have been modified.\n")
-	sb.WriteString("    echo If backup was enabled, you can restore from the .backup folder.\n")
+
+	if !bsw.disableBackup {
+		sb.WriteString("    echo If backup was enabled, you can restore from the .backup folder.\n")
+	}
+
 	sb.WriteString("    echo.\n")
 	sb.WriteString(")\n\n")
 
-	sb.WriteString("echo.\n")
-	sb.WriteString("pause\n")
+	if bsw.autoClose && !bsw.silentMode {
+		sb.WriteString("echo.\n")
+		sb.WriteString("pause\n")
+	} else if !bsw.silentMode {
+		sb.WriteString("echo.\n")
+		sb.WriteString("pause\n")
+	}
 
 	return sb.String()
 }

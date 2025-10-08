@@ -304,7 +304,7 @@ If you encounter issues with version 1.0.3, you can safely downgrade:
 
 - **Pre-verification**: Confirms you're on version 1.0.3 before downgrading
 - **Post-verification**: Confirms you're on version 1.0.2 after downgrading
-- **Automatic rollback**: If verification fails, restores version 1.0.3
+- **Manual rollback**: If verification fails, backup is preserved for manual restoration to 1.0.3
 
 ---
 
