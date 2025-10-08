@@ -775,6 +775,39 @@ func (aw *ApplierWindow) appendLog(message string) {
 	aw.logText.Refresh()
 }
 
+// enableSimpleMode configures the UI for simple mode (simplified interface)
+func (aw *ApplierWindow) enableSimpleMode() {
+	// Hide/disable advanced options that users shouldn't modify in silent mode
+	if aw.verifyBeforeCheck != nil {
+		aw.verifyBeforeCheck.SetChecked(true)
+		aw.verifyBeforeCheck.Disable()
+	}
+	if aw.verifyAfterCheck != nil {
+		aw.verifyAfterCheck.SetChecked(true)
+		aw.verifyAfterCheck.Disable()
+	}
+	if aw.autoDetectCheck != nil {
+		aw.autoDetectCheck.SetChecked(true)
+		aw.autoDetectCheck.Disable()
+	}
+	// Keep backup checkbox enabled but checked by default (user can uncheck if needed)
+	if aw.backupCheck != nil {
+		aw.backupCheck.SetChecked(true)
+	}
+	// Keep dry run enabled (useful for users to test)
+	// Keep ignore1GB checkbox enabled (advanced users might need it)
+
+	// Disable custom key file selection in silent mode
+	if aw.customKeyFileEntry != nil {
+		aw.customKeyFileEntry.Disable()
+	}
+
+	// Disable patch file selection in silent mode (already embedded)
+	if aw.patchFileEntry != nil {
+		aw.patchFileEntry.Disable()
+	}
+}
+
 // LoadEmbeddedPatch loads an embedded patch (called from main when self-contained exe detected)
 func (aw *ApplierWindow) LoadEmbeddedPatch(patch *utils.Patch, targetDir string) {
 	aw.loadedPatch = patch
@@ -868,13 +901,27 @@ func (aw *ApplierWindow) LoadEmbeddedPatch(patch *utils.Patch, targetDir string)
 		aw.requiredLabel.SetText(fmt.Sprintf("%d (must match exact hashes)", len(patch.RequiredFiles)))
 	}
 
-	aw.setStatus("Embedded patch loaded - ready to apply")
-	aw.appendLog("✓ Self-contained patch loaded successfully")
-	aw.appendLog(fmt.Sprintf("From version: %s", patch.FromVersion))
-	aw.appendLog(fmt.Sprintf("To version: %s", patch.ToVersion))
-	aw.appendLog(fmt.Sprintf("Target directory: %s", targetDir))
-	aw.appendLog("")
-	aw.appendLog("Click 'Apply Patch' when ready...")
+	// Check if simple mode is enabled
+	if patch.SimpleMode {
+		aw.enableSimpleMode()
+		aw.setStatus("Patch loaded in simple mode")
+		aw.appendLog("=== SIMPLIFIED PATCH APPLICATION ===")
+		aw.appendLog(fmt.Sprintf("You are about to patch \"%s\" to \"%s\"", patch.FromVersion, patch.ToVersion))
+		aw.appendLog("")
+		aw.appendLog("Options:")
+		aw.appendLog("  - Create backup (recommended)")
+		aw.appendLog("  - Dry run to test without making changes")
+		aw.appendLog("")
+		aw.appendLog("Click 'Apply Patch' when ready or 'Dry Run' to test first")
+	} else {
+		aw.setStatus("Embedded patch loaded - ready to apply")
+		aw.appendLog("✓ Self-contained patch loaded successfully")
+		aw.appendLog(fmt.Sprintf("From version: %s", patch.FromVersion))
+		aw.appendLog(fmt.Sprintf("To version: %s", patch.ToVersion))
+		aw.appendLog(fmt.Sprintf("Target directory: %s", targetDir))
+		aw.appendLog("")
+		aw.appendLog("Click 'Apply Patch' when ready...")
+	}
 
 	aw.updateApplyButton()
 }

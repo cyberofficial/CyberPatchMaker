@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/cyberofficial/cyberpatchmaker/internal/core/patcher"
 	"github.com/cyberofficial/cyberpatchmaker/internal/core/version"
@@ -463,33 +464,213 @@ func runSilentMode(patch *utils.Patch, defaultTargetDir string, customTargetDir 
 		targetDir = customTargetDir
 	}
 
+	// Create log file with current epoch timestamp
+	logFileName := fmt.Sprintf("log_%d.txt", time.Now().Unix())
+	logFile, err := os.Create(logFileName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: Failed to create log file: %v\n", err)
+		logFile = nil
+	}
+	defer func() {
+		if logFile != nil {
+			logFile.Close()
+		}
+	}()
+
+	// Helper function to write to both console and log
+	logOutput := func(format string, args ...interface{}) {
+		msg := fmt.Sprintf(format, args...)
+		fmt.Print(msg)
+		if logFile != nil {
+			logFile.WriteString(msg)
+		}
+	}
+
+	// Log header with timestamp
+	timestamp := time.Now().Format("2006-01-02 15:04:05")
+	logOutput("========================================\n")
+	logOutput("CyberPatchMaker Silent Mode Log\n")
+	logOutput("Started: %s\n", timestamp)
+	logOutput("========================================\n\n")
+
 	// Check if directory exists
 	if !utils.FileExists(targetDir) {
-		fmt.Fprintf(os.Stderr, "Error: Target directory not found: %s\n", targetDir)
+		logOutput("Error: Target directory not found: %s\n", targetDir)
+		logOutput("\n========================================\n")
+		logOutput("Status: FAILED\n")
+		logOutput("Completed: %s\n", time.Now().Format("2006-01-02 15:04:05"))
+		logOutput("========================================\n")
+		if logFile != nil {
+			logOutput("\nLog saved to: %s\n", logFileName)
+		}
 		os.Exit(1)
 	}
 
 	// Override key file path if custom one is provided
 	if customKeyFile != "" {
 		patch.FromKeyFile.Path = customKeyFile
+		logOutput("Using custom key file: %s\n", customKeyFile)
 	}
+
+	// Log patch details
+	logOutput("Patch Information:\n")
+	logOutput("  From Version: %s\n", patch.FromVersion)
+	logOutput("  To Version:   %s\n", patch.ToVersion)
+	logOutput("  Key File:     %s\n", patch.FromKeyFile.Path)
+	logOutput("  Target Dir:   %s\n", targetDir)
+	logOutput("  Compression:  %s\n", patch.Header.Compression)
+	logOutput("\n")
+
+	// Display simple startup message
+	logOutput("Applying patch...\n\n")
 
 	// Apply patch with default settings (verify=true, backup=true)
 	applier := patcher.NewApplier()
 	if err := applier.ApplyPatch(patch, targetDir, true, true, true); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Patch application failed: %v\n", err)
+		logOutput("\nError: Patch application failed: %v\n", err)
+		logOutput("\n========================================\n")
+		logOutput("Status: FAILED\n")
+		logOutput("Completed: %s\n", time.Now().Format("2006-01-02 15:04:05"))
+		logOutput("========================================\n")
+		if logFile != nil {
+			logOutput("\nLog saved to: %s\n", logFileName)
+		}
 		os.Exit(1)
 	}
 
 	// Success - output minimal message
-	fmt.Printf("Patch applied successfully: %s → %s\n", patch.FromVersion, patch.ToVersion)
+	logOutput("\n")
+	logOutput("Patch applied successfully: %s → %s\n", patch.FromVersion, patch.ToVersion)
+	logOutput("\n========================================\n")
+	logOutput("Status: SUCCESS\n")
+	logOutput("Completed: %s\n", time.Now().Format("2006-01-02 15:04:05"))
+	logOutput("========================================\n")
+	if logFile != nil {
+		logOutput("\nLog saved to: %s\n", logFileName)
+	}
 	os.Exit(0)
+}
+
+// runSimpleMode runs a simplified interface for end users when patch creator enabled simple mode
+func runSimpleMode(patch *utils.Patch, defaultTargetDir string, reader *bufio.Reader) {
+	fmt.Println()
+	fmt.Println("==============================================")
+	fmt.Println("          Simple Patch Application")
+	fmt.Println("==============================================")
+	fmt.Println()
+	fmt.Printf("You are about to patch \"%s\" to \"%s\"\n", patch.FromVersion, patch.ToVersion)
+	fmt.Println()
+
+	// Ask for target directory
+	fmt.Printf("Target directory [%s]: ", defaultTargetDir)
+	input, _ := reader.ReadString('\n')
+	input = strings.TrimSpace(input)
+	targetDir := defaultTargetDir
+	if input != "" {
+		targetDir = input
+	}
+
+	// Check if directory exists
+	if !utils.FileExists(targetDir) {
+		fmt.Printf("Error: Directory not found: %s\n", targetDir)
+		fmt.Println("\nPress Enter to exit...")
+		reader.ReadString('\n')
+		os.Exit(1)
+	}
+
+	// Ask about backup (default: yes)
+	fmt.Print("\nCreate backup before patching? (Y/n): ")
+	backupInput, _ := reader.ReadString('\n')
+	backupInput = strings.TrimSpace(strings.ToLower(backupInput))
+	createBackup := backupInput == "" || backupInput == "y" || backupInput == "yes"
+
+	// Show options menu
+	for {
+		fmt.Println("\n==============================================")
+		fmt.Println("Options:")
+		fmt.Println("  1. Dry Run (test without making changes)")
+		fmt.Println("  2. Apply Patch")
+		fmt.Println("  3. Exit")
+		fmt.Println("==============================================")
+		fmt.Print("Select option [1-3]: ")
+
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+
+		switch input {
+		case "1":
+			// Dry run
+			fmt.Println("\n=== DRY RUN ===")
+			fmt.Println("Testing patch application...")
+			performDryRun(patch, targetDir, "")
+			fmt.Println("\nPress Enter to continue...")
+			reader.ReadString('\n')
+
+		case "2":
+			// Apply patch
+			fmt.Println("\n=== APPLYING PATCH ===")
+			fmt.Printf("Target: %s\n", targetDir)
+			fmt.Printf("Backup: %s\n", formatBoolState(createBackup))
+			fmt.Println()
+
+			fmt.Print("Proceed with patching? (yes/no): ")
+			confirm, _ := reader.ReadString('\n')
+			confirm = strings.TrimSpace(strings.ToLower(confirm))
+
+			if confirm == "yes" || confirm == "y" {
+				fmt.Println("\nApplying patch...")
+				applier := patcher.NewApplier()
+				// Use default settings: verify before and after
+				if err := applier.ApplyPatch(patch, targetDir, true, true, createBackup); err != nil {
+					fmt.Printf("\nError: Patch application failed: %v\n", err)
+					// Try to restore backup if it was created
+					if createBackup {
+						backupDir := targetDir + ".backup"
+						if utils.FileExists(backupDir) {
+							fmt.Println("Attempting to restore from backup...")
+							if restoreErr := restoreBackup(backupDir, targetDir); restoreErr != nil {
+								fmt.Printf("Error: Failed to restore backup: %v\n", restoreErr)
+							} else {
+								fmt.Println("Backup restored successfully")
+							}
+						}
+					}
+					fmt.Println("\nPress Enter to exit...")
+					reader.ReadString('\n')
+					os.Exit(1)
+				}
+
+				fmt.Println("\n=== SUCCESS ===")
+				fmt.Printf("Patch applied successfully!\n")
+				fmt.Printf("Version updated from %s to %s\n", patch.FromVersion, patch.ToVersion)
+				fmt.Println("\nPress Enter to exit...")
+				reader.ReadString('\n')
+				return
+			} else {
+				fmt.Println("Patch application cancelled")
+			}
+
+		case "3":
+			// Exit
+			fmt.Println("\nExiting...")
+			return
+
+		default:
+			fmt.Println("Invalid option. Please select 1-3.")
+		}
+	}
 }
 
 // runInteractiveMode runs the interactive console interface for embedded patches
 func runInteractiveMode(patch *utils.Patch, defaultTargetDir string, ignore1GB bool) {
 	reader := bufio.NewReader(os.Stdin)
 	customKeyFile := "" // Track custom key file path
+
+	// Check if patch creator enabled simple mode for end users
+	if patch.SimpleMode {
+		runSimpleMode(patch, defaultTargetDir, reader)
+		return
+	}
 
 	// Display patch information
 	fmt.Println()

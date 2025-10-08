@@ -29,7 +29,9 @@ Perfect for:
 - **Production-Ready** - Built-in backup and recovery systems
 - **Self-Contained Executables** - Create standalone `.exe` files for easy end-user distribution
 - **Smart File Exclusion** - Use `.cyberignore` to exclude sensitive files and reduce patch size
-- **Scan Caching** - Cache directory scans for instant patch generation (15+ min → <1 sec for large projects) **(New!)**
+- **Scan Caching** - Cache directory scans for instant patch generation (15+ min → <1 sec for large projects)
+- **Simple Mode for End Users** - Simplified interface for non-technical users with basic options **(New in v1.0.9!)**
+- **Silent Mode** - Fully automatic patching with zero user interaction, automatic log file generation (CLI only)
 
 ## Quick Start
 

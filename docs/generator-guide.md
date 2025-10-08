@@ -497,6 +497,79 @@ See [Downgrade Guide](downgrade-guide.md) for complete documentation.
 
 ---
 
+### Example 8: Simple Mode for End Users
+
+**NEW in v1.0.9**: Enable simplified interface for end users when creating self-contained executables.
+
+When you distribute patches to clients who will give the executables to their users, you can enable **Simple Mode** to provide a streamlined, user-friendly experience. This hides advanced options and shows only what end users need.
+
+**Using GUI Generator:**
+
+1. Open the Patch Generator GUI
+2. Configure your patch settings (from/to versions, compression, etc.)
+3. Check **"Enable Simple Mode for End Users"** checkbox
+4. Click "Generate Patch" or "Generate + Create EXE"
+
+**Using CLI Generator:**
+
+Currently, Simple Mode can only be enabled via the GUI. The CLI generator does not have a `--simple-mode` flag. The `SimpleMode` field in the patch structure is set by the GUI when the checkbox is checked.
+
+**Note:** Simple Mode is different from the `--silent` flag (which is for fully automatic patching with no user interaction).
+
+**What Users See (GUI exe):**
+- Simple message: "You are about to patch from [version] to [version]"
+- Create backup checkbox (checked by default)
+- Dry Run button (to test without changes)
+- Apply Patch button
+- Advanced options are hidden/disabled
+
+**What Users See (CLI exe):**
+- Clean console interface showing patch info
+- Simple menu with only 3 options:
+  1. Dry Run (test without making changes)
+  2. Apply Patch
+  3. Exit
+- Backup option available before applying
+- No confusing technical details
+
+**Benefits:**
+- **Simplified UX**: End users see only what they need
+- **Reduced Support**: Fewer questions about advanced options
+- **Professional**: Cleaner interface for client distributions
+- **Safety**: Critical options (verify, auto-detect) forced on
+- **Flexibility**: Backup and dry run still available
+
+**Example Workflow:**
+
+```bash
+# Software vendor creates patches (enable Simple Mode via GUI checkbox)
+patch-gen --versions-dir ./releases \
+          --new-version 2.0.0 \
+          --output ./dist \
+          --create-exe \
+          --verify
+
+# Distribute the .exe files to clients
+# Clients give them to end users
+# End users double-click and see simple interface
+```
+
+**When to Use Simple Mode:**
+- Distributing to non-technical end users
+- Client deployments where support is limited
+- Enterprise environments with IT policies
+- Any scenario where simplified UX is desired
+
+**When NOT to Use Simple Mode:**
+- Internal development/testing
+- Technical users who need full control
+- Debugging or troubleshooting patches
+- Advanced deployment scenarios
+
+**Remember:** Simple Mode (SimpleMode field) = Simplified UI | Silent Mode (--silent flag) = Automation
+
+---
+
 ## Understanding Patch Size
 
 ### Factors Affecting Patch Size

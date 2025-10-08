@@ -51,6 +51,7 @@ type Patch struct {
 	ToKeyFile     KeyFileInfo       // Target key file verification
 	RequiredFiles []FileRequirement // Files that MUST exist with exact hashes
 	Operations    []PatchOperation  // List of changes to apply
+	SimpleMode    bool              // If true, show simplified UI for end users (minimal options, no advanced settings)
 }
 
 // FileRequirement specifies a file that must exist with exact hash

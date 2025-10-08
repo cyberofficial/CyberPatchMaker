@@ -187,6 +187,7 @@ The `--silent` flag enables fully automated patching for **self-contained execut
 - **Exit codes**: Returns 0 for success, 1 for failure (scriptable)
 - **Minimal output**: Only shows essential status messages
 - **Error handling**: Proper error codes for automation tools
+- **Automatic logging**: Creates log file `log_<epochtime>.txt` with complete patch execution details
 
 ### Basic Usage
 
@@ -215,33 +216,105 @@ The `--silent` flag enables fully automated patching for **self-contained execut
 - Post-verification failed
 - Any other error during patching
 
+### Log Files
+
+Silent mode automatically creates a timestamped log file to track patch execution:
+
+**Log File Name Format:**
+```
+log_<epochtime>.txt
+```
+
+Example: `log_1728372045.txt` (Unix epoch timestamp)
+
+**Log File Contents:**
+- Patch execution start time and end time
+- Complete patch information (versions, key file, compression)
+- Target directory and settings
+- All operations performed
+- Success or failure status
+- Error messages (if any)
+
+**Example Log File:**
+```
+========================================
+CyberPatchMaker Silent Mode Log
+Started: 2025-10-08 14:30:45
+========================================
+
+Patch Information:
+  From Version: 1.0.0
+  To Version:   1.0.1
+  Key File:     program.exe
+  Target Dir:   C:\MyApp
+  Compression:  zstd
+
+Applying patch...
+
+[Applier output here...]
+
+Patch applied successfully: 1.0.0 → 1.0.1
+
+========================================
+Status: SUCCESS
+Completed: 2025-10-08 14:31:12
+========================================
+
+Log saved to: log_1728372045.txt
+```
+
 ### Example Output
 
 **Success:**
 ```
-Applying patch from 1.0.0 to 1.0.1...
-Verifying current version...
-Pre-patch verification successful
+========================================
+CyberPatchMaker Silent Mode Log
+Started: 2025-10-08 14:30:45
+========================================
 
-Creating backup...
-Backed up 3 files
-Backup created at: C:\MyApp\backup.cyberpatcher
+Patch Information:
+  From Version: 1.0.0
+  To Version:   1.0.1
+  Key File:     program.exe
+  Target Dir:   C:\MyApp
+  Compression:  zstd
 
-Applying 4 operations...
-  Added: libs/newfeature.dll
-  Modified: data/config.json
-  Modified: libs/core.dll
-  Modified: program.exe
-
-Verifying patched version...
-Post-patch verification successful
+Applying patch...
 
 Patch applied successfully: 1.0.0 → 1.0.1
+
+========================================
+Status: SUCCESS
+Completed: 2025-10-08 14:31:12
+========================================
+
+Log saved to: log_1728372045.txt
 ```
 
 **Failure:**
 ```
+========================================
+CyberPatchMaker Silent Mode Log
+Started: 2025-10-08 14:30:45
+========================================
+
+Patch Information:
+  From Version: 1.0.0
+  To Version:   1.0.1
+  Key File:     program.exe
+  Target Dir:   C:\NonExistent
+  Compression:  zstd
+
+Applying patch...
+
 Error: Target directory not found: C:\NonExistent
+
+========================================
+Status: FAILED
+Completed: 2025-10-08 14:30:46
+========================================
+
+Log saved to: log_1728372045.txt
 ```
 
 ### Automation Examples
@@ -261,8 +334,20 @@ foreach ($server in $servers) {
     
     if ($LASTEXITCODE -eq 0) {
         Write-Host "✓ $server updated successfully" -ForegroundColor Green
+        
+        # Archive log file
+        $logFile = Get-ChildItem -Path . -Filter "log_*.txt" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        if ($logFile) {
+            Move-Item $logFile.FullName "\\share\logs\$server`_$($logFile.Name)"
+        }
     } else {
         Write-Host "✗ $server update failed" -ForegroundColor Red
+        
+        # Archive failure log for investigation
+        $logFile = Get-ChildItem -Path . -Filter "log_*.txt" | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+        if ($logFile) {
+            Move-Item $logFile.FullName "\\share\logs\FAILED_$server`_$($logFile.Name)"
+        }
     }
 }
 ```
@@ -330,11 +415,12 @@ jobs:
 
 1. **Always test first**: Run in interactive mode once to verify
 2. **Monitor exit codes**: Check `$LASTEXITCODE` / `%ERRORLEVEL%` / `$?`
-3. **Log output**: Redirect output to log files for troubleshooting
-4. **Check disk space**: Ensure space for backup before running
-5. **Close application**: Ensure target application is stopped
-6. **Handle failures**: Implement retry logic or alerting
-7. **Verify result**: Check application version after patching
+3. **Review log files**: Check `log_<epochtime>.txt` files for detailed execution history
+4. **Archive logs**: Save log files for troubleshooting and audit trails
+5. **Check disk space**: Ensure space for backup before running
+6. **Close application**: Ensure target application is stopped
+7. **Handle failures**: Implement retry logic or alerting
+8. **Verify result**: Check application version after patching
 
 ### Limitations
 
@@ -356,6 +442,108 @@ If any check fails:
 2. Backup is restored (if created)
 3. Exit code 1 is returned
 4. Error message is written to stderr
+
+---
+
+## Simple Mode for End Users
+
+### Overview
+
+**NEW in v1.0.9**: Patch creators can enable **Simple Mode** when generating self-contained executables. This provides end users with a simplified, user-friendly interface that hides technical details.
+
+This is distinct from the `--silent` automation flag - instead, this feature is **configured by the patch creator** during patch generation using the `SimpleMode` field in the patch structure.
+
+### How It Works
+
+When a patch is created with Simple Mode enabled:
+
+**For GUI Executables:**
+- Shows simplified message: "You are about to patch from [version] to [version]"
+- Only displays essential options:
+  - **Create backup** checkbox (checked by default)
+  - **Dry Run** button (to test without changes)
+  - **Apply Patch** button
+- Advanced options are hidden/disabled automatically
+- Provides clear, simple instructions
+
+**For CLI Executables:**
+- Shows clean console interface with patch version info
+- Simple menu with only 3 options:
+  1. Dry Run (test without making changes)
+  2. Apply Patch
+  3. Exit
+- Asks about backup before applying (recommended by default)
+- No confusing technical settings
+
+### User Experience Example
+
+**GUI Mode:**
+```
+=== Simple Mode Enabled ===
+You are about to patch from 1.0.0 to 1.0.3
+
+Please review the options below:
+• Create backup is enabled by default (recommended)
+• Use Dry Run to simulate the patch without making changes
+• Click Apply Patch when ready
+```
+
+**CLI Mode:**
+```
+==============================================
+     Simplified Patch Application
+==============================================
+
+You are about to patch "1.0.0" to "1.0.3"
+
+Target directory [C:\MyApp]: 
+
+Create backup before patching? (Y/n): Y
+
+==============================================
+Options:
+  1. Dry Run (test without making changes)
+  2. Apply Patch
+  3. Exit
+==============================================
+Select option [1-3]:
+```
+
+### Benefits
+
+**For Patch Creators:**
+- Professional, polished interface for clients
+- Reduced support burden
+- Users can't accidentally disable critical safety features
+- Better user experience for non-technical users
+
+**For End Users:**
+- Simple, clear interface
+- No confusing technical jargon
+- Essential safety features always enabled
+- Dry run option still available for testing
+
+### When This Mode is Used
+
+Patch creators enable this when:
+- Distributing to non-technical end users
+- Client deployments with limited support
+- Enterprise environments requiring simplified UX
+- Any scenario where advanced options shouldn't be exposed
+
+### How to Create Patches with This Feature
+
+See [Generator Guide - Simple Mode](generator-guide.md#example-8-simple-mode-for-end-users) for instructions on creating patches with this feature enabled.
+
+### Technical Details
+
+When Simple Mode is enabled:
+- **Verification**: Always enabled (before and after)
+- **Auto-detect version**: Always enabled
+- **Backup**: User can choose, default is YES
+- **Dry Run**: Available to users
+- **Custom key file**: Disabled in GUI, not exposed in simplified CLI
+- **1GB bypass**: Hidden in simplified interface
 
 ---
 

@@ -49,6 +49,7 @@ type GeneratorWindow struct {
 	exeType              string // "gui" or "console" for self-contained executable type
 	createReversePatches bool
 	ignore1GB            bool
+	simpleModeForUsers   bool   // Enable simplified UI for end users
 	useScanCache         bool   // Enable scan caching
 	forceRescan          bool   // Force rescan despite cache
 	cacheDir             string // Custom cache directory
@@ -75,6 +76,7 @@ type GeneratorWindow struct {
 	exeTypeRadio        *widget.RadioGroup
 	crpCheck            *widget.Check
 	ignore1GBCheck      *widget.Check
+	simpleModeCheck     *widget.Check
 	useScanCacheCheck   *widget.Check
 	forceRescanCheck    *widget.Check
 	cacheDirEntry       *widget.Entry
@@ -394,6 +396,11 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	})
 	gw.ignore1GBCheck.SetChecked(false)
 
+	gw.simpleModeCheck = widget.NewCheck("Enable Simple Mode for End Users", func(checked bool) {
+		gw.simpleModeForUsers = checked
+	})
+	gw.simpleModeCheck.SetChecked(false)
+
 	// Scan cache checkbox
 	gw.useScanCacheCheck = widget.NewCheck("Use scan cache (faster subsequent patches)", func(checked bool) {
 		gw.useScanCache = checked
@@ -451,6 +458,7 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 		container.NewHBox(widget.NewLabel("  Type:"), gw.exeTypeRadio),
 		gw.crpCheck,
 		gw.ignore1GBCheck,
+		gw.simpleModeCheck,
 	)
 
 	// Third column: Cache options
@@ -947,6 +955,9 @@ func (gw *GeneratorWindow) generatePatch() {
 		return
 	}
 
+	// Set simple mode if enabled
+	patch.SimpleMode = gw.simpleModeForUsers
+
 	// Report what was found
 	gw.appendLog("\n=== Patch Operations Summary ===")
 	addedCount := 0
@@ -1033,6 +1044,9 @@ func (gw *GeneratorWindow) generatePatch() {
 		if err != nil {
 			gw.appendLog("ERROR: Failed to generate reverse patch: " + err.Error())
 		} else {
+			// Set simple mode if enabled
+			reversePatch.SimpleMode = gw.simpleModeForUsers
+
 			// Validate reverse patch
 			if err := reverseGenerator.ValidatePatch(reversePatch); err != nil {
 				gw.appendLog("ERROR: Reverse patch validation failed: " + err.Error())
@@ -1232,6 +1246,9 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 			continue
 		}
 
+		// Set simple mode if enabled
+		patch.SimpleMode = gw.simpleModeForUsers
+
 		// Validate patch
 		if err := generator.ValidatePatch(patch); err != nil {
 			gw.appendLog(fmt.Sprintf("ERROR: Patch validation failed: %v", err))
@@ -1291,6 +1308,9 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 			if err != nil {
 				gw.appendLog(fmt.Sprintf("ERROR: Failed to generate reverse patch: %v", err))
 			} else {
+				// Set simple mode if enabled
+				reversePatch.SimpleMode = gw.simpleModeForUsers
+
 				// Validate reverse patch
 				if err := reverseGenerator.ValidatePatch(reversePatch); err != nil {
 					gw.appendLog(fmt.Sprintf("ERROR: Reverse patch validation failed: %v", err))
