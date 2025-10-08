@@ -305,43 +305,6 @@ func performDryRun(patch *utils.Patch, currentDir string, customKeyFile string) 
 	fmt.Println("\n✓ Dry run completed - patch can be applied safely")
 }
 
-func restoreBackup(backupDir, targetDir string) error {
-	// Remove current directory
-	if err := os.RemoveAll(targetDir); err != nil {
-		return fmt.Errorf("failed to remove current directory: %w", err)
-	}
-
-	// Restore from backup
-	return copyDir(backupDir, targetDir)
-}
-
-func copyDir(src, dst string) error {
-	entries, err := os.ReadDir(src)
-	if err != nil {
-		return err
-	}
-
-	for _, entry := range entries {
-		srcPath := src + string(os.PathSeparator) + entry.Name()
-		dstPath := dst + string(os.PathSeparator) + entry.Name()
-
-		if entry.IsDir() {
-			if err := utils.EnsureDir(dstPath); err != nil {
-				return err
-			}
-			if err := copyDir(srcPath, dstPath); err != nil {
-				return err
-			}
-		} else {
-			if err := utils.CopyFile(srcPath, dstPath); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
 // checkEmbeddedPatch checks if this executable contains an embedded patch
 func checkEmbeddedPatch(ignore1GB bool) (*utils.Patch, string, bool) {
 	// Get path to this executable
