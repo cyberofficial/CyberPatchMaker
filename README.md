@@ -37,7 +37,7 @@ Perfect for:
 
 ### Installation
 
-**Requirements:** Go 1.21 or later
+**Requirements:** Go 1.24.0 or later
 
 ```bash
 # Clone and build

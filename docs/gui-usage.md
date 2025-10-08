@@ -89,7 +89,7 @@ The Patch Generator GUI provides a user-friendly interface for creating binary p
     - Enterprise deployments requiring simple UX
     - Patches for non-technical end users
   - Works with both GUI and CLI executables
-  - See [Generator Guide - Silent Mode](generator-guide.md#example-8-silent-mode-for-end-users) for complete details
+  - See [Generator Guide - Simple Mode for End Users](generator-guide.md#example-8-simple-mode-for-end-users) for complete details
   - Default: Disabled
 
 #### Scan Cache Options (Speeds up sequential patches)

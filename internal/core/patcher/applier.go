@@ -58,6 +58,16 @@ func (a *Applier) ApplyPatch(patch *utils.Patch, targetDir string, verifyBefore,
 	fmt.Printf("Applying %d operations...\n", len(patch.Operations))
 	for i, op := range patch.Operations {
 		if err := a.applyOperation(targetDir, op); err != nil {
+			// Operation failed - automatically restore from backup if it was created
+			if createBackup {
+				fmt.Printf("\nOperation %d failed, automatically restoring from backup...\n", i)
+				backupDir := filepath.Join(targetDir, "backup.cyberpatcher")
+				if restoreErr := a.restoreMirrorBackup(backupDir, targetDir, patch.Operations[:i+1]); restoreErr != nil {
+					fmt.Printf("Warning: Failed to restore backup: %v\n", restoreErr)
+				} else {
+					fmt.Println("Backup restored successfully")
+				}
+			}
 			return fmt.Errorf("failed to apply operation %d: %w", i, err)
 		}
 	}
@@ -66,10 +76,30 @@ func (a *Applier) ApplyPatch(patch *utils.Patch, targetDir string, verifyBefore,
 	if verifyAfter {
 		fmt.Println("Verifying patched version...")
 		if err := a.verifyKeyFile(targetDir, patch.ToKeyFile); err != nil {
+			// Post-verification failed - automatically restore from backup if it was created
+			if createBackup {
+				fmt.Println("\nPost-verification failed, automatically restoring from backup...")
+				backupDir := filepath.Join(targetDir, "backup.cyberpatcher")
+				if restoreErr := a.restoreMirrorBackup(backupDir, targetDir, patch.Operations); restoreErr != nil {
+					fmt.Printf("Warning: Failed to restore backup: %v\n", restoreErr)
+				} else {
+					fmt.Println("Backup restored successfully")
+				}
+			}
 			return fmt.Errorf("post-patch key file verification failed: %w", err)
 		}
 
 		if err := a.verifyPatchedFiles(targetDir, patch.Operations); err != nil {
+			// Post-verification failed - automatically restore from backup if it was created
+			if createBackup {
+				fmt.Println("\nPost-verification failed, automatically restoring from backup...")
+				backupDir := filepath.Join(targetDir, "backup.cyberpatcher")
+				if restoreErr := a.restoreMirrorBackup(backupDir, targetDir, patch.Operations); restoreErr != nil {
+					fmt.Printf("Warning: Failed to restore backup: %v\n", restoreErr)
+				} else {
+					fmt.Println("Backup restored successfully")
+				}
+			}
 			return fmt.Errorf("post-patch verification failed: %w", err)
 		}
 		fmt.Println("Post-patch verification successful")
@@ -300,6 +330,97 @@ func (a *Applier) verifyPatchedFiles(targetDir string, operations []utils.PatchO
 
 	if len(mismatches) > 0 {
 		return fmt.Errorf("found %d mismatches:\n%v", len(mismatches), mismatches)
+	}
+
+	return nil
+}
+
+// restoreMirrorBackup restores files from a selective backup created by createMirrorBackup
+// This restores only the files that were backed up, putting them back in their original locations
+// It also cleans up any files/directories that were added during the failed patch application
+func (a *Applier) restoreMirrorBackup(backupDir, targetDir string, operations []utils.PatchOperation) error {
+	if !utils.FileExists(backupDir) {
+		return fmt.Errorf("backup directory does not exist: %s", backupDir)
+	}
+
+	restoredCount := 0
+	cleanedCount := 0
+
+	// First, restore files that were backed up (modified/deleted files)
+	for _, op := range operations {
+		if op.Type == utils.OpModify || op.Type == utils.OpDelete {
+			// Restore individual files
+			backupPath := filepath.Join(backupDir, op.FilePath)
+			targetPath := filepath.Join(targetDir, op.FilePath)
+
+			if !utils.FileExists(backupPath) {
+				continue // File wasn't backed up, skip
+			}
+
+			// Ensure target directory exists
+			if err := utils.EnsureDir(filepath.Dir(targetPath)); err != nil {
+				return fmt.Errorf("failed to create target directory for %s: %w", op.FilePath, err)
+			}
+
+			// Copy file back from backup
+			if err := utils.CopyFile(backupPath, targetPath); err != nil {
+				return fmt.Errorf("failed to restore file %s: %w", op.FilePath, err)
+			}
+
+			restoredCount++
+
+		} else if op.Type == utils.OpDeleteDir {
+			// Restore entire directory that was deleted
+			backupPath := filepath.Join(backupDir, op.FilePath)
+			targetPath := filepath.Join(targetDir, op.FilePath)
+
+			if !utils.FileExists(backupPath) {
+				continue // Directory wasn't backed up, skip
+			}
+
+			// Copy entire directory back from backup
+			if err := utils.CopyDir(backupPath, targetPath); err != nil {
+				return fmt.Errorf("failed to restore directory %s: %w", op.FilePath, err)
+			}
+
+			// Count files in restored directory
+			fileCount, err := utils.CountFilesInDir(targetPath)
+			if err != nil {
+				return fmt.Errorf("failed to count files in restored directory %s: %w", op.FilePath, err)
+			}
+
+			restoredCount += fileCount
+		}
+	}
+
+	// Second, clean up any files/directories that were added during the failed patch
+	for _, op := range operations {
+		if op.Type == utils.OpAdd {
+			// Remove newly added files
+			targetPath := filepath.Join(targetDir, op.FilePath)
+			if utils.FileExists(targetPath) {
+				if err := os.Remove(targetPath); err != nil {
+					return fmt.Errorf("failed to remove added file %s during rollback: %w", op.FilePath, err)
+				}
+				cleanedCount++
+			}
+		} else if op.Type == utils.OpAddDir {
+			// Remove newly added directories
+			targetPath := filepath.Join(targetDir, op.FilePath)
+			if utils.FileExists(targetPath) {
+				if err := os.RemoveAll(targetPath); err != nil {
+					return fmt.Errorf("failed to remove added directory %s during rollback: %w", op.FilePath, err)
+				}
+				cleanedCount++
+			}
+		}
+	}
+
+	if restoredCount > 0 {
+		fmt.Printf("Restored %d files from backup\n", restoredCount)
+	}
+	if cleanedCount > 0 {
+		fmt.Printf("Cleaned up %d added files/directories\n", cleanedCount)
 	}
 
 	return nil

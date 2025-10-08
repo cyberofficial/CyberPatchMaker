@@ -589,7 +589,7 @@ Before any changes are made, the applier verifies:
 
 **Cleanup:**
 - **On success**: Backup is **PRESERVED** (kept for manual rollback if needed)
-- **On failure**: Backup **PRESERVED** (used for automatic rollback, then kept for investigation)
+- **On failure**: **AUTOMATIC ROLLBACK** from backup, then backup preserved for investigation
 - **User action**: Delete `backup.cyberpatcher` folder when no longer needed
 
 ---

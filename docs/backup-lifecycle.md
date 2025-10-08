@@ -122,12 +122,11 @@ Your installation may be corrupted or modified
    or
 5. Post-verification (verify all files match target version)
    ✗ Modified file hash DOES NOT MATCH expected
-6. Backup still exists in target\backup.cyberpatcher
-7. Automatic rollback restores from backup
-8. Exit with error code
+6. Backup remains in target\backup.cyberpatcher for manual rollback
+7. Exit with error code
 ```
 
-**Result:** Installation automatically restored to original clean state from backup
+**Result:** Installation remains in partially modified state, backup preserved for manual rollback
 
 **Example Output:**
 ```
@@ -135,28 +134,26 @@ Applying patch from 1.0.0 to 1.0.1...
 Verifying current version...
 Pre-patch verification successful
 
-Creating selective backup...
-Backing up: program.exe
-Backing up: data\config.json
-Backup created in: C:\MyApp\backup.cyberpatcher
+Creating backup...
+Backup created at: C:\MyApp\backup.cyberpatcher
 
 Applying 20 operations...
   Modified: program.exe
   Error: failed to write file: permission denied
 
-Rolling back from backup...
-Restored: program.exe
-Rollback complete
-
 Error: patch application failed
-Installation restored to original state
+Restoring from backup...
+Backup restored successfully
+Installation returned to original state
+Backup preserved at: C:\MyApp\backup.cyberpatcher
+For manual rollback (if needed): Copy files from backup folder to their original locations
 ```
 
-**Why Restoration Works:**
-- Backup was created from **verified clean state** (after pre-verification)
-- Restoring from backup **guarantees** return to clean version 1.0.0
-- User can retry after fixing the issue (e.g., file permissions, disk space)
-- Failed backup remains at `target\backup.cyberpatcher` for investigation
+**Automatic Rollback on Failure**
+- **Automatic restoration**: Failed patches automatically restore from backup
+- **Complete recovery**: All modified files are restored to their original state
+- **Backup preserved**: Available for additional manual recovery if needed
+- **User safety**: No manual intervention required when patches fail
 
 ---
 
@@ -179,7 +176,7 @@ The backup contains a **selective mirror-structure copy** of only the files bein
 
 ### Cleanup Behavior
 - **On success**: Backup is **PRESERVED** for manual rollback if needed
-- **On failure**: Backup **PRESERVED** for automatic rollback or investigation
+- **On failure**: **AUTOMATIC ROLLBACK** restores files, then backup is preserved for investigation
 - **User responsibility**: Delete `backup.cyberpatcher` folder when no longer needed
 
 ## Implementation Details
@@ -190,39 +187,35 @@ Backup management is implemented in `internal/core/patcher/applier.go`:
 ```go
 // In ApplyPatch function (after pre-verification):
 if createBackup {
-    fmt.Println("\nCreating selective backup...")
+    fmt.Println("\nCreating backup...")
     backupDir := filepath.Join(targetDir, "backup.cyberpatcher")
-    if err := a.createSelectiveBackup(targetDir, backupDir, patch); err != nil {
+    if err := a.createMirrorBackup(targetDir, backupDir, patch.Operations); err != nil {
         return fmt.Errorf("failed to create backup: %w", err)
     }
-    fmt.Printf("Backup created in: %s\n", backupDir)
+    fmt.Printf("Backup created at: %s\n", backupDir)
+    fmt.Println("Note: Backup will be preserved after patching for manual rollback")
 }
 
 // ... apply operations ...
 
 // On success: Backup is PRESERVED (NOT removed)
-// On failure: Automatic rollback uses backup, then preserves it
+// On failure: Backup remains untouched for troubleshooting
 ```
 
 ### Backup Methods
 
-**createSelectiveBackup(targetDir, backupDir string, patch *Patch)**:
+**createMirrorBackup(targetDir, backupDir string, operations []utils.PatchOperation)**:
 1. Removes existing `backup.cyberpatcher` if present
 2. Iterates through patch operations
 3. For each OpModify or OpDelete operation:
    - Determines source file path in targetDir
    - Creates matching directory structure in backupDir
    - Copies file from targetDir to backupDir with preserved path
-4. For OpAdd operations: **Skips** (new files don't exist yet)
-5. Uses `filepath.Join` for cross-platform paths
-
-**rollbackFromBackup(backupDir, targetDir string, backedUpFiles []string)**:
-1. Iterates through list of backed-up files
-2. For each file:
-   - Reads file from backupDir
-   - Writes file to targetDir (overwrites failed changes)
-   - Preserves directory structure
-3. On success, backup remains in `backup.cyberpatcher` for investigation
+4. For OpDeleteDir operations:
+   - Backs up entire directory that will be deleted (with all contents)
+   - Copies entire directory tree to backup
+5. For OpAdd operations: **Skips** (new files don't exist yet)
+6. Uses `filepath.Join` for cross-platform paths
 
 ## Why This Design?
 

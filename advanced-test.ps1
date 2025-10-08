@@ -2,7 +2,7 @@
 # Tests complex scenarios with nested directories, multiple operations, and various compression formats
 
 param(
-    [switch]$1gbtest
+    [switch]$run1gbtest
 )
 
 Write-Host "========================================" -ForegroundColor Cyan
@@ -10,7 +10,7 @@ Write-Host "CyberPatchMaker Advanced Test Suite" -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 
-if ($1gbtest) {
+if ($run1gbtest) {
     Write-Host "1GB Bypass Test Mode: ENABLED" -ForegroundColor Yellow
     Write-Host "Will test large patch (>1GB) creation and application" -ForegroundColor Yellow
     Write-Host "" 
@@ -1459,8 +1459,8 @@ Test-Step "Test batch mode with CLI executable creation" {
     Write-Host "  Batch mode with executables verified" -ForegroundColor Gray
 }
 
-# Test 38: 1GB Bypass Test (only if -1gbtest flag is set)
-if ($1gbtest) {
+# Test 38: 1GB Bypass Test (only if -run1gbtest flag is set)
+if ($run1gbtest) {
     Test-Step "Test 1GB bypass with large patch creation" {
         Write-Host "  Creating large version (>1GB)..." -ForegroundColor Gray
         
@@ -2874,6 +2874,84 @@ Test-Step "Verify Simple Mode addresses real-world use cases" {
     Write-Host "    • Silent Mode (--silent) for full automation, Simple Mode for end users" -ForegroundColor Gray
 }
 
+# Test 56: Automatic Rollback on Failed Patch Application
+Test-Step "Verify automatic rollback on failed patch application" {
+    Write-Host "  Testing automatic rollback when patch application fails..." -ForegroundColor Gray
+    
+    # Create a test directory with version 1.0.1
+    $testDir = "testdata\advanced-output\rollback-test"
+    Remove-Item $testDir -Recurse -Force -ErrorAction SilentlyContinue
+    Copy-Item "testdata\versions\1.0.1" $testDir -Recurse -Force
+    
+    # Corrupt a file that will be modified by the patch to cause verification failure
+    $targetFile = "$testDir\program.exe"
+    Write-Host "  Corrupting target file to force patch failure..." -ForegroundColor Gray
+    $originalContent = Get-Content $targetFile -Raw
+    # Corrupt the file by changing some bytes
+    $corruptedContent = $originalContent -replace "Test Program v1.0.1", "Corrupted Program v1.0.1"
+    Set-Content -Path $targetFile -Value $corruptedContent -NoNewline
+    
+    Write-Host "  Applying patch that should fail due to corrupted target..." -ForegroundColor Gray
+    $output = & patch-apply.exe --patch "testdata\advanced-output\patches\1.0.1-to-1.0.2.patch" --current-dir $testDir --verify --backup 2>&1
+    
+    # Check that the patch failed
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "  ✗ Expected patch to fail but it succeeded" -ForegroundColor Red
+        return $false
+    }
+    
+    # Check for automatic rollback messages
+    $rollbackDetected = $false
+    $restoreDetected = $false
+    
+    foreach ($line in $output) {
+        if ($line -match "automatically restoring from backup") {
+            $rollbackDetected = $true
+            Write-Host "  ✓ Automatic rollback message detected" -ForegroundColor Green
+        }
+        if ($line -match "Restored.*files from backup") {
+            $restoreDetected = $true
+            Write-Host "  ✓ Backup restoration message detected" -ForegroundColor Green
+        }
+    }
+    
+    if (-not $rollbackDetected) {
+        Write-Host "  ✗ Automatic rollback message not found in output" -ForegroundColor Red
+        Write-Host "  Output was:" -ForegroundColor Gray
+        $output | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }
+        return $false
+    }
+    
+    if (-not $restoreDetected) {
+        Write-Host "  ✗ Backup restoration message not found in output" -ForegroundColor Red
+        return $false
+    }
+    
+    # Verify that the original file was restored
+    $restoredContent = Get-Content $targetFile -Raw
+    if ($restoredContent -eq $originalContent) {
+        Write-Host "  ✓ Original file correctly restored from backup" -ForegroundColor Green
+    } else {
+        Write-Host "  ✗ File was not properly restored from backup" -ForegroundColor Red
+        return $false
+    }
+    
+    # Verify backup directory still exists
+    $backupDir = "$testDir\backup.cyberpatcher"
+    if (Test-Path $backupDir) {
+        Write-Host "  ✓ Backup directory preserved after rollback" -ForegroundColor Green
+    } else {
+        Write-Host "  ✗ Backup directory not found after rollback" -ForegroundColor Red
+        return $false
+    }
+    
+    Write-Host "  ✓ Automatic rollback on patch failure verified!" -ForegroundColor Green
+    Write-Host "    • Patch application failed as expected" -ForegroundColor Gray
+    Write-Host "    • Automatic rollback was triggered" -ForegroundColor Gray
+    Write-Host "    • Original files were restored from backup" -ForegroundColor Gray
+    Write-Host "    • Backup directory preserved for inspection" -ForegroundColor Gray
+}
+
 # Final summary
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
@@ -2930,7 +3008,7 @@ if ($failed -eq 0) {
     Write-Host "  • Simple Mode feature documentation and implementation validation" -ForegroundColor Gray
     Write-Host "  • Simple Mode real-world use case scenarios (vendors, IT, modders)" -ForegroundColor Gray
     Write-Host "  • Silent Mode (--silent flag) for fully automatic patching (automation)" -ForegroundColor Gray
-    if ($1gbtest) {
+    if ($run1gbtest) {
         Write-Host "  • 1GB bypass mode with large patches (>1GB)" -ForegroundColor Gray
     }
     Write-Host ""
