@@ -46,11 +46,8 @@ User must:
    - Choose from/to versions (or use batch mode)
    - Set compression and options
 3. **Check the "Create self-contained executable" checkbox**
-4. **Choose executable type:**
-   - **GUI (Windows)**: Creates graphical executable with windows interface
-   - **Console Host (Interactive CLI)**: Creates interactive command-line executable
-5. Click "Generate Patch"
-6. Both files are created:
+4. Click "Generate Patch"
+5. Both files are created:
    - `patch-1.0.0-to-1.0.1.patch` (standard patch file)
    - `patch-1.0.0-to-1.0.1.exe` (self-contained executable with chosen type)
 

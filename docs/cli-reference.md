@@ -23,28 +23,23 @@ patch-gen [options]
 | `--output <path>` | Yes | Output directory for patches (default: patches) |
 | `--key-file <name>` | No | Specific key file to use (e.g., app_name.exe) |
 | `--compression <type>` | No | Compression: `zstd` (default), `gzip`, `none` |
-| `--level <n>` | No | Compression level (default: 3) |
+| `--level <n>` | No | Compression level: zstd (1-4), gzip (1-3), default: 3 |
 | `--verify` | No | Verify patches after creation (default: true) |
 | `--create-exe` | No | Create self-contained CLI executable |
 | `--crp` | No | Create reverse patch for downgrades |
 | `--savescans` | No | Enable scan caching to `.data/` directory |
 | `--scandata <dir>` | No | Custom cache directory (default: `.data`) |
 | `--rescan` | No | Force rescan, ignoring cached data |
+| `--jobs <n>` | No | Number of parallel workers (0 = auto-detect CPU cores, 1 = single-threaded) |
 | `--version` | No | Show version information |
 | `--help` | No | Display help information |
 
 ### Exit Codes
 
 | Code | Meaning |
-|------|---------|
+|------|------|
 | 0 | Success |
-| 1 | General error |
-| 2 | Invalid arguments |
-| 3 | Version not found |
-| 4 | Key file detection failed |
-| 5 | Manifest generation failed |
-| 6 | Patch generation failed |
-| 7 | Verification failed |
+| 1 | Error (all error conditions) |
 
 ### Examples
 
@@ -94,6 +89,7 @@ patch-apply [options]
 | `--verify` | No | Verify file hashes before and after patching (default: true) |
 | `--backup` | No | Create backup before patching (default: true) |
 | `--ignore1gb` | No | Bypass 1GB patch size limit (use with caution) |
+| `--silent` | No | Silent mode: apply patch automatically without prompts (for automation) |
 | `--version` | No | Show version information |
 | `--help` | No | Show this help message |
 
@@ -131,17 +127,9 @@ See [Backup Lifecycle](backup-lifecycle.md) for complete backup system documenta
 ### Exit Codes
 
 | Code | Meaning |
-|------|---------|
+|------|------|
 | 0 | Success |
-| 1 | General error |
-| 2 | Invalid arguments |
-| 3 | Patch file not found |
-| 4 | Current directory not found |
-| 5 | Pre-verification failed |
-| 6 | Backup creation failed |
-| 7 | Operation failed |
-| 8 | Post-verification failed |
-| 9 | Restoration failed |
+| 1 | Error (all error conditions) |
 
 ### Examples
 
@@ -171,6 +159,19 @@ patch-apply --patch ./patches/1.0.0-to-1.0.3.patch \
 patch-apply --patch ./patches/1.0.0-to-1.0.3.patch \
             --current-dir ./myapp \
             --key-file C:\MyApp\renamed_program.exe
+```
+
+**Silent Mode** (for automation/CI-CD):
+```bash
+# Apply patch automatically without prompts
+# Only works with self-contained executables
+1.0.0-to-1.0.1.exe --silent
+
+# Silent mode with custom target directory
+1.0.0-to-1.0.1.exe --silent --current-dir C:\MyApp
+
+# Silent mode with custom key file
+1.0.0-to-1.0.1.exe --silent --current-dir C:\MyApp --key-file renamed.exe
 ```
 
 ---

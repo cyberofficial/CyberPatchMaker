@@ -162,36 +162,36 @@ zstd supports compression levels 1-4:
 
 ### gzip Levels
 
-gzip supports compression levels 1-9:
+gzip supports compression levels 1-3:
 
 | Level | Speed | Size | Use Case |
 |-------|-------|------|----------|
-| **1** | Fastest | Largest | Quick compression |
-| **6** | **Balanced** | **Medium** | **Default (recommended)** |
-| **9** | Slowest | Smallest | Maximum compression |
+| **1** | Fastest | Largest | Quick compression (BestSpeed) |
+| **2** | **Balanced** | **Medium** | **Default (recommended)** |
+| **3** | Slowest | Smallest | Maximum compression (BestCompression) |
 
 **Setting level:**
 ```bash
-# Level 1 - Fastest
+# Level 1 - Fastest (BestSpeed)
 ./generator --versions-dir ./versions \
             --new-version 1.0.1 \
             --output ./patches \
             --compression gzip \
             --level 1
 
-# Level 6 - Default
+# Level 2 - Default (DefaultCompression)
 ./generator --versions-dir ./versions \
             --new-version 1.0.1 \
             --output ./patches \
             --compression gzip \
-            --level 6
+            --level 2
 
-# Level 9 - Maximum compression
+# Level 3 - Maximum compression (BestCompression)
 ./generator --versions-dir ./versions \
             --new-version 1.0.1 \
             --output ./patches \
             --compression gzip \
-            --level 9
+            --level 3
 ```
 
 ---
@@ -209,7 +209,7 @@ gzip supports compression levels 1-9:
 | **zstd** | 2 | 1.5s | 2.8 MB | 3.6x | 55% | 140 MB |
 | **zstd** | 3 | 2.0s | 2.5 MB | 4.0x | 65% | 160 MB |
 | **zstd** | 4 | 3.5s | 2.3 MB | 4.3x | 85% | 220 MB |
-| **gzip** | 6 | 2.8s | 2.7 MB | 3.7x | 70% | 100 MB |
+| **gzip** | 2 | 2.8s | 2.7 MB | 3.7x | 70% | 100 MB |
 
 **Recommendation:** zstd level 3 (default) - Best balance
 
@@ -226,7 +226,7 @@ gzip supports compression levels 1-9:
 | **zstd** | 2 | 18s | 24.2 MB | 4.1x | 60% | 300 MB |
 | **zstd** | 3 | 25s | 21.8 MB | 4.6x | 70% | 350 MB |
 | **zstd** | 4 | 48s | 19.5 MB | 5.1x | 90% | 500 MB |
-| **gzip** | 6 | 35s | 23.5 MB | 4.3x | 75% | 200 MB |
+| **gzip** | 2 | 35s | 23.5 MB | 4.3x | 75% | 200 MB |
 
 **Recommendation:** zstd level 3 (default) - Best balance
 
@@ -243,7 +243,7 @@ gzip supports compression levels 1-9:
 | **zstd** | 2 | 3.8m | 245 MB | 4.1x | 65% | 600 MB |
 | **zstd** | 3 | 5.2m | 220 MB | 4.5x | 75% | 700 MB |
 | **zstd** | 4 | 9.5m | 195 MB | 5.1x | 95% | 1.2 GB |
-| **gzip** | 6 | 7.8m | 238 MB | 4.2x | 80% | 400 MB |
+| **gzip** | 2 | 7.8m | 238 MB | 4.2x | 80% | 400 MB |
 
 **Recommendation:** zstd level 2 or 3 - Faster generation with good compression
 
@@ -255,7 +255,7 @@ gzip supports compression levels 1-9:
 
 ```
 Do you need maximum compatibility?
-  ├─ YES → Use gzip level 6
+  ├─ YES → Use gzip level 2 (default)
   └─ NO → Continue...
 
 Is patch generation speed critical?
@@ -296,7 +296,7 @@ For testing/debugging only:
 
 **Scenario 5: Legacy systems**
 - **Goal:** Maximum compatibility
-- **Recommendation:** `--compression gzip --level 6`
+- **Recommendation:** `--compression gzip --level 2`
 - **Why:** Universal support, available on all systems
 
 **Scenario 6: High-performance local network**
@@ -549,7 +549,7 @@ Apply diff: Binary diff + Original file → Changed file
             --new-version 1.0.1 \
             --output ./patches \
             --compression gzip \
-            --level 6
+            --level 2
 ```
 
 ---
@@ -582,7 +582,7 @@ Apply diff: Binary diff + Original file → Changed file
 | **Default (recommended)** | zstd | 3 | Best balance |
 | **Fast generation** | zstd | 1 | Quick testing |
 | **Small patches** | zstd | 4 | Bandwidth limited |
-| **Maximum compatibility** | gzip | 6 | Legacy systems |
+| **Maximum compatibility** | gzip | 2 | Legacy systems |
 | **Testing only** | none | - | Debugging |
 
 ---

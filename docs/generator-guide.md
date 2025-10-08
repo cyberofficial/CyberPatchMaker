@@ -180,6 +180,16 @@ This requires both versions to already be registered in the system.
 - Only meaningful when used with `--savescans`
 - Ensures cache is up-to-date after file modifications
 
+**`--jobs <n>`** (Parallel Processing)
+- Number of parallel workers to use for file hashing and processing
+- `0` = Auto-detect CPU cores (default, recommended)
+- `1` = Single-threaded (useful for debugging)
+- `2+` = Specific number of workers
+- **Performance**: Significantly faster on multi-core systems (especially for large projects)
+- **Example**: 4-core system can process 4 files simultaneously
+- Scales based on available CPU cores and I/O bandwidth
+- Works with all generation modes and compression options
+
 **`--help`**
 - Display usage information
 - Shows all available options
