@@ -394,7 +394,7 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	})
 	gw.ignore1GBCheck.SetChecked(false)
 
-	gw.simpleModeCheck = widget.NewCheck("Simple mode", func(checked bool) {
+	gw.simpleModeCheck = widget.NewCheck("Simple Mode for End Users", func(checked bool) {
 		gw.simpleModeForUsers = checked
 	})
 	gw.simpleModeCheck.SetChecked(false)
@@ -589,6 +589,19 @@ func (gw *GeneratorWindow) scanVersions() {
 		gw.setStatus("Error: Versions directory does not exist")
 		gw.appendLog("ERROR: Directory does not exist")
 		return
+	}
+
+	// Auto-set output directory to versionsDir/patchfiles if not already set
+	if gw.outputDir == "" {
+		patchFilesDir := filepath.Join(gw.versionsDir, "patchfiles")
+		gw.outputDir = patchFilesDir
+		gw.outputDirEntry.SetText(patchFilesDir)
+		gw.appendLog("Auto-set output directory: " + patchFilesDir)
+
+		// Ensure the patchfiles directory exists
+		if err := os.MkdirAll(patchFilesDir, 0755); err != nil {
+			gw.appendLog("Warning: Could not create patchfiles directory: " + err.Error())
+		}
 	}
 
 	// Read directory contents
