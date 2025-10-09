@@ -109,6 +109,35 @@ build/intermediate/
 - Backslashes `\` are automatically converted to `/`
 - Both `config/secrets.json` and `config\secrets.json` work
 
+### 5. Absolute Path Patterns
+
+Ignore files using full absolute paths (Windows-style with drive letters):
+
+```
+E:\projects\myapp\*.key
+C:\temp\logs\*.log
+D:\shared\secrets\*
+```
+
+**Absolute Path Features**:
+- Must include drive letter (e.g., `C:`, `D:`, `E:`)
+- Use backslashes `\` or forward slashes `/` (both work)
+- Supports wildcards (`*`) for flexible matching
+- Case-insensitive matching on Windows
+- Useful for excluding files outside the project directory
+
+**Examples**:
+```
+:: Exclude all .key files on E: drive
+E:\projects\myapp\*.key
+
+:: Exclude temp logs from specific directory
+C:\temp\build\logs\*.log
+
+:: Exclude entire temp directory on D: drive
+D:\temp\*
+```
+
 ## Common Use Cases
 
 ### Example 1: Web Application
@@ -182,6 +211,25 @@ recent_files.json
 debug_symbols/
 ```
 
+### Example 4: Application with External Dependencies
+
+```
+:: .cyberignore for app with external files
+
+:: Local project files (relative paths)
+*.log
+temp/
+config/secrets.json
+
+:: External temp directories (absolute paths)
+C:\temp\build\*
+E:\shared\cache\logs\*.log
+
+:: Network drive exclusions
+\\server\share\temp\*
+Z:\network\backups\*
+```
+
 ## Behavior Details
 
 ### Pattern Matching
@@ -191,17 +239,21 @@ debug_symbols/
 3. **Wildcard Recursive**: `*.log` also matches `.log` files in subdirectories
 4. **Directory Match**: `logs/` matches entire `logs/` directory tree
 5. **Nested Path**: `config/secrets.json` matches only that specific file
+6. **Absolute Path Match**: `E:\temp\*.log` matches `.log` files in `E:\temp\` directory
+7. **Absolute Wildcard**: `C:\shared\*` matches all files in `C:\shared\` directory
 
 ### Path Normalization
 
 - Paths are normalized to forward slashes `/` internally
 - Both `folder/file.txt` and `folder\file.txt` in `.cyberignore` work identically
 - Windows and Unix path styles are supported
+- Absolute paths are converted to consistent format for matching
 
 ### Case Sensitivity
 
 - Pattern matching is **case-sensitive** on case-sensitive file systems (Linux/macOS)
 - Pattern matching is **case-insensitive** on case-insensitive file systems (Windows)
+- This applies to both relative and absolute path patterns
 
 ## Best Practices
 
@@ -332,18 +384,22 @@ If directory has 10 files but only 4 are registered, 6 files were ignored (inclu
 2. Directory prefix match: `path` starts with `pattern/`
 3. Wildcard match using filepath.Match (Go standard library)
 4. Extension match for `*.ext` patterns
+5. **Absolute path match**: Full absolute paths are compared case-insensitively on Windows
+6. **Absolute wildcard match**: Absolute paths with wildcards use enhanced pattern matching
 
 ### Performance Impact
 
 - `.cyberignore` is loaded once at scan start
 - Minimal performance overhead (simple string matching)
 - Directory exclusions improve performance (skips entire trees)
+- Absolute path patterns add slight overhead for path normalization
 
 ### Compatibility
 
 - Feature added in CyberPatchMaker v1.0.2
 - Works with all patch modes: legacy `--versions-dir` and custom `--from-dir/--to-dir`
 - Compatible with all compression modes (zstd, gzip, none)
+- Absolute path support added in v1.0.12
 
 ## Example Workflow
 
@@ -394,9 +450,10 @@ Files like `secret.key`, `*.log`, and `config/secrets.json` won't be in the patc
 The `.cyberignore` file provides fine-grained control over which files are included in patches:
 
 - **Simple Syntax**: Comment lines start with `::`
-- **Flexible Patterns**: Exact names, wildcards, directories, nested paths
+- **Flexible Patterns**: Exact names, wildcards, directories, nested paths, **absolute paths**
 - **Automatic**: Just place `.cyberignore` in source directory
 - **Safe**: `.cyberignore` and `backup.cyberpatcher/` always excluded
 - **Performance**: Directory exclusions skip entire trees efficiently
+- **Cross-Platform**: Works with relative and absolute paths on Windows and Unix systems
 
 Use `.cyberignore` to keep sensitive data out of patches and reduce patch size!

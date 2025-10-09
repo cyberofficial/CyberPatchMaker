@@ -76,21 +76,47 @@ func (ip *IgnorePatterns) ShouldIgnore(relPath string) bool {
 	}
 
 	return false
+}
+
+// ShouldIgnoreWithAbsPath checks if a path should be ignored based on loaded patterns, supporting absolute paths
+func (ip *IgnorePatterns) ShouldIgnoreWithAbsPath(relPath, absPath string) bool {
+	// Normalize paths to forward slashes
+	normalizedRelPath := strings.ReplaceAll(relPath, "\\", "/")
+	normalizedAbsPath := strings.ReplaceAll(absPath, "\\", "/")
+
+	// Always ignore .cyberignore file itself
+	if normalizedRelPath == ".cyberignore" {
+		return true
+	}
+
+	for _, pattern := range ip.patterns {
+		// Check against relative path
+		if ip.matchPattern(normalizedRelPath, pattern) {
+			return true
+		}
+
+		// Check against absolute path for absolute patterns
+		if ip.matchPattern(normalizedAbsPath, pattern) {
+			return true
+		}
+	}
+
+	return false
 } // matchPattern checks if a path matches a pattern
 func (ip *IgnorePatterns) matchPattern(path, pattern string) bool {
-	// Exact match
-	if path == pattern {
+	// Exact match (case-insensitive on Windows)
+	if strings.EqualFold(path, pattern) {
 		return true
 	}
 
 	// Check if pattern is a directory (ends with /)
 	if strings.HasSuffix(pattern, "/") {
-		// Match if path starts with this directory
-		if strings.HasPrefix(path, pattern) {
+		// Match if path starts with this directory (case-insensitive)
+		if strings.HasPrefix(strings.ToLower(path), strings.ToLower(pattern)) {
 			return true
 		}
 		// Also match the directory itself without trailing slash
-		if path == strings.TrimSuffix(pattern, "/") {
+		if strings.EqualFold(path, strings.TrimSuffix(pattern, "/")) {
 			return true
 		}
 	}
@@ -103,23 +129,66 @@ func (ip *IgnorePatterns) matchPattern(path, pattern string) bool {
 
 	// Handle wildcard patterns (*.ext)
 	if strings.Contains(pattern, "*") {
-		// Simple glob matching
-		matched, err := filepath.Match(pattern, filepath.Base(path))
-		if err == nil && matched {
-			return true
-		}
+		// Handle absolute path patterns with wildcards like "E:\some\folder\*.tmp"
+		// Check if this is an absolute path pattern (contains path separators)
+		if strings.Contains(pattern, "/") || strings.Contains(pattern, "\\") {
+			// Normalize pattern to forward slashes for consistent processing
+			normalizedPattern := strings.ReplaceAll(pattern, "\\", "/")
 
-		// Also try matching against the full path for patterns with directories
-		matched, err = filepath.Match(pattern, path)
-		if err == nil && matched {
-			return true
-		}
+			// Split the pattern into directory part and filename part manually
+			// Find the last path separator
+			lastSep := strings.LastIndex(normalizedPattern, "/")
+			if lastSep >= 0 {
+				patternDir := normalizedPattern[:lastSep]
+				patternFile := normalizedPattern[lastSep+1:]
 
-		// Handle patterns like "*.txt" that should match "folder/file.txt"
-		if strings.HasPrefix(pattern, "*.") {
-			ext := strings.TrimPrefix(pattern, "*")
-			if strings.HasSuffix(path, ext) {
+				// If the pattern file contains wildcards, check directory match + filename match
+				if strings.Contains(patternFile, "*") {
+					// Normalize path to forward slashes
+					normalizedPath := strings.ReplaceAll(path, "\\", "/")
+
+					// Split path manually
+					lastPathSep := strings.LastIndex(normalizedPath, "/")
+					if lastPathSep >= 0 {
+						pathDir := normalizedPath[:lastPathSep]
+						pathFile := normalizedPath[lastPathSep+1:]
+
+						// Check if directories match (case-insensitive)
+						if strings.EqualFold(pathDir, patternDir) {
+							// Check if filename matches the pattern
+							matched, err := filepath.Match(patternFile, pathFile)
+							if err == nil && matched {
+								return true
+							}
+						}
+					}
+				} else {
+					// No wildcards in filename part, treat as exact path match
+					if strings.EqualFold(path, pattern) {
+						return true
+					}
+				}
+			}
+		} else {
+			// Simple wildcard pattern like "*.log"
+			// Try matching against the full path for patterns with directories
+			matched, err := filepath.Match(pattern, path)
+			if err == nil && matched {
 				return true
+			}
+
+			// Also try matching against just the filename
+			matched, err = filepath.Match(pattern, filepath.Base(path))
+			if err == nil && matched {
+				return true
+			}
+
+			// Handle patterns like "*.txt" that should match "folder/file.txt"
+			if strings.HasPrefix(pattern, "*.") {
+				ext := strings.TrimPrefix(pattern, "*")
+				if strings.HasSuffix(path, ext) {
+					return true
+				}
 			}
 		}
 	}

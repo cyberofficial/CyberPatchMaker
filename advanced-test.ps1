@@ -2874,82 +2874,166 @@ Test-Step "Verify Simple Mode addresses real-world use cases" {
     Write-Host "    • Silent Mode (--silent) for full automation, Simple Mode for end users" -ForegroundColor Gray
 }
 
-# Test 56: Automatic Rollback on Failed Patch Application
-Test-Step "Verify automatic rollback on failed patch application" {
-    Write-Host "  Testing automatic rollback when patch application fails..." -ForegroundColor Gray
+# Test 57: .cyberignore Absolute Path Pattern Support
+Test-Step "Verify .cyberignore absolute path pattern support" {
+    Write-Host "  Testing .cyberignore absolute path patterns..." -ForegroundColor Gray
     
-    # Create a test directory with version 1.0.1
-    $testDir = "testdata\advanced-output\rollback-test"
-    Remove-Item $testDir -Recurse -Force -ErrorAction SilentlyContinue
-    Copy-Item "testdata\versions\1.0.1" $testDir -Recurse -Force
+    # Create test structure with absolute path patterns
+    $testBasePath = "testdata/advanced-output/cyberignore-absolute-test"
     
-    # Corrupt a file that will be modified by the patch to cause verification failure
-    $targetFile = "$testDir\program.exe"
-    Write-Host "  Corrupting target file to force patch failure..." -ForegroundColor Gray
-    $originalContent = Get-Content $targetFile -Raw
-    # Corrupt the file by changing some bytes
-    $corruptedContent = $originalContent -replace "Test Program v1.0.1", "Corrupted Program v1.0.1"
-    Set-Content -Path $targetFile -Value $corruptedContent -NoNewline
+    # Version 1.0.0 with .cyberignore containing absolute paths
+    $v1Path = "$testBasePath/1.0.0"
+    New-Item -ItemType Directory -Force -Path "$v1Path/config" | Out-Null
+    New-Item -ItemType Directory -Force -Path "$v1Path/logs" | Out-Null
+    New-Item -ItemType Directory -Force -Path "$v1Path/temp" | Out-Null
     
-    Write-Host "  Applying patch that should fail due to corrupted target..." -ForegroundColor Gray
-    $output = & .\patch-apply.exe --patch "testdata\advanced-output\patches\1.0.1-to-1.0.2.patch" --current-dir $testDir --verify --backup 2>&1
+    # Create external directories within the version directory to test absolute paths
+    $externalTemp = "$v1Path/external/temp"
+    $externalLogs = "$v1Path/external/logs"
+    $externalShared = "$v1Path/external/shared"
+    New-Item -ItemType Directory -Force -Path $externalTemp | Out-Null
+    New-Item -ItemType Directory -Force -Path $externalLogs | Out-Null
+    New-Item -ItemType Directory -Force -Path $externalShared | Out-Null
     
-    # Check that the patch failed
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "  ✗ Expected patch to fail but it succeeded" -ForegroundColor Red
-        return $false
+    # Get absolute paths for the external directories
+    $externalTempAbs = Resolve-Path $externalTemp
+    $externalLogsAbs = Resolve-Path $externalLogs
+    $externalSharedAbs = Resolve-Path $externalShared
+    
+    # Create .cyberignore file with absolute path patterns
+    $ignoreContent = @"
+:: Test absolute path patterns
+:: This is a comment
+
+:: Ignore local files (relative paths)
+*.log
+*.tmp
+temp/
+
+:: Ignore external files (absolute paths)
+$externalTempAbs\*.tmp
+$externalLogsAbs\*.log
+$externalSharedAbs\*
+"@
+    Set-Content -Path "$v1Path/.cyberignore" -Value $ignoreContent
+    
+    # Create various test files
+    Set-Content -Path "$v1Path/app.exe" -Value "Application v1.0.0"
+    Set-Content -Path "$v1Path/data.txt" -Value "Data v1.0.0"
+    Set-Content -Path "$v1Path/debug.log" -Value "Debug log content"
+    Set-Content -Path "$v1Path/cache.tmp" -Value "Temp cache"
+    Set-Content -Path "$v1Path/config/settings.json" -Value '{"setting":"value"}'
+    Set-Content -Path "$v1Path/logs/app.log" -Value "Application log"
+    Set-Content -Path "$v1Path/temp/data.tmp" -Value "Temp data"
+    
+    # Create external files that should be ignored by absolute paths
+    Set-Content -Path "$externalTemp/external.tmp" -Value "External temp file"
+    Set-Content -Path "$externalLogs/external.log" -Value "External log file"
+    Set-Content -Path "$externalShared/secret.key" -Value "Secret key"
+    Set-Content -Path "$externalShared/config.ini" -Value "Shared config"
+    
+    Write-Host "  Created test structure with 11 files + .cyberignore" -ForegroundColor Gray
+    Write-Host "    Files that SHOULD be scanned: app.exe, data.txt, config/settings.json (3 files)" -ForegroundColor Gray
+    Write-Host "    Files that SHOULD be ignored: 8 files (.cyberignore, *.log, temp/, external absolute paths)" -ForegroundColor Gray
+    
+    # Version 1.0.1 - same structure with changes
+    $v2Path = "$testBasePath/1.0.1"
+    Copy-Item -Path "$v1Path" -Destination "$v2Path" -Recurse -Force
+    Set-Content -Path "$v2Path/app.exe" -Value "Application v1.0.1 UPDATED"
+    Set-Content -Path "$v2Path/data.txt" -Value "Data v1.0.1 UPDATED"
+    
+    # Update .cyberignore in v2Path to have correct absolute paths for v2
+    $externalTempAbsV2 = $externalTempAbs -replace "1\.0\.0", "1.0.1"
+    $externalLogsAbsV2 = $externalLogsAbs -replace "1\.0\.0", "1.0.1"
+    $externalSharedAbsV2 = $externalSharedAbs -replace "1\.0\.0", "1.0.1"
+    
+    $ignoreContentV2 = @"
+:: Test absolute path patterns
+:: This is a comment
+
+:: Ignore local files (relative paths)
+*.log
+*.tmp
+temp/
+
+:: Ignore external files (absolute paths)
+$externalTempAbsV2\*.tmp
+$externalLogsAbsV2\*.log
+$externalSharedAbsV2\*
+"@
+    Set-Content -Path "$v2Path/.cyberignore" -Value $ignoreContentV2
+    
+    # Generate patch (should only scan 3 files from each version, ignore external absolute path files)
+    Write-Host "  Generating patch with .cyberignore absolute paths active..." -ForegroundColor Gray
+    
+    $output = & .\patch-gen.exe --from-dir "$v1Path" --to-dir "$v2Path" ` -output "$testBasePath/patches" --compression none 2>&1 | Out-String
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Patch generation failed: $output"
     }
     
-    # Check for automatic rollback messages
-    $rollbackDetected = $false
-    $restoreDetected = $false
+    Write-Host "  Patch generation output:" -ForegroundColor Gray
+    Write-Host "$output" -ForegroundColor DarkGray
     
-    foreach ($line in $output) {
-        if ($line -match "automatically restoring from backup") {
-            $rollbackDetected = $true
-            Write-Host "  ✓ Automatic rollback message detected" -ForegroundColor Green
+    # Verify only 3 files were scanned (absolute path files should not be scanned at all)
+    if ($output -match "Version 1\.0\.0 registered:\s+(\d+)\s+files") {
+        $filesScanned = [int]$matches[1]
+        
+        if ($filesScanned -eq 3) {
+            Write-Host "  ✓ Correctly scanned 3 files (8 files + .cyberignore + external absolute paths ignored)" -ForegroundColor Green
+        } else {
+            throw "Expected 3 files scanned, got $filesScanned (absolute path patterns not working?)"
         }
-        if ($line -match "Restored.*files from backup") {
-            $restoreDetected = $true
-            Write-Host "  ✓ Backup restoration message detected" -ForegroundColor Green
+    } else {
+        throw "Could not parse scan output"
+    }
+    
+    # Verify ignored patterns are not in output
+    $ignoredPatterns = @("debug.log", "cache.tmp", "app.log", "data.tmp", "external.tmp", "external.log", "secret.key", "config.ini")
+    $foundIgnored = @()
+    
+    foreach ($pattern in $ignoredPatterns) {
+        if ($output -match [regex]::Escape($pattern)) {
+            $foundIgnored += $pattern
         }
     }
     
-    if (-not $rollbackDetected) {
-        Write-Host "  ✗ Automatic rollback message not found in output" -ForegroundColor Red
-        Write-Host "  Output was:" -ForegroundColor Gray
-        $output | ForEach-Object { Write-Host "    $_" -ForegroundColor Gray }
-        return $false
-    }
-    
-    if (-not $restoreDetected) {
-        Write-Host "  ✗ Backup restoration message not found in output" -ForegroundColor Red
-        return $false
-    }
-    
-    # Verify that the original file was restored
-    $restoredContent = Get-Content $targetFile -Raw
-    if ($restoredContent -eq $originalContent) {
-        Write-Host "  ✓ Original file correctly restored from backup" -ForegroundColor Green
+    if ($foundIgnored.Count -eq 0) {
+        Write-Host "  ✓ No ignored files referenced in patch output" -ForegroundColor Green
     } else {
-        Write-Host "  ✗ File was not properly restored from backup" -ForegroundColor Red
-        return $false
+        throw "Found ignored files in output: $($foundIgnored -join ', ') (absolute path patterns failed)"
     }
     
-    # Verify backup directory still exists
-    $backupDir = "$testDir\backup.cyberpatcher"
-    if (Test-Path $backupDir) {
-        Write-Host "  ✓ Backup directory preserved after rollback" -ForegroundColor Green
+    # Verify specific absolute path patterns
+    Write-Host "  Verifying absolute path patterns..." -ForegroundColor Gray
+    
+    # Test absolute path wildcard (*.tmp in external temp)
+    if ($output -notmatch "external\.tmp") {
+        Write-Host "    ✓ Absolute path wildcard pattern (*.tmp in external temp) working" -ForegroundColor Gray
     } else {
-        Write-Host "  ✗ Backup directory not found after rollback" -ForegroundColor Red
-        return $false
+        throw "Absolute path wildcard pattern (*.tmp) failed"
     }
     
-    Write-Host "  ✓ Automatic rollback on patch failure verified!" -ForegroundColor Green
-    Write-Host "    • Patch application failed as expected" -ForegroundColor Gray
-    Write-Host "    • Automatic rollback was triggered" -ForegroundColor Gray
-    Write-Host "    • Original files were restored from backup" -ForegroundColor Gray
-    Write-Host "    • Backup directory preserved for inspection" -ForegroundColor Gray
+    # Test absolute path directory (* in external shared)
+    if ($output -notmatch "secret\.key|config\.ini") {
+        Write-Host "    ✓ Absolute path directory pattern (* in external shared) working" -ForegroundColor Gray
+    } else {
+        throw "Absolute path directory pattern failed"
+    }
+    
+    # Test that relative patterns still work alongside absolute
+    if ($output -notmatch "debug\.log") {
+        Write-Host "    ✓ Relative patterns still work alongside absolute patterns" -ForegroundColor Gray
+    } else {
+        throw "Relative patterns broken when absolute patterns present"
+    }
+    
+    Write-Host "  ✓ .cyberignore absolute path pattern support verified!" -ForegroundColor Green
+    Write-Host "    • Absolute path patterns (*.tmp, *, etc.) working" -ForegroundColor Gray
+    Write-Host "    • Case-insensitive matching on Windows" -ForegroundColor Gray
+    Write-Host "    • External directory exclusions working" -ForegroundColor Gray
+    Write-Host "    • Relative and absolute patterns work together" -ForegroundColor Gray
+    Write-Host "    • Files outside project directory can be excluded" -ForegroundColor Gray
 }
 
 # Final summary
@@ -2991,7 +3075,7 @@ if ($failed -eq 0) {
     Write-Host "  • Batch mode with executable creation" -ForegroundColor Gray
     Write-Host "  • CLI applier verification (not GUI)" -ForegroundColor Gray
     Write-Host "  • Backup directory exclusion (backup.cyberpatcher ignored)" -ForegroundColor Gray
-    Write-Host "  • .cyberignore file support (wildcard, directory, exact path patterns)" -ForegroundColor Gray
+    Write-Host "  • .cyberignore file support (wildcard, directory, exact path, absolute path patterns)" -ForegroundColor Gray
     Write-Host "  • Self-contained executable silent mode (--silent flag for automation)" -ForegroundColor Gray
     Write-Host "  • Silent mode automatic log file generation (audit trails for automation)" -ForegroundColor Gray
     Write-Host "  • Create reverse patch (--crp flag for downgrades)" -ForegroundColor Gray

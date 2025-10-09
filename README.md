@@ -103,6 +103,10 @@ logs/
 :: Ignore user data
 saves/
 user_config.json
+
+:: Exclude files from external directories (absolute paths)
+E:\temp\build\*.log
+C:\shared\cache\*
 ```
 
 The generator automatically excludes matching files from patches. Perfect for keeping API keys, certificates, and user data out of updates!

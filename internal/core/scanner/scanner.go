@@ -37,6 +37,12 @@ func (s *Scanner) ScanDirectory() ([]utils.FileEntry, []string, error) {
 			return fmt.Errorf("error accessing path %s: %w", path, err)
 		}
 
+		// Get absolute path
+		absPath, err := filepath.Abs(path)
+		if err != nil {
+			return fmt.Errorf("failed to get absolute path for %s: %w", path, err)
+		}
+
 		// Get relative path from root
 		relPath, err := filepath.Rel(s.rootPath, path)
 		if err != nil {
@@ -60,7 +66,7 @@ func (s *Scanner) ScanDirectory() ([]utils.FileEntry, []string, error) {
 		}
 
 		// Check if path should be ignored based on .cyberignore patterns
-		if s.ignorePatterns.ShouldIgnore(relPath) {
+		if s.ignorePatterns.ShouldIgnoreWithAbsPath(relPath, absPath) {
 			if info.IsDir() {
 				return filepath.SkipDir
 			}
@@ -117,7 +123,8 @@ func (s *Scanner) ScanDirectoryWithProgress(progressCallback func(current, total
 			return nil
 		}
 		// Check .cyberignore patterns
-		if s.ignorePatterns.ShouldIgnore(relPath) {
+		absPath, _ := filepath.Abs(path)
+		if s.ignorePatterns.ShouldIgnoreWithAbsPath(relPath, absPath) {
 			if info.IsDir() {
 				return filepath.SkipDir
 			}
@@ -158,7 +165,7 @@ func (s *Scanner) ScanDirectoryWithProgress(progressCallback func(current, total
 		}
 
 		// Check if path should be ignored based on .cyberignore patterns
-		if s.ignorePatterns.ShouldIgnore(relPath) {
+		if s.ignorePatterns.ShouldIgnoreWithAbsPath(relPath, path) {
 			if info.IsDir() {
 				return filepath.SkipDir
 			}
