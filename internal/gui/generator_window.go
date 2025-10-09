@@ -282,10 +282,8 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 
 	// Left column: Version selection
 	leftColumn := container.NewVBox(
-		widget.NewLabel("Version Selection:"),
 		container.NewBorder(nil, nil, widget.NewLabel("From:"), nil, gw.fromVersionSelect),
 		container.NewBorder(nil, nil, widget.NewLabel("Key:"), nil, gw.fromKeyFileEntry),
-		widget.NewSeparator(),
 		container.NewBorder(nil, nil, widget.NewLabel("To:"), nil, gw.toVersionSelect),
 		container.NewBorder(nil, nil, widget.NewLabel("Key:"), nil, gw.toKeyFileEntry),
 	)
@@ -350,21 +348,21 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 
 	compressionContainer := container.NewVBox(
 		gw.compressionRadio,
-		container.NewBorder(nil, nil, widget.NewLabel("Level:"), gw.compressionLabel, gw.compressionSlider),
+		container.NewBorder(nil, nil, widget.NewLabel("Lvl:"), gw.compressionLabel, gw.compressionSlider),
 	)
 
 	// Create advanced options
-	gw.verifyCheck = widget.NewCheck("Verify after creation", func(checked bool) {
+	gw.verifyCheck = widget.NewCheck("Verify after", func(checked bool) {
 		gw.verifyAfter = checked
 	})
 	gw.verifyCheck.SetChecked(true)
 
-	gw.skipIdenticalCheck = widget.NewCheck("Skip identical files", func(checked bool) {
+	gw.skipIdenticalCheck = widget.NewCheck("Skip identical", func(checked bool) {
 		gw.skipIdentical = checked
 	})
 	gw.skipIdenticalCheck.SetChecked(true)
 
-	gw.createExeCheck = widget.NewCheck("Create self-contained executable", func(checked bool) {
+	gw.createExeCheck = widget.NewCheck("Create .exe", func(checked bool) {
 		gw.createExecutable = checked
 		if checked {
 			gw.exeTypeRadio.Enable()
@@ -375,34 +373,34 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	gw.createExeCheck.SetChecked(false)
 
 	// Executable type selector
-	gw.exeTypeRadio = widget.NewRadioGroup([]string{"GUI (Windows)", "Console Host (Interactive CLI)"}, func(selected string) {
-		if selected == "GUI (Windows)" {
+	gw.exeTypeRadio = widget.NewRadioGroup([]string{"GUI", "Console"}, func(selected string) {
+		if selected == "GUI" {
 			gw.exeType = "gui"
 		} else {
 			gw.exeType = "console"
 		}
 	})
 	gw.exeTypeRadio.Horizontal = true
-	gw.exeTypeRadio.SetSelected("GUI (Windows)")
+	gw.exeTypeRadio.SetSelected("GUI")
 	gw.exeTypeRadio.Disable() // Disabled until createExeCheck is enabled
 
-	gw.crpCheck = widget.NewCheck("Create reverse patch (for downgrades)", func(checked bool) {
+	gw.crpCheck = widget.NewCheck("Reverse patch", func(checked bool) {
 		gw.createReversePatches = checked
 	})
 	gw.crpCheck.SetChecked(false)
 
-	gw.ignore1GBCheck = widget.NewCheck("Ignore 1GB limit (use with caution)", func(checked bool) {
+	gw.ignore1GBCheck = widget.NewCheck("Ignore 1GB limit", func(checked bool) {
 		gw.ignore1GB = checked
 	})
 	gw.ignore1GBCheck.SetChecked(false)
 
-	gw.simpleModeCheck = widget.NewCheck("Enable Simple Mode for End Users", func(checked bool) {
+	gw.simpleModeCheck = widget.NewCheck("Simple mode", func(checked bool) {
 		gw.simpleModeForUsers = checked
 	})
 	gw.simpleModeCheck.SetChecked(false)
 
 	// Scan cache checkbox
-	gw.useScanCacheCheck = widget.NewCheck("Use scan cache (faster subsequent patches)", func(checked bool) {
+	gw.useScanCacheCheck = widget.NewCheck("Scan cache", func(checked bool) {
 		gw.useScanCache = checked
 		if checked {
 			gw.forceRescanCheck.Enable()
@@ -415,7 +413,7 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	gw.useScanCacheCheck.SetChecked(false)
 
 	// Force rescan checkbox
-	gw.forceRescanCheck = widget.NewCheck("Force rescan (ignore cache)", func(checked bool) {
+	gw.forceRescanCheck = widget.NewCheck("Force rescan", func(checked bool) {
 		gw.forceRescan = checked
 	})
 	gw.forceRescanCheck.SetChecked(false)
@@ -448,14 +446,11 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 
 	// Right column: Options
 	rightColumn := container.NewVBox(
-		widget.NewLabel("Compression:"),
 		compressionContainer,
-		widget.NewSeparator(),
-		widget.NewLabel("Options:"),
 		gw.verifyCheck,
 		gw.skipIdenticalCheck,
 		gw.createExeCheck,
-		container.NewHBox(widget.NewLabel("  Type:"), gw.exeTypeRadio),
+		gw.exeTypeRadio,
 		gw.crpCheck,
 		gw.ignore1GBCheck,
 		gw.simpleModeCheck,
@@ -463,15 +458,9 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 
 	// Third column: Cache options
 	cacheColumn := container.NewVBox(
-		widget.NewLabel("Scan Cache:"),
-		widget.NewLabel("(speeds up sequential patches)"),
-		widget.NewSeparator(),
 		gw.useScanCacheCheck,
 		gw.forceRescanCheck,
-		container.NewBorder(nil, nil, widget.NewLabel("Cache Dir:"), nil, gw.cacheDirEntry),
-		widget.NewSeparator(),
-		widget.NewLabel("Parallel Operations:"),
-		widget.NewLabel("(faster for large projects)"),
+		container.NewBorder(nil, nil, widget.NewLabel("Dir:"), nil, gw.cacheDirEntry),
 		container.NewBorder(nil, nil, widget.NewLabel("Workers:"), gw.workerThreadsLabel, gw.workerThreadsSlider),
 	)
 
@@ -503,7 +492,7 @@ func (gw *GeneratorWindow) buildUI() fyne.CanvasObject {
 	logBg := canvas.NewRectangle(color.White)
 	logWithBg := container.NewStack(logBg, gw.logText)
 	logContainer := container.NewVScroll(logWithBg)
-	logContainer.SetMinSize(fyne.NewSize(0, 150))
+	logContainer.SetMinSize(fyne.NewSize(0, 80))
 
 	// Assemble the UI with compact layout
 	return container.NewVBox(

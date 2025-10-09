@@ -193,27 +193,23 @@ func (aw *ApplierWindow) buildUI() fyne.CanvasObject {
 
 	// Left column: Patch Info
 	patchInfoLeft := container.NewVBox(
-		widget.NewLabel("Version Info:"),
 		container.NewBorder(nil, nil, widget.NewLabel("From:"), nil, aw.fromVersionLabel),
 		container.NewBorder(nil, nil, widget.NewLabel("To:"), nil, aw.toVersionLabel),
-		container.NewBorder(nil, nil, widget.NewLabel("Key File:"), nil, aw.keyFileLabel),
+		container.NewBorder(nil, nil, widget.NewLabel("Key:"), nil, aw.keyFileLabel),
 		container.NewBorder(nil, nil, widget.NewLabel("Hash:"), nil, aw.hashLabel),
-		widget.NewSeparator(),
 		container.NewBorder(nil, nil, widget.NewLabel("Size:"), nil, aw.sizeLabel),
-		container.NewBorder(nil, nil, widget.NewLabel("Compression:"), nil, aw.compressionLabel),
-		container.NewBorder(nil, nil, widget.NewLabel("Created:"), nil, aw.createdLabel),
+		container.NewBorder(nil, nil, widget.NewLabel("Comp:"), nil, aw.compressionLabel),
+		container.NewBorder(nil, nil, widget.NewLabel("Date:"), nil, aw.createdLabel),
 	)
 
 	// Right column: Operations Info
 	patchInfoRight := container.NewVBox(
-		widget.NewLabel("Operations:"),
-		container.NewBorder(nil, nil, widget.NewLabel("Added:"), nil, aw.addedLabel),
-		container.NewBorder(nil, nil, widget.NewLabel("Modified:"), nil, aw.modifiedLabel),
-		container.NewBorder(nil, nil, widget.NewLabel("Deleted:"), nil, aw.deletedLabel),
-		container.NewBorder(nil, nil, widget.NewLabel("Dirs+:"), nil, aw.addDirsLabel),
-		container.NewBorder(nil, nil, widget.NewLabel("Dirs-:"), nil, aw.deleteDirsLabel),
-		widget.NewSeparator(),
-		container.NewBorder(nil, nil, widget.NewLabel("Required:"), nil, aw.requiredLabel),
+		container.NewBorder(nil, nil, widget.NewLabel("Add:"), nil, aw.addedLabel),
+		container.NewBorder(nil, nil, widget.NewLabel("Mod:"), nil, aw.modifiedLabel),
+		container.NewBorder(nil, nil, widget.NewLabel("Del:"), nil, aw.deletedLabel),
+		container.NewBorder(nil, nil, widget.NewLabel("Dir+:"), nil, aw.addDirsLabel),
+		container.NewBorder(nil, nil, widget.NewLabel("Dir-:"), nil, aw.deleteDirsLabel),
+		container.NewBorder(nil, nil, widget.NewLabel("Req:"), nil, aw.requiredLabel),
 	)
 
 	// Create two-column patch info layout
@@ -223,7 +219,7 @@ func (aw *ApplierWindow) buildUI() fyne.CanvasObject {
 	)
 
 	// Create options
-	aw.dryRunCheck = widget.NewCheck("Dry Run (Simulate)", func(checked bool) {
+	aw.dryRunCheck = widget.NewCheck("Dry Run", func(checked bool) {
 		aw.dryRun = checked
 		// Disable backup and verify when dry run is enabled
 		if checked {
@@ -252,12 +248,12 @@ func (aw *ApplierWindow) buildUI() fyne.CanvasObject {
 	})
 	aw.backupCheck.SetChecked(true)
 
-	aw.autoDetectCheck = widget.NewCheck("Auto-detect version", func(checked bool) {
+	aw.autoDetectCheck = widget.NewCheck("Auto-detect", func(checked bool) {
 		aw.autoDetect = checked
 	})
 	aw.autoDetectCheck.SetChecked(true)
 
-	aw.ignore1GBCheck = widget.NewCheck("Ignore 1GB limit (use with caution)", func(checked bool) {
+	aw.ignore1GBCheck = widget.NewCheck("Ignore 1GB limit", func(checked bool) {
 		aw.ignore1GB = checked
 		// Notify callback if set (updates global flag in main.go)
 		if aw.onIgnore1GBChanged != nil {
@@ -300,7 +296,7 @@ func (aw *ApplierWindow) buildUI() fyne.CanvasObject {
 	logBg := canvas.NewRectangle(color.White)
 	logWithBg := container.NewStack(logBg, aw.logText)
 	logContainer := container.NewVScroll(logWithBg)
-	logContainer.SetMinSize(fyne.NewSize(0, 150))
+	logContainer.SetMinSize(fyne.NewSize(0, 80))
 
 	// Assemble the UI with compact layout
 	return container.NewVBox(

@@ -9,15 +9,15 @@ import (
 
 // UI Spacing Constants
 const (
-	PaddingSmall  float32 = 5
-	PaddingMedium float32 = 10
-	PaddingLarge  float32 = 20
+	PaddingSmall  float32 = 2
+	PaddingMedium float32 = 4
+	PaddingLarge  float32 = 8
 
-	ButtonMinWidth  float32 = 120
-	ButtonMinHeight float32 = 40
+	ButtonMinWidth  float32 = 90
+	ButtonMinHeight float32 = 28
 
-	WindowMinWidth  float32 = 800
-	WindowMinHeight float32 = 600
+	WindowMinWidth  float32 = 650
+	WindowMinHeight float32 = 450
 )
 
 // UI Colors

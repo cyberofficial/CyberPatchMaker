@@ -15,8 +15,8 @@ func main() {
 	myApp := app.NewWithID("com.cyberofficial.cyberpatchmaker.generator")
 	myWindow := myApp.NewWindow("CyberPatchMaker v" + version.GetVersion())
 
-	// Set window size (increased for better tab visibility)
-	myWindow.Resize(fyne.NewSize(900, 700))
+	// Set window size - compact and professional
+	myWindow.Resize(fyne.NewSize(700, 500))
 
 	// Create generator UI
 	generatorUI := gui.NewGeneratorWindow()

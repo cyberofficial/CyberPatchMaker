@@ -58,7 +58,7 @@ func main() {
 	if isEmbedded && patch != nil {
 		// Show embedded patch applier
 		myWindow := myApp.NewWindow(fmt.Sprintf("Apply Patch: %s → %s", patch.FromVersion, patch.ToVersion))
-		myWindow.Resize(fyne.NewSize(700, 600))
+		myWindow.Resize(fyne.NewSize(600, 450))
 
 		applierUI := gui.NewApplierWindow()
 		applierUI.SetWindow(myWindow)
@@ -81,7 +81,7 @@ func main() {
 	} else {
 		// Normal mode - show file browser UI
 		myWindow := myApp.NewWindow("CyberPatchMaker - Patch Applier")
-		myWindow.Resize(fyne.NewSize(800, 600))
+		myWindow.Resize(fyne.NewSize(650, 450))
 
 		applierUI := gui.NewApplierWindow()
 		applierUI.SetWindow(myWindow)
