@@ -75,15 +75,19 @@ func (bsw *BatchScriptWindow) SetWindow(window fyne.Window) {
 
 // buildUI builds the complete UI layout
 func (bsw *BatchScriptWindow) buildUI() fyne.CanvasObject {
-	// Instructions label (compact)
+	// Instructions label (expanded)
 	instructionsLabel := widget.NewLabel(
-		"Generate batch scripts for end users. Choose options including silent mode for automated deployment.",
+		"Generate batch scripts for end users. Choose options including silent mode for automated deployment.\n\n" +
+			"• Select a .patch file or self-contained .exe file\n" +
+			"• Configure options like silent mode, verification, and backup\n" +
+			"• Add custom instructions for end users\n" +
+			"• Preview and generate the batch script",
 	)
 	instructionsLabel.Wrapping = fyne.TextWrapWord
 
 	// Top row: Patch file and Target directory side by side
 	bsw.patchFileEntry = widget.NewEntry()
-	bsw.patchFileEntry.SetPlaceHolder("Select patch file...")
+	bsw.patchFileEntry.SetPlaceHolder("Select patch file (.patch) or executable (.exe)...")
 	bsw.patchFileEntry.OnChanged = func(text string) {
 		bsw.patchFile = text
 		bsw.updatePreview()
@@ -195,7 +199,7 @@ func (bsw *BatchScriptWindow) buildUI() fyne.CanvasObject {
 	)
 	optionsRow := container.NewGridWithColumns(2, leftOptions, rightOptions)
 
-	// Custom instructions (compact)
+	// Custom instructions (expanded)
 	bsw.customInstrEntry = widget.NewMultiLineEntry()
 	bsw.customInstrEntry.SetPlaceHolder("Optional: Custom instructions for end users...")
 	bsw.customInstrEntry.OnChanged = func(text string) {
@@ -203,10 +207,13 @@ func (bsw *BatchScriptWindow) buildUI() fyne.CanvasObject {
 		bsw.updatePreview()
 	}
 
+	customInstrScroll := container.NewVScroll(bsw.customInstrEntry)
+	customInstrScroll.SetMinSize(fyne.NewSize(0, 80)) // Added minimum height
+
 	customInstrContainer := container.NewBorder(
 		widget.NewLabel("Instructions:"),
 		nil, nil, nil,
-		container.NewVScroll(bsw.customInstrEntry),
+		customInstrScroll,
 	)
 
 	// Preview text area (smaller, more compact)
@@ -215,7 +222,7 @@ func (bsw *BatchScriptWindow) buildUI() fyne.CanvasObject {
 	bsw.previewText.Wrapping = fyne.TextWrapOff
 
 	previewScroll := container.NewVScroll(bsw.previewText)
-	previewScroll.SetMinSize(fyne.NewSize(0, 200)) // Reduced from 300 to 200
+	previewScroll.SetMinSize(fyne.NewSize(0, 120)) // Reduced from 200 to 120
 
 	previewContainer := container.NewBorder(
 		widget.NewLabel("Preview:"),
@@ -227,7 +234,7 @@ func (bsw *BatchScriptWindow) buildUI() fyne.CanvasObject {
 	bsw.autoCloseCheck.SetChecked(true)
 	bsw.showProgressCheck.SetChecked(true)
 
-	// Bottom row: Status and generate button
+	// Bottom row: Status and generate button (more compact)
 	bsw.generateBtn = widget.NewButton("Generate Script", func() {
 		bsw.generateBatchScript()
 	})
@@ -269,6 +276,14 @@ func (bsw *BatchScriptWindow) selectPatchFile() {
 	dialog.ShowFileOpen(func(file fyne.URIReadCloser, err error) {
 		if err == nil && file != nil {
 			path := file.URI().Path()
+			// Validate file extension
+			ext := strings.ToLower(filepath.Ext(path))
+			if ext != ".patch" && ext != ".exe" {
+				if bsw.window != nil {
+					dialog.ShowError(fmt.Errorf("please select a .patch or .exe file"), bsw.window)
+				}
+				return
+			}
 			bsw.patchFileEntry.SetText(path)
 			bsw.patchFile = path
 			bsw.updatePreview()
@@ -370,8 +385,18 @@ func (bsw *BatchScriptWindow) generateBatchScriptContent() string {
 		sb.WriteString("pause\n\n")
 	}
 
-	// Get patch filename
+	// Get patch filename and determine executable
 	patchFileName := filepath.Base(bsw.patchFile)
+	fileExt := strings.ToLower(filepath.Ext(bsw.patchFile))
+
+	var executable string
+	if fileExt == ".exe" {
+		// For self-contained executables, use the exe file directly
+		executable = patchFileName
+	} else {
+		// For .patch files, use applier.exe
+		executable = "applier.exe"
+	}
 
 	// Build applier command
 	sb.WriteString("echo.\n")
@@ -389,26 +414,43 @@ func (bsw *BatchScriptWindow) generateBatchScriptContent() string {
 	}
 
 	// Build command with options
-	command := fmt.Sprintf("applier.exe --patch \"%s\" --current-dir \"%s\"", patchFileName, targetDir)
-
-	if bsw.customKeyFile != "" {
-		command += fmt.Sprintf(" --key-file \"%s\"", bsw.customKeyFile)
-	}
-
-	if bsw.includeDryRun {
-		command += " --dry-run"
-	}
-
-	if bsw.silentMode {
-		command += " --silent"
-	}
-
-	if bsw.disableVerify {
-		command += " --verify=false"
-	}
-
-	if bsw.disableBackup {
-		command += " --backup=false"
+	var command string
+	if fileExt == ".exe" {
+		// Self-contained executable - different command format
+		command = fmt.Sprintf("%s", executable)
+		if bsw.targetDir != "" {
+			command += fmt.Sprintf(" --current-dir \"%s\"", targetDir)
+		}
+		if bsw.customKeyFile != "" {
+			command += fmt.Sprintf(" --key-file \"%s\"", bsw.customKeyFile)
+		}
+		if bsw.silentMode {
+			command += " --silent"
+		}
+		if bsw.disableVerify {
+			command += " --verify=false"
+		}
+		if bsw.disableBackup {
+			command += " --backup=false"
+		}
+	} else {
+		// Standard patch file with applier.exe
+		command = fmt.Sprintf("%s --patch \"%s\" --current-dir \"%s\"", executable, patchFileName, targetDir)
+		if bsw.customKeyFile != "" {
+			command += fmt.Sprintf(" --key-file \"%s\"", bsw.customKeyFile)
+		}
+		if bsw.includeDryRun {
+			command += " --dry-run"
+		}
+		if bsw.silentMode {
+			command += " --silent"
+		}
+		if bsw.disableVerify {
+			command += " --verify=false"
+		}
+		if bsw.disableBackup {
+			command += " --backup=false"
+		}
 	}
 
 	sb.WriteString(command + "\n\n")
@@ -472,11 +514,22 @@ func (bsw *BatchScriptWindow) generateBatchScript() {
 	bsw.setStatus("Generating batch script...")
 	bsw.generateBtn.Disable()
 
-	// Validate patch file exists
+	// Validate patch file exists and has correct extension
 	if _, err := os.Stat(bsw.patchFile); os.IsNotExist(err) {
-		bsw.setStatus("Error: Patch file does not exist")
+		bsw.setStatus("Error: File does not exist")
 		if bsw.window != nil {
-			dialog.ShowError(fmt.Errorf("patch file does not exist: %s", bsw.patchFile), bsw.window)
+			dialog.ShowError(fmt.Errorf("file does not exist: %s", bsw.patchFile), bsw.window)
+		}
+		bsw.generateBtn.Enable()
+		return
+	}
+
+	// Validate file extension
+	ext := strings.ToLower(filepath.Ext(bsw.patchFile))
+	if ext != ".patch" && ext != ".exe" {
+		bsw.setStatus("Error: Invalid file type")
+		if bsw.window != nil {
+			dialog.ShowError(fmt.Errorf("please select a .patch or .exe file"), bsw.window)
 		}
 		bsw.generateBtn.Enable()
 		return

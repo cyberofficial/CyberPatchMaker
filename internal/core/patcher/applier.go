@@ -120,7 +120,7 @@ func (a *Applier) ApplyPatch(patch *utils.Patch, targetDir string, verifyBefore,
 func (a *Applier) applyOperation(targetDir string, op utils.PatchOperation) error {
 	targetPath := filepath.Join(targetDir, op.FilePath)
 
-	switch op.Type {
+	switch opType := op.Type; opType {
 	case utils.OpAdd:
 		return a.applyAdd(targetPath, op)
 	case utils.OpModify:

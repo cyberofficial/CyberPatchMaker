@@ -2892,7 +2892,7 @@ Test-Step "Verify automatic rollback on failed patch application" {
     Set-Content -Path $targetFile -Value $corruptedContent -NoNewline
     
     Write-Host "  Applying patch that should fail due to corrupted target..." -ForegroundColor Gray
-    $output = & patch-apply.exe --patch "testdata\advanced-output\patches\1.0.1-to-1.0.2.patch" --current-dir $testDir --verify --backup 2>&1
+    $output = & .\patch-apply.exe --patch "testdata\advanced-output\patches\1.0.1-to-1.0.2.patch" --current-dir $testDir --verify --backup 2>&1
     
     # Check that the patch failed
     if ($LASTEXITCODE -eq 0) {
