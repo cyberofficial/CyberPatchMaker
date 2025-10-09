@@ -417,7 +417,7 @@ func (bsw *BatchScriptWindow) generateBatchScriptContent() string {
 	var command string
 	if fileExt == ".exe" {
 		// Self-contained executable - different command format
-		command = fmt.Sprintf("%s", executable)
+		command = executable
 		if bsw.targetDir != "" {
 			command += fmt.Sprintf(" --current-dir \"%s\"", targetDir)
 		}

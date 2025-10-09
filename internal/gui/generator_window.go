@@ -597,11 +597,7 @@ func (gw *GeneratorWindow) scanVersions() {
 		gw.outputDir = patchFilesDir
 		gw.outputDirEntry.SetText(patchFilesDir)
 		gw.appendLog("Auto-set output directory: " + patchFilesDir)
-
-		// Ensure the patchfiles directory exists
-		if err := os.MkdirAll(patchFilesDir, 0755); err != nil {
-			gw.appendLog("Warning: Could not create patchfiles directory: " + err.Error())
-		}
+		// Note: Directory creation moved to generatePatch() to avoid creating folders before user clicks Generate
 	}
 
 	// Read directory contents
@@ -793,6 +789,14 @@ func (gw *GeneratorWindow) getFilesInDirectory(dirPath string) []string {
 func (gw *GeneratorWindow) generatePatch() {
 	gw.setStatus("Generating patch...")
 	gw.generateBtn.Disable()
+
+	// Create output directory if it doesn't exist (only when user clicks Generate)
+	if err := os.MkdirAll(gw.outputDir, 0755); err != nil {
+		gw.setStatus("Error: Failed to create output directory")
+		gw.appendLog("ERROR: Could not create output directory: " + err.Error())
+		gw.generateBtn.Enable()
+		return
+	}
 
 	if gw.batchMode {
 		gw.generateBatchPatches()
@@ -1116,6 +1120,14 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 	gw.appendLog("=== BATCH MODE: Generating patches from ALL versions ===")
 	gw.appendLog(fmt.Sprintf("Target version: %s", gw.toVersion))
 	gw.appendLog(fmt.Sprintf("Compression: %s (level %d)", gw.compression, gw.compressionLevel))
+
+	// Create output directory if it doesn't exist (only when user clicks Generate)
+	if err := os.MkdirAll(gw.outputDir, 0755); err != nil {
+		gw.setStatus("Error: Failed to create output directory")
+		gw.appendLog("ERROR: Could not create output directory: " + err.Error())
+		gw.generateBtn.Enable()
+		return
+	}
 
 	// Create version manager
 	versionMgr := version.NewManager()
