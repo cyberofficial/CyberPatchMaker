@@ -84,6 +84,17 @@ const (
 	OpDeleteDir                      // Delete directory
 )
 
+// Memory optimization constants for large file handling
+const (
+	// ChunkSize is the size of each chunk when processing large files (128MB)
+	// This prevents memory exhaustion when dealing with multi-GB files
+	ChunkSize = 128 * 1024 * 1024 // 128 MB
+
+	// LargeFileThreshold determines when to use chunked processing (1GB)
+	// Files larger than this threshold will be processed in chunks
+	LargeFileThreshold = 1024 * 1024 * 1024 // 1 GB
+)
+
 // PatchHeader contains patch-level information
 type PatchHeader struct {
 	FormatVersion int       // Patch format version

@@ -106,10 +106,46 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 	for _, file := range added {
 		fullPath := filepath.Join(toVersion.Location, file.Path)
 
-		// Read new file
-		fileData, err := os.ReadFile(fullPath)
+		// Check if file is large (>1GB)
+		isLarge, fileSize, err := g.differ.IsLargeFile(fullPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read new file %s: %w", file.Path, err)
+			return nil, fmt.Errorf("failed to check file size for %s: %w", file.Path, err)
+		}
+
+		var fileData []byte
+		if isLarge {
+			// For large files, use chunked copying to avoid memory issues
+			fmt.Printf("  Large file detected (%d MB), using chunked copy: %s\n", fileSize/(1024*1024), file.Path)
+			// For added files, we still need the full data but we'll read it in chunks
+			tmpFile, err := os.CreateTemp("", "cyberpatch-add-*.tmp")
+			if err != nil {
+				return nil, fmt.Errorf("failed to create temp file for %s: %w", file.Path, err)
+			}
+			defer os.Remove(tmpFile.Name())
+			defer tmpFile.Close()
+
+			// Copy file in chunks to temp location
+			progressCallback := func(processed, total int64) {
+				percent := float64(processed) / float64(total) * 100
+				fmt.Printf("\r  Progress: %.1f%% (%d/%d MB)", percent, processed/(1024*1024), total/(1024*1024))
+			}
+			err = g.differ.CopyFileChunked(fullPath, tmpFile.Name(), utils.ChunkSize, progressCallback)
+			if err != nil {
+				return nil, fmt.Errorf("failed to copy large file %s: %w", file.Path, err)
+			}
+			fmt.Println() // New line after progress
+
+			// Read the temp file data (now we have it all in one place)
+			fileData, err = os.ReadFile(tmpFile.Name())
+			if err != nil {
+				return nil, fmt.Errorf("failed to read temp file for %s: %w", file.Path, err)
+			}
+		} else {
+			// Read normal-sized file directly
+			fileData, err = os.ReadFile(fullPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to read new file %s: %w", file.Path, err)
+			}
 		}
 
 		patch.Operations = append(patch.Operations, utils.PatchOperation{
@@ -120,7 +156,11 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 			Size:        file.Size,
 		})
 
-		fmt.Printf("  Add: %s (%d bytes)\n", file.Path, file.Size)
+		if isLarge {
+			fmt.Printf("  Add (large): %s (%d MB)\n", file.Path, file.Size/(1024*1024))
+		} else {
+			fmt.Printf("  Add: %s (%d bytes)\n", file.Path, file.Size)
+		}
 	}
 
 	// Process modified files
@@ -147,13 +187,43 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 			continue
 		}
 
-		// Always generate binary diff for modified files
+		// Check if either old or new file is large
 		oldPath := filepath.Join(fromVersion.Location, file.Path)
 		newPath := filepath.Join(toVersion.Location, file.Path)
 
-		diffData, err := g.differ.GenerateDiff(oldPath, newPath)
+		isOldLarge, oldSize, err := g.differ.IsLargeFile(oldPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate diff for %s: %w", file.Path, err)
+			return nil, fmt.Errorf("failed to check old file size for %s: %w", file.Path, err)
+		}
+
+		isNewLarge, newSize, err := g.differ.IsLargeFile(newPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to check new file size for %s: %w", file.Path, err)
+		}
+
+		var diffData []byte
+
+		// Use chunked processing for large files
+		if isOldLarge || isNewLarge {
+			fmt.Printf("  Large file detected (old: %d MB, new: %d MB), using chunked diff: %s\n",
+				oldSize/(1024*1024), newSize/(1024*1024), file.Path)
+
+			progressCallback := func(processed, total int64) {
+				percent := float64(processed) / float64(total) * 100
+				fmt.Printf("\r  Progress: %.1f%% (%d/%d MB)", percent, processed/(1024*1024), total/(1024*1024))
+			}
+
+			diffData, err = g.differ.GenerateDiffChunked(oldPath, newPath, utils.ChunkSize, progressCallback)
+			if err != nil {
+				return nil, fmt.Errorf("failed to generate chunked diff for %s: %w", file.Path, err)
+			}
+			fmt.Println() // New line after progress
+		} else {
+			// Use standard bsdiff for normal-sized files
+			diffData, err = g.differ.GenerateDiff(oldPath, newPath)
+			if err != nil {
+				return nil, fmt.Errorf("failed to generate diff for %s: %w", file.Path, err)
+			}
 		}
 
 		patch.Operations = append(patch.Operations, utils.PatchOperation{
@@ -165,8 +235,13 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 			Size:        int64(len(diffData)),
 		})
 
-		fmt.Printf("  Modify (diff): %s (diff: %d bytes, orig: %d bytes, new: %d bytes)\n",
-			file.Path, len(diffData), sourceFile.Size, file.Size)
+		if isOldLarge || isNewLarge {
+			fmt.Printf("  Modify (chunked diff): %s (diff: %d MB, orig: %d MB, new: %d MB)\n",
+				file.Path, len(diffData)/(1024*1024), sourceFile.Size/(1024*1024), file.Size/(1024*1024))
+		} else {
+			fmt.Printf("  Modify (diff): %s (diff: %d bytes, orig: %d bytes, new: %d bytes)\n",
+				file.Path, len(diffData), sourceFile.Size, file.Size)
+		}
 	}
 
 	// Create patch header

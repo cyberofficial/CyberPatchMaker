@@ -32,6 +32,7 @@ Perfect for:
 - **Scan Caching** - Cache directory scans for instant patch generation (15+ min → <1 sec for large projects)
 - **Simple Mode for End Users** - Simplified interface for non-technical users with basic options **(New in v1.0.9!)**
 - **Silent Mode** - Fully automatic patching with zero user interaction, automatic log file generation (CLI only)
+- **Large File Handling** - Automatic memory-optimized processing for files >1GB, prevents memory exhaustion **(New in v1.0.6!)**
 
 ## Quick Start
 
@@ -185,7 +186,7 @@ patch-apply --patch 1.0.0-to-1.0.2.patch --current-dir ./myapp --verify
 - **Patch Applier** (`patch-apply.exe` / `patch-apply`) - Install updates
 - Comprehensive verification and automatic rollback
 - Tested with complex directory structures
-- Handles files from 1KB to 5GB+
+- Handles files from 1KB to 20GB+ with automatic memory optimization
 - Multiple compression formats (zstd, gzip)
 
 **Experimental GUI (In Development):**

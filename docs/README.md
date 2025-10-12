@@ -13,6 +13,7 @@ Welcome to the CyberPatchMaker documentation wiki. This comprehensive guide cove
 - [GUI Usage Guide](gui-usage.md) - Using the graphical interface **(Experimental)**
 - [Self-Contained Executables](self-contained-executables.md) - Create standalone patch executables **(New!)**
 - [Downgrade Guide](downgrade-guide.md) - Rollback to previous versions
+- [Large File Handling](large-file-handling.md) - Memory-efficient processing for 20GB+ files **(New in v1.0.6!)**
 - [CLI Reference](cli-reference.md) - Quick command-line reference
 - [CLI Examples](CLI-EXAMPLES.md) - Real-world command examples
 - [Version Management](version-management.md) - Managing multiple versions
