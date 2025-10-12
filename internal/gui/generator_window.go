@@ -927,7 +927,7 @@ func (gw *GeneratorWindow) generatePatch() {
 	toVer.Manifest.Version = toVersion
 	gw.appendLog(fmt.Sprintf("Target version: %d files, %d directories", len(toFiles), len(toDirs)))
 	gw.appendLog("")
-	gw.appendLog("Preparing to compare versions...")
+	gw.appendLog("Preparing to compare versions... This may take a while, program will build and gather the files to hash")
 	gw.setStatus("Preparing comparison...")
 
 	// Generate patch
@@ -1188,7 +1188,7 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 	gw.appendLog(fmt.Sprintf("Target version: %d files, %d directories", len(toFiles), len(toDirs)))
 	gw.appendLog("")
 	gw.appendLog("Target scan complete - ready for batch generation")
-	gw.appendLog("Preparing to compare versions...")
+	gw.appendLog("Preparing to compare versions... This may take a while, program will build and gather the files to hash")
 	gw.setStatus("Preparing batch comparison...")
 
 	// Process each source version

@@ -102,7 +102,7 @@ func (m *Manager) RegisterVersion(versionNumber, location, keyFilePath string) (
 							len(cachedVersion.Manifest.Files), len(cachedVersion.Manifest.Directories))
 						fmt.Printf("Version %s registered: %d files, %d directories\n",
 							versionNumber, len(cachedVersion.Manifest.Files), len(cachedVersion.Manifest.Directories))
-						fmt.Printf("Preparing to compare versions...\n")
+						fmt.Printf("Preparing to compare versions... This may take a while, program will build and gather the files to hash\n")
 						return cachedVersion, nil
 					}
 				}
@@ -206,7 +206,7 @@ func (m *Manager) RegisterVersion(versionNumber, location, keyFilePath string) (
 
 	fmt.Printf("Version %s registered: %d files, %d directories\n",
 		versionNumber, len(files), len(directories))
-	fmt.Printf("Preparing to compare versions...\n")
+	fmt.Printf("Preparing to compare versions... This may take a while, program will build and gather the files to hash\n")
 
 	// Save to cache if enabled
 	if m.useScanCache && m.scanCache != nil {
