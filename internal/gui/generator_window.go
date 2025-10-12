@@ -1,11 +1,14 @@
 package gui
 
 import (
+	"bufio"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"image/color"
+	"io"
 	"io/fs"
 	"os"
 	"path/filepath"
@@ -927,7 +930,7 @@ func (gw *GeneratorWindow) generatePatch() {
 	toVer.Manifest.Version = toVersion
 	gw.appendLog(fmt.Sprintf("Target version: %d files, %d directories", len(toFiles), len(toDirs)))
 	gw.appendLog("")
-	gw.appendLog("Preparing to compare versions... This may take a while, program will build and gather the files to hash")
+	gw.appendLog("Preparing to compare versions...\nThis may take a while, program will build and gather the files to hash")
 	gw.setStatus("Preparing comparison...")
 
 	// Generate patch
@@ -1188,7 +1191,7 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 	gw.appendLog(fmt.Sprintf("Target version: %d files, %d directories", len(toFiles), len(toDirs)))
 	gw.appendLog("")
 	gw.appendLog("Target scan complete - ready for batch generation")
-	gw.appendLog("Preparing to compare versions... This may take a while, program will build and gather the files to hash")
+	gw.appendLog("Preparing to compare versions...\nThis may take a while, program will build and gather the files to hash")
 	gw.setStatus("Preparing batch comparison...")
 
 	// Process each source version
@@ -1427,30 +1430,254 @@ func (gw *GeneratorWindow) appendLog(message string) {
 	gw.logText.Refresh()
 }
 
-// savePatch saves the patch to a file with compression
+// savePatch saves the patch to a file with compression and streaming to avoid memory exhaustion
 func (gw *GeneratorWindow) savePatch(patch *utils.Patch, filename string, options *utils.PatchOptions) error {
-	// Marshal patch to JSON
-	data, err := json.MarshalIndent(patch, "", "  ")
+	// Create output file
+	outFile, err := os.Create(filename)
 	if err != nil {
-		return fmt.Errorf("failed to marshal patch: %w", err)
+		return fmt.Errorf("failed to create patch file: %w", err)
+	}
+	defer outFile.Close()
+
+	// Create a pipe for streaming JSON encoding
+	jsonReader, jsonWriter := io.Pipe()
+	defer jsonReader.Close()
+
+	// Start custom streaming JSON encoding in a goroutine
+	encodeErr := make(chan error, 1)
+	go func() {
+		defer jsonWriter.Close()
+		encodeErr <- gw.encodePatchStreaming(patch, jsonWriter)
+	}()
+
+	// Set up compression if needed
+	var finalReader io.Reader = jsonReader
+
+	if options.Compression != "none" && options.Compression != "" {
+		// Create a pipe for compression
+		compressedReader, compressor := io.Pipe()
+
+		// Start compression in a goroutine
+		go func() {
+			defer compressor.Close()
+			err := utils.CompressDataStreaming(jsonReader, compressor, options.Compression, options.CompressionLevel)
+			if err != nil {
+				compressor.CloseWithError(err)
+			}
+		}()
+
+		finalReader = compressedReader
 	}
 
-	// Compress if needed
-	if options.Compression != "none" && options.Compression != "" {
-		compressedData, err := utils.CompressData(data, options.Compression, options.CompressionLevel)
-		if err != nil {
-			return fmt.Errorf("failed to compress patch: %w", err)
-		}
-		data = compressedData
+	// Create a hash writer to calculate checksum while writing
+	hasher := sha256.New()
+	multiWriter := io.MultiWriter(outFile, hasher)
+
+	// Copy data through compression and hashing
+	_, err = io.Copy(multiWriter, finalReader)
+	if err != nil {
+		return fmt.Errorf("failed to write patch data: %w", err)
+	}
+
+	// Close output file
+	if err := outFile.Close(); err != nil {
+		return fmt.Errorf("failed to close output file: %w", err)
+	}
+
+	// Check for encoding errors
+	if err := <-encodeErr; err != nil {
+		return fmt.Errorf("failed to encode patch: %w", err)
 	}
 
 	// Calculate checksum
-	checksum := utils.CalculateDataChecksum(data)
+	checksum := fmt.Sprintf("%x", hasher.Sum(nil))
 	patch.Header.Checksum = checksum
 
-	// Write to file
-	if err := os.WriteFile(filename, data, 0644); err != nil {
-		return fmt.Errorf("failed to write patch file: %w", err)
+	return nil
+}
+
+// encodePatchStreaming writes the patch as JSON in a streaming fashion to avoid memory exhaustion
+func (gw *GeneratorWindow) encodePatchStreaming(patch *utils.Patch, writer io.Writer) error {
+	// Create a buffered writer for better performance
+	bufWriter := bufio.NewWriterSize(writer, 64*1024) // 64KB buffer
+	defer bufWriter.Flush()
+
+	// Write opening brace
+	if _, err := bufWriter.WriteString("{\n"); err != nil {
+		return err
+	}
+
+	// Encode header
+	if err := gw.encodeField(bufWriter, "Header", patch.Header, true); err != nil {
+		return err
+	}
+
+	// Encode simple fields
+	if err := gw.encodeField(bufWriter, "FromVersion", patch.FromVersion, true); err != nil {
+		return err
+	}
+	if err := gw.encodeField(bufWriter, "ToVersion", patch.ToVersion, true); err != nil {
+		return err
+	}
+	if err := gw.encodeField(bufWriter, "FromKeyFile", patch.FromKeyFile, true); err != nil {
+		return err
+	}
+	if err := gw.encodeField(bufWriter, "ToKeyFile", patch.ToKeyFile, true); err != nil {
+		return err
+	}
+	if err := gw.encodeField(bufWriter, "RequiredFiles", patch.RequiredFiles, true); err != nil {
+		return err
+	}
+	if err := gw.encodeField(bufWriter, "SimpleMode", patch.SimpleMode, true); err != nil {
+		return err
+	}
+
+	// Encode operations array manually to stream large data
+	if _, err := bufWriter.WriteString(`  "Operations": [`); err != nil {
+		return err
+	}
+
+	for i, op := range patch.Operations {
+		if i > 0 {
+			if _, err := bufWriter.WriteString(",\n"); err != nil {
+				return err
+			}
+		} else {
+			if _, err := bufWriter.WriteString("\n"); err != nil {
+				return err
+			}
+		}
+
+		if err := gw.encodeOperation(bufWriter, op); err != nil {
+			return err
+		}
+	}
+
+	if _, err := bufWriter.WriteString("\n  ]\n"); err != nil {
+		return err
+	}
+
+	// Write closing brace
+	if _, err := bufWriter.WriteString("}\n"); err != nil {
+		return err
+	}
+
+	return bufWriter.Flush()
+}
+
+// encodeField encodes a single field with proper JSON formatting
+func (gw *GeneratorWindow) encodeField(writer io.Writer, name string, value interface{}, addComma bool) error {
+	commaStr := ","
+	if !addComma {
+		commaStr = ""
+	}
+
+	// For simple types, use JSON encoding
+	data, err := json.MarshalIndent(value, "  ", "  ")
+	if err != nil {
+		return err
+	}
+
+	// Write field name and value
+	fieldStr := fmt.Sprintf("  \"%s\": ", name)
+	if _, err := writer.Write([]byte(fieldStr)); err != nil {
+		return err
+	}
+
+	// Write the JSON data, but indent it properly
+	lines := strings.Split(string(data), "\n")
+	for i, line := range lines {
+		if i > 0 {
+			if _, err := writer.Write([]byte("\n")); err != nil {
+				return err
+			}
+		}
+		if _, err := writer.Write([]byte(line)); err != nil {
+			return err
+		}
+	}
+
+	if _, err := writer.Write([]byte(commaStr + "\n")); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// encodeOperation encodes a single patch operation with streaming for large binary data
+func (gw *GeneratorWindow) encodeOperation(writer io.Writer, op utils.PatchOperation) error {
+	// Write operation opening
+	if _, err := writer.Write([]byte("    {\n")); err != nil {
+		return err
+	}
+
+	// Encode simple fields
+	if err := gw.encodeOperationField(writer, "Type", int(op.Type), true); err != nil {
+		return err
+	}
+	if err := gw.encodeOperationField(writer, "FilePath", op.FilePath, true); err != nil {
+		return err
+	}
+	if err := gw.encodeOperationField(writer, "BinaryDiff", op.BinaryDiff, true); err != nil {
+		return err
+	}
+
+	// Encode NewFile data - this is the large binary data that needs streaming
+	if err := gw.encodeOperationField(writer, "NewFile", op.NewFile, true); err != nil {
+		return err
+	}
+
+	if err := gw.encodeOperationField(writer, "OldChecksum", op.OldChecksum, true); err != nil {
+		return err
+	}
+	if err := gw.encodeOperationField(writer, "NewChecksum", op.NewChecksum, true); err != nil {
+		return err
+	}
+	if err := gw.encodeOperationField(writer, "Size", op.Size, false); err != nil {
+		return err
+	}
+
+	// Write operation closing
+	if _, err := writer.Write([]byte("\n    }")); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// encodeOperationField encodes a single field within an operation
+func (gw *GeneratorWindow) encodeOperationField(writer io.Writer, name string, value interface{}, addComma bool) error {
+	commaStr := ","
+	if !addComma {
+		commaStr = ""
+	}
+
+	fieldStr := fmt.Sprintf("      \"%s\": ", name)
+	if _, err := writer.Write([]byte(fieldStr)); err != nil {
+		return err
+	}
+
+	// For byte slices (binary data), encode as base64
+	if byteData, ok := value.([]byte); ok {
+		encoded := base64.StdEncoding.EncodeToString(byteData)
+		jsonStr := fmt.Sprintf("\"%s\"%s", encoded, commaStr)
+		if _, err := writer.Write([]byte(jsonStr)); err != nil {
+			return err
+		}
+	} else {
+		// For other types, use JSON encoding
+		data, err := json.Marshal(value)
+		if err != nil {
+			return err
+		}
+		jsonStr := string(data) + commaStr
+		if _, err := writer.Write([]byte(jsonStr)); err != nil {
+			return err
+		}
+	}
+
+	if _, err := writer.Write([]byte("\n")); err != nil {
+		return err
 	}
 
 	return nil

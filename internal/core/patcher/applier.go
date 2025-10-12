@@ -11,7 +11,8 @@ import (
 
 // Applier handles patch application
 type Applier struct {
-	differ *differ.Differ
+	differ        *differ.Differ
+	patchFilePath string // Stores the patch file path during application for large file streaming
 }
 
 // NewApplier creates a new patch applier
@@ -23,6 +24,14 @@ func NewApplier() *Applier {
 
 // ApplyPatch applies a patch to a target directory
 func (a *Applier) ApplyPatch(patch *utils.Patch, targetDir string, verifyBefore, verifyAfter bool, createBackup bool) error {
+	return a.ApplyPatchWithPath(patch, targetDir, "", verifyBefore, verifyAfter, createBackup)
+}
+
+// ApplyPatchWithPath applies a patch to a target directory with knowledge of the patch file location
+func (a *Applier) ApplyPatchWithPath(patch *utils.Patch, targetDir string, patchFilePath string, verifyBefore, verifyAfter bool, createBackup bool) error {
+	// Store patch file path for large file streaming
+	a.patchFilePath = patchFilePath
+
 	fmt.Printf("Applying patch from %s to %s...\n", patch.FromVersion, patch.ToVersion)
 
 	// Verify target directory exists
@@ -143,7 +152,7 @@ func (a *Applier) applyAdd(targetPath string, op utils.PatchOperation) error {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	// Check if this is a large file operation
+	// Check if this is a large file operation (data embedded in patch)
 	fileSize := int64(len(op.NewFile))
 	isLarge := fileSize > utils.LargeFileThreshold
 
@@ -256,11 +265,19 @@ func (a *Applier) applyModify(targetPath string, op utils.PatchOperation) error 
 	if resultSize > utils.LargeFileThreshold {
 		fmt.Printf("  Writing large result (%d MB) in chunks...\n", resultSize/(1024*1024))
 
-		outFile, err := os.Create(targetPath)
+		// Write to temporary file in current directory (same filesystem for atomic rename)
+		targetDir := filepath.Dir(targetPath)
+		targetBase := filepath.Base(targetPath)
+		tempFile, err := os.CreateTemp(targetDir, ".tmp_"+targetBase+"_*")
 		if err != nil {
-			return fmt.Errorf("failed to create output file: %w", err)
+			return fmt.Errorf("failed to create temp file: %w", err)
 		}
-		defer outFile.Close()
+		tempPath := tempFile.Name()
+		defer func() {
+			tempFile.Close()
+			// Clean up temp file if it still exists (error case)
+			os.Remove(tempPath)
+		}()
 
 		// Write data in chunks
 		written := int64(0)
@@ -271,7 +288,7 @@ func (a *Applier) applyModify(targetPath string, op utils.PatchOperation) error 
 				chunkSize = remaining
 			}
 
-			n, err := outFile.Write(newData[written : written+chunkSize])
+			n, err := tempFile.Write(newData[written : written+chunkSize])
 			if err != nil {
 				return fmt.Errorf("failed to write chunk: %w", err)
 			}
@@ -282,6 +299,16 @@ func (a *Applier) applyModify(targetPath string, op utils.PatchOperation) error 
 			fmt.Printf("\r  Write progress: %.1f%% (%d/%d MB)", percent, written/(1024*1024), resultSize/(1024*1024))
 		}
 		fmt.Println() // New line after progress
+
+		// Close temp file before rename
+		if err := tempFile.Close(); err != nil {
+			return fmt.Errorf("failed to close temp file: %w", err)
+		}
+
+		// Atomic rename to target path
+		if err := os.Rename(tempPath, targetPath); err != nil {
+			return fmt.Errorf("failed to rename temp file to target: %w", err)
+		}
 	} else {
 		// Write normal-sized file directly
 		if err := os.WriteFile(targetPath, newData, 0644); err != nil {
@@ -297,8 +324,8 @@ func (a *Applier) applyModify(targetPath string, op utils.PatchOperation) error 
 		return fmt.Errorf("checksum verification failed after modify")
 	}
 
-	if isLarge || resultSize > utils.LargeFileThreshold {
-		fmt.Printf("  Modified (large): %s (%d MB)\n", op.FilePath, resultSize/(1024*1024))
+	if isLarge {
+		fmt.Printf("  Modified (large): %s (%d MB)\n", op.FilePath, op.Size/(1024*1024))
 	} else {
 		fmt.Printf("  Modified: %s\n", op.FilePath)
 	}

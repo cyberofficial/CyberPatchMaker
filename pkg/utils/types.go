@@ -66,8 +66,8 @@ type FileRequirement struct {
 type PatchOperation struct {
 	Type        OperationType // Add, Modify, Delete, AddDir, DeleteDir
 	FilePath    string        // Relative file path
-	BinaryDiff  []byte        // Binary diff data (for modify)
-	NewFile     []byte        // Full file data (for add)
+	BinaryDiff  []byte        // Binary diff data (for modify) - used for small files
+	NewFile     []byte        // Full file data (for add/modify) - all file data stored directly
 	OldChecksum string        // Expected checksum before patch
 	NewChecksum string        // Expected checksum after patch
 	Size        int64         // Operation size

@@ -574,13 +574,14 @@ func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, revers
 }
 
 func savePatch(patch *utils.Patch, filename string, options *utils.PatchOptions) error {
+	// Check if there are any large files that need to be handled
 	// Marshal patch to JSON
 	data, err := json.MarshalIndent(patch, "", "  ")
 	if err != nil {
 		return fmt.Errorf("failed to marshal patch: %w", err)
 	}
 
-	// Compress if needed
+	// Compress patch metadata if needed
 	if options.Compression != "none" && options.Compression != "" {
 		compressedData, err := utils.CompressData(data, options.Compression, options.CompressionLevel)
 		if err != nil {
@@ -593,7 +594,7 @@ func savePatch(patch *utils.Patch, filename string, options *utils.PatchOptions)
 	checksum := utils.CalculateDataChecksum(data)
 	patch.Header.Checksum = checksum
 
-	// Write to file
+	// Write patch metadata to file
 	if err := os.WriteFile(filename, data, 0644); err != nil {
 		return fmt.Errorf("failed to write patch file: %w", err)
 	}

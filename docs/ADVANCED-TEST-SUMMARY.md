@@ -2024,15 +2024,20 @@ Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.
 Testing: Simple mode - end-to-end workflow
   Testing complete Simple Mode workflow...
   ✓ Self-contained exe created with SimpleMode=true
-  ✓ End user runs exe and sees simple 3-option menu
+  ✓ End user runs exe and sees simplified interface
   ✓ GUI version: Simple message + basic options only
-  ✓ CLI version: 3 options - Dry Run (1), Apply Patch (2), Exit (3)
+  ✓ CLI version: FULLY AUTOMATED - no prompts, runs dry-run then applies
+  ✓ CLI: Uses current directory as target automatically
+  ✓ CLI: Backup always enabled (no prompt)
+  ✓ CLI: Creates log file: <patchname>_<utctime>_log.txt
   ✓ Advanced options hidden/auto-enabled for safety
 ✓ PASSED: Simple mode - end-to-end workflow
 ```
 
 **What This Tests:**
 - Complete workflow: GUI generator → self-contained exe → end user
+- **CLI Simple Mode**: Fully automated - double-click in target folder and it patches automatically
+- **GUI Simple Mode**: Simplified interface with essential options only
 - Patch creator enables Simple Mode checkbox
 - End user receives exe with embedded SimpleMode=true
 - End user sees simplified interface (GUI or CLI)
@@ -2041,9 +2046,12 @@ Testing: Simple mode - end-to-end workflow
 **Workflow Steps:**
 1. **Patch Creator:** Uses GUI generator, enables "Enable Simple Mode for End Users"
 2. **Patch Creator:** Creates self-contained exe with SimpleMode=true
-3. **End User:** Runs exe, sees simple 3-option menu
-4. **End User:** Can test with Dry Run, then Apply Patch
-5. **End User:** Simple, clear choices - no technical complexity
+3. **GUI End User:** Runs exe, sees simplified interface with essential options
+4. **GUI End User:** Can test with Dry Run, then Apply Patch with simple choices
+5. **CLI End User:** Double-clicks exe in target folder, patching happens automatically
+6. **CLI:** Runs dry-run validation, then auto-applies if successful
+7. **CLI:** Creates detailed log file: `<patchname>_<utctime>_log.txt`
+8. **Result:** Zero technical knowledge required for CLI users
 
 ---
 
@@ -2119,11 +2127,13 @@ Testing: Simple mode - use case scenarios
 - Users can test with 'Dry Run' before applying
 - Reduces support burden (fewer confused users)
 
-**Use Case 4: Automation Scripts (Silent Mode)**
-- CLI applier with --silent flag applies patch automatically
-- No user interaction required (fully automatic)
-- Returns exit code 0 on success, 1 on failure
-- Perfect for CI/CD pipelines or deployment scripts
+**Use Case 4: Automation Scripts (Silent Mode vs Simple Mode)**
+- **--silent flag:** Works with any exe, requires --current-dir parameter for scripts
+- **Simple Mode CLI:** Works when SimpleMode=true, auto-uses current dir for end users
+- Both fully automated, both return exit code 0 on success
+- Simple Mode: For end users (double-click in target folder)
+- --silent flag: For scripts/CI/CD with explicit target paths
+- CLI Simple Mode creates detailed logs: `<patchname>_<utctime>_log.txt`
 
 ---
 

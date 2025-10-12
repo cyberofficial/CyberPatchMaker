@@ -449,7 +449,7 @@ If any check fails:
 
 ### Overview
 
-**NEW in v1.0.9**: Patch creators can enable **Simple Mode** when generating self-contained executables. This provides end users with a simplified, user-friendly interface that hides technical details.
+**NEW in v1.0.9**: Patch creators can enable **Simple Mode** when generating self-contained executables. This provides end users with a fully automated patching experience.
 
 This is distinct from the `--silent` automation flag - instead, this feature is **configured by the patch creator** during patch generation using the `SimpleMode` field in the patch structure.
 
@@ -466,14 +466,15 @@ When a patch is created with Simple Mode enabled:
 - Advanced options are hidden/disabled automatically
 - Provides clear, simple instructions
 
-**For CLI Executables:**
-- Shows clean console interface with patch version info
-- Simple menu with only 3 options:
-  1. Dry Run (test without making changes)
-  2. Apply Patch
-  3. Exit
-- Asks about backup before applying (recommended by default)
-- No confusing technical settings
+**For CLI Executables (Fully Automated):**
+- **No user prompts** - completely automated patching
+- Automatically uses **current directory** as target
+- Automatically enables **backup** (recommended)
+- Automatically runs **dry-run first** to validate
+- If dry-run succeeds, **automatically applies patch**
+- Creates detailed log file: `<patchname>_<utctime>_log.txt`
+- Shows progress in console and logs everything to file
+- Exit code 0 on success, 1 on failure
 
 ### User Experience Example
 
@@ -488,25 +489,61 @@ Please review the options below:
 • Click Apply Patch when ready
 ```
 
-**CLI Mode:**
+**CLI Mode (Fully Automated):**
 ```
 ==============================================
-     Simplified Patch Application
+  CyberPatchMaker - Self-Contained Patch
 ==============================================
 
-You are about to patch "1.0.0" to "1.0.3"
+==============================================
+          Simple Patch Application
+==============================================
 
-Target directory [C:\MyApp]: 
+Automated patching from "1.0.0" to "1.0.3"
 
-Create backup before patching? (Y/n): Y
+Patch Information:
+  Started:      2025-10-12 18:30:45 UTC
+  From Version: 1.0.0
+  To Version:   1.0.3
+  Key File:     program.exe
+  Target Dir:   C:\MyApp
+  Backup:       Enabled
+  Compression:  zstd
 
 ==============================================
-Options:
-  1. Dry Run (test without making changes)
-  2. Apply Patch
-  3. Exit
+Step 1: Dry Run (Validation)
 ==============================================
-Select option [1-3]:
+
+Testing patch application without making changes...
+
+Verifying key file: program.exe
+✓ Key file verified
+
+Verifying 15 required files...
+✓ All required files verified
+
+✓ Dry run completed successfully
+
+==============================================
+Step 2: Applying Patch
+==============================================
+
+Applying patch with backup enabled...
+
+[Patch application output...]
+
+==============================================
+          Patch Applied Successfully
+==============================================
+
+Version updated: 1.0.0 → 1.0.3
+
+========================================
+Status: SUCCESS
+Completed: 2025-10-12 18:31:12 UTC
+========================================
+
+Log saved to: 1.0.0-to-1.0.3_1728756645_log.txt
 ```
 
 ### Benefits
@@ -516,12 +553,15 @@ Select option [1-3]:
 - Reduced support burden
 - Users can't accidentally disable critical safety features
 - Better user experience for non-technical users
+- CLI mode is fully automated - no user interaction needed
 
 **For End Users:**
-- Simple, clear interface
+- **CLI: Zero interaction** - just double-click and it patches
+- **GUI: Simple, clear interface** with only essential options
 - No confusing technical jargon
 - Essential safety features always enabled
-- Dry run option still available for testing
+- Automatic dry-run validation before applying
+- Complete logs saved automatically for troubleshooting
 
 ### When This Mode is Used
 
@@ -530,6 +570,7 @@ Patch creators enable this when:
 - Client deployments with limited support
 - Enterprise environments requiring simplified UX
 - Any scenario where advanced options shouldn't be exposed
+- Need for zero-interaction patching (CLI mode)
 
 ### How to Create Patches with This Feature
 
@@ -538,12 +579,24 @@ See [Generator Guide - Simple Mode](generator-guide.md#example-8-simple-mode-for
 ### Technical Details
 
 When Simple Mode is enabled:
+
+**GUI Mode:**
 - **Verification**: Always enabled (before and after)
 - **Auto-detect version**: Always enabled
 - **Backup**: User can choose, default is YES
 - **Dry Run**: Available to users
-- **Custom key file**: Disabled in GUI, not exposed in simplified CLI
+- **Custom key file**: Disabled in GUI
 - **1GB bypass**: Hidden in simplified interface
+
+**CLI Mode (Fully Automated):**
+- **Target Directory**: Automatically uses current directory
+- **Verification**: Always enabled (before and after)
+- **Backup**: Always enabled (no prompt)
+- **Dry Run**: Automatically performed first
+- **Patch Application**: Automatically applied if dry-run succeeds
+- **Logging**: All output saved to `<patchname>_<utctime>_log.txt`
+- **Exit Codes**: 0 on success, 1 on failure
+- **No User Prompts**: Completely non-interactive
 
 ---
 
