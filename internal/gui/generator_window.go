@@ -1657,11 +1657,36 @@ func (gw *GeneratorWindow) encodeOperationField(writer io.Writer, name string, v
 		return err
 	}
 
-	// For byte slices (binary data), encode as base64
+	// For byte slices (binary data), encode as base64 using streaming encoder
 	if byteData, ok := value.([]byte); ok {
-		encoded := base64.StdEncoding.EncodeToString(byteData)
-		jsonStr := fmt.Sprintf("\"%s\"%s", encoded, commaStr)
-		if _, err := writer.Write([]byte(jsonStr)); err != nil {
+		// Write opening quote
+		if _, err := writer.Write([]byte("\"")); err != nil {
+			return err
+		}
+
+		// Create base64 encoder that writes directly to output
+		encoder := base64.NewEncoder(base64.StdEncoding, writer)
+
+		// Write data in chunks to avoid memory exhaustion
+		const chunkSize = 64 * 1024 // 64KB chunks
+		for i := 0; i < len(byteData); i += chunkSize {
+			end := i + chunkSize
+			if end > len(byteData) {
+				end = len(byteData)
+			}
+			if _, err := encoder.Write(byteData[i:end]); err != nil {
+				encoder.Close()
+				return err
+			}
+		}
+
+		// Close encoder to flush any remaining data
+		if err := encoder.Close(); err != nil {
+			return err
+		}
+
+		// Write closing quote and comma
+		if _, err := writer.Write([]byte(fmt.Sprintf("\"%s", commaStr))); err != nil {
 			return err
 		}
 	} else {
