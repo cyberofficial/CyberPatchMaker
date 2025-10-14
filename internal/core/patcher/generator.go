@@ -176,7 +176,7 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 		FormatVersion: 1,
 		CreatedAt:     time.Now(),
 		Compression:   options.Compression,
-		PatchSize:     g.calculatePatchSize(patch),
+		PatchSize:     g.CalculatePatchSize(patch),
 		Checksum:      "", // Will be calculated when saving
 	}
 
@@ -185,8 +185,8 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 	return patch, nil
 }
 
-// calculatePatchSize calculates the total size of patch operations
-func (g *Generator) calculatePatchSize(patch *utils.Patch) int64 {
+// CalculatePatchSize calculates the total size of patch operations
+func (g *Generator) CalculatePatchSize(patch *utils.Patch) int64 {
 	var totalSize int64
 	for _, op := range patch.Operations {
 		totalSize += op.Size

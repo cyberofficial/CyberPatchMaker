@@ -133,13 +133,39 @@ func main() {
 }
 
 func loadPatch(filename string) (*utils.Patch, error) {
-	// Read patch file
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read patch file: %w", err)
+	// Check if this is a multi-part patch (has .01.patch, .02.patch, etc. naming)
+	if strings.HasSuffix(filename, ".01.patch") {
+		// Load all parts of multi-part patch
+		fmt.Println("Detected multi-part patch, loading all parts...")
+		patch, err := patcher.LoadMultiPartPatch(filename)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load multi-part patch: %w", err)
+		}
+		return patch, nil
 	}
 
-	return parsePatchData(data)
+	// Check if user provided a non-.01 part number
+	// Look for pattern: .XX.patch where XX is 02-99
+	for i := 2; i <= 99; i++ {
+		partSuffix := fmt.Sprintf(".%02d.patch", i)
+		if strings.HasSuffix(filename, partSuffix) {
+			// User provided a non-first part, redirect to part 1
+			part1File := strings.Replace(filename, partSuffix, ".01.patch", 1)
+			if utils.FileExists(part1File) {
+				fmt.Printf("Note: Part %d detected, loading from part 1: %s\n", i, part1File)
+				return loadPatch(part1File)
+			}
+		}
+	}
+
+	// Single-part patch (legacy format)
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open patch file: %w", err)
+	}
+	defer file.Close()
+
+	return parsePatchDataStreaming(file)
 }
 
 // parsePatchData parses patch data, automatically detecting and decompressing if needed
@@ -163,6 +189,74 @@ func parsePatchData(data []byte) (*utils.Patch, error) {
 		if err := json.Unmarshal(data, &patch); err != nil {
 			return nil, fmt.Errorf("failed to parse patch JSON: %w", err)
 		}
+	}
+
+	return &patch, nil
+}
+
+// parsePatchDataStreaming parses patch data using streaming decompression to handle large files
+func parsePatchDataStreaming(reader io.Reader) (*utils.Patch, error) {
+	// Read first few bytes to detect format without consuming the full stream
+	limitedReader := &io.LimitedReader{R: reader, N: 10}
+	header := make([]byte, 10)
+	n, err := limitedReader.Read(header)
+	if err != nil && err != io.EOF {
+		return nil, fmt.Errorf("failed to read patch header: %w", err)
+	}
+	header = header[:n]
+
+	// Check if it starts with JSON (uncompressed)
+	if len(header) > 0 && header[0] == '{' {
+		// Uncompressed JSON - combine header with remaining reader
+		fullReader := io.MultiReader(bytes.NewReader(header), reader)
+		// Use a buffered reader with large buffer for large JSON documents
+		bufReader := bufio.NewReaderSize(fullReader, 64*1024*1024) // 64MB buffer
+		var patch utils.Patch
+		decoder := json.NewDecoder(bufReader)
+		decoder.UseNumber() // Preserve large numbers
+		if err := decoder.Decode(&patch); err != nil {
+			return nil, fmt.Errorf("failed to parse uncompressed patch JSON: %w", err)
+		}
+		return &patch, nil
+	}
+
+	// Not uncompressed JSON, try compressed formats
+	// Combine header with remaining reader for decompression
+	fullReader := io.MultiReader(bytes.NewReader(header), reader)
+
+	// Try zstd decompression
+	zstdPipeReader, zstdPipeWriter := io.Pipe()
+	go func() {
+		defer zstdPipeWriter.Close()
+		if err := utils.DecompressDataStreaming(fullReader, zstdPipeWriter, "zstd"); err != nil {
+			zstdPipeWriter.CloseWithError(err)
+		}
+	}()
+
+	// Use buffered reader for large JSON documents
+	bufReader := bufio.NewReaderSize(zstdPipeReader, 64*1024*1024) // 64MB buffer
+	var patch utils.Patch
+	decoder := json.NewDecoder(bufReader)
+	decoder.UseNumber() // Preserve large numbers as strings to avoid precision loss
+	if err := decoder.Decode(&patch); err == nil {
+		return &patch, nil
+	}
+
+	// Zstd failed, try gzip with fresh reader
+	fullReader = io.MultiReader(bytes.NewReader(header), reader)
+	gzipPipeReader, gzipPipeWriter := io.Pipe()
+	go func() {
+		defer gzipPipeWriter.Close()
+		if err := utils.DecompressDataStreaming(fullReader, gzipPipeWriter, "gzip"); err != nil {
+			gzipPipeWriter.CloseWithError(err)
+		}
+	}()
+
+	bufReader = bufio.NewReaderSize(gzipPipeReader, 64*1024*1024) // 64MB buffer
+	decoder = json.NewDecoder(bufReader)
+	decoder.UseNumber() // Preserve large numbers as strings to avoid precision loss
+	if err := decoder.Decode(&patch); err != nil {
+		return nil, fmt.Errorf("failed to parse patch: unsupported compression or invalid format: %w", err)
 	}
 
 	return &patch, nil
@@ -397,7 +491,7 @@ func checkEmbeddedPatch(ignore1GB bool) (*utils.Patch, string, bool) {
 
 	// The embedded patch data is the raw .patch file content
 	// We need to parse it the same way loadPatch() does
-	patch, err := parsePatchData(patchData)
+	patch, err := parsePatchDataStreaming(bytes.NewReader(patchData))
 	if err != nil {
 		return nil, "", false
 	}

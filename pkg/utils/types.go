@@ -52,6 +52,23 @@ type Patch struct {
 	RequiredFiles []FileRequirement // Files that MUST exist with exact hashes
 	Operations    []PatchOperation  // List of changes to apply
 	SimpleMode    bool              // If true, show simplified UI for end users (minimal options, no advanced settings)
+	MultiPart     *MultiPartInfo    // Multi-part patch information (nil if single-part)
+}
+
+// MultiPartInfo contains metadata for multi-part patches
+type MultiPartInfo struct {
+	IsMultiPart bool       // True if this is a multi-part patch
+	PartNumber  int        // Current part number (1-indexed)
+	TotalParts  int        // Total number of parts
+	PartHashes  []PartHash // Hashes of all parts for verification (only in part 1)
+	MaxPartSize int64      // Maximum size per part (default 4GB)
+}
+
+// PartHash stores hash information for a patch part
+type PartHash struct {
+	PartNumber int    // Part number (1-indexed)
+	Checksum   string // SHA-256 hash of the part file
+	Size       int64  // Part file size in bytes
 }
 
 // FileRequirement specifies a file that must exist with exact hash
@@ -93,6 +110,10 @@ const (
 	// LargeFileThreshold determines when to use chunked processing (1GB)
 	// Files larger than this threshold will be processed in chunks
 	LargeFileThreshold = 1024 * 1024 * 1024 // 1 GB
+
+	// DefaultMaxPartSize is the default maximum size for multi-part patches (4GB)
+	// Patches larger than this will be split into multiple parts
+	DefaultMaxPartSize = 4 * 1024 * 1024 * 1024 // 4 GB
 )
 
 // PatchHeader contains patch-level information

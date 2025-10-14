@@ -441,8 +441,29 @@ func (aw *ApplierWindow) loadPatchInfo() {
 	aw.appendLog("Patch information loaded successfully")
 }
 
-// loadPatch loads a patch from file (with automatic decompression)
+// loadPatch loads a patch from file (with automatic decompression and multi-part support)
 func (aw *ApplierWindow) loadPatch(filename string) (*utils.Patch, error) {
+	// Check if this is a multi-part patch (filename ends with .01.patch, .02.patch, etc.)
+	basename := filepath.Base(filename)
+
+	// Check for .01.patch, .02.patch, etc. pattern
+	if len(basename) >= 9 && basename[len(basename)-9:len(basename)-6] == ".0" {
+		// Extract part number
+		partNumStr := basename[len(basename)-8 : len(basename)-6]
+
+		// If user specified part 2 or higher, redirect to part 1
+		if partNumStr != "01" {
+			part1Path := filepath.Join(filepath.Dir(filename), basename[:len(basename)-8]+"01.patch")
+			aw.appendLog(fmt.Sprintf("Detected multi-part patch - loading from part 1: %s", part1Path))
+			filename = part1Path
+		}
+
+		// Load multi-part patch
+		aw.appendLog("Loading multi-part patch...")
+		return patcher.LoadMultiPartPatch(filename)
+	}
+
+	// Single-part patch - use standard loading
 	// Read patch file
 	data, err := os.ReadFile(filename)
 	if err != nil {

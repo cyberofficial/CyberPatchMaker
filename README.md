@@ -33,6 +33,7 @@ Perfect for:
 - **Simple Mode for End Users** - Simplified interface for non-technical users with basic options **(New in v1.0.9!)**
 - **Silent Mode** - Fully automatic patching with zero user interaction, automatic log file generation (CLI only)
 - **Large File Handling** - Automatic memory-optimized processing for files >1GB, prevents memory exhaustion **(New in v1.0.6!)**
+- **Multi-Part Patches** - Automatic splitting of patches >4GB into manageable parts (prevents memory exhaustion with 18GB+ patches) **(New!)**
 
 ## Quick Start
 
@@ -82,6 +83,7 @@ The `--verify` flag ensures everything is checked before and after patching, wit
 - [CLI Reference](docs/cli-reference.md) - Complete command reference
 - [CLI Examples](docs/CLI-EXAMPLES.md) - Common usage patterns
 - [Downgrade Guide](docs/downgrade-guide.md) - Rollback to previous versions
+- [Multi-Part Patches](docs/multipart-patches.md) - Handling patches >4GB (automatic splitting)
 
 ### Excluding Files with .cyberignore (New!)
 

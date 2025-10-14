@@ -997,25 +997,13 @@ func (gw *GeneratorWindow) generatePatch() {
 		return
 	}
 
-	// Save patch to file
+	// Save patch to file (with automatic multi-part splitting if needed)
 	gw.appendLog("Saving patch file...")
-	if err := gw.savePatch(patch, outputPath, options); err != nil {
+	if err := gw.savePatchWithMultiPartSupport(patch, outputPath, options, generator); err != nil {
 		gw.setStatus("Error: Failed to save patch")
 		gw.appendLog("ERROR: " + err.Error())
 		gw.generateBtn.Enable()
 		return
-	}
-
-	// Get patch file size
-	info, err := os.Stat(outputPath)
-	if err == nil {
-		sizeKB := float64(info.Size()) / 1024.0
-		sizeMB := sizeKB / 1024.0
-		if sizeMB >= 1.0 {
-			gw.appendLog(fmt.Sprintf("Patch size: %.2f MB", sizeMB))
-		} else {
-			gw.appendLog(fmt.Sprintf("Patch size: %.2f KB", sizeKB))
-		}
 	}
 
 	gw.setStatus("Patch generated successfully!")
@@ -1060,8 +1048,8 @@ func (gw *GeneratorWindow) generatePatch() {
 			if err := reverseGenerator.ValidatePatch(reversePatch); err != nil {
 				gw.appendLog("ERROR: Reverse patch validation failed: " + err.Error())
 			} else {
-				// Save reverse patch
-				if err := gw.savePatch(reversePatch, reversePatchPath, options); err != nil {
+				// Save reverse patch (with multi-part support)
+				if err := gw.savePatchWithMultiPartSupport(reversePatch, reversePatchPath, options, reverseGenerator); err != nil {
 					gw.appendLog("ERROR: Failed to save reverse patch: " + err.Error())
 				} else {
 					// Get reverse patch file size
@@ -1294,24 +1282,14 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 			continue
 		}
 
-		// Save patch
-		if err := gw.savePatch(patch, outputPath, options); err != nil {
+		// Save patch (with multi-part support)
+		if err := gw.savePatchWithMultiPartSupport(patch, outputPath, options, generator); err != nil {
 			gw.appendLog(fmt.Sprintf("ERROR: Failed to save patch: %v", err))
 			failCount++
 			continue
 		}
 
-		// Get patch file size
-		info, err := os.Stat(outputPath)
-		if err == nil {
-			sizeKB := float64(info.Size()) / 1024.0
-			sizeMB := sizeKB / 1024.0
-			if sizeMB >= 1.0 {
-				gw.appendLog(fmt.Sprintf("✓ Patch saved: %.2f MB", sizeMB))
-			} else {
-				gw.appendLog(fmt.Sprintf("✓ Patch saved: %.2f KB", sizeKB))
-			}
-		}
+		// Note: File size is already reported in savePatchWithMultiPartSupport
 
 		// Create self-contained executable if requested
 		if gw.createExecutable {
@@ -1353,21 +1331,11 @@ func (gw *GeneratorWindow) generateBatchPatches() {
 				if err := reverseGenerator.ValidatePatch(reversePatch); err != nil {
 					gw.appendLog(fmt.Sprintf("ERROR: Reverse patch validation failed: %v", err))
 				} else {
-					// Save reverse patch
-					if err := gw.savePatch(reversePatch, reversePatchPath, options); err != nil {
+					// Save reverse patch (with multi-part support)
+					if err := gw.savePatchWithMultiPartSupport(reversePatch, reversePatchPath, options, reverseGenerator); err != nil {
 						gw.appendLog(fmt.Sprintf("ERROR: Failed to save reverse patch: %v", err))
 					} else {
-						// Get reverse patch file size
-						info, err := os.Stat(reversePatchPath)
-						if err == nil {
-							sizeKB := float64(info.Size()) / 1024.0
-							sizeMB := sizeKB / 1024.0
-							if sizeMB >= 1.0 {
-								gw.appendLog(fmt.Sprintf("✓ Reverse patch saved: %.2f MB", sizeMB))
-							} else {
-								gw.appendLog(fmt.Sprintf("✓ Reverse patch saved: %.2f KB", sizeKB))
-							}
-						}
+						// Note: File size is already reported in savePatchWithMultiPartSupport
 
 						// Create reverse exe if requested
 						if gw.createExecutable {
@@ -1430,7 +1398,62 @@ func (gw *GeneratorWindow) appendLog(message string) {
 	gw.logText.Refresh()
 }
 
-// savePatch saves the patch to a file with compression and streaming to avoid memory exhaustion
+// savePatchWithMultiPartSupport checks patch size and splits into parts if needed
+func (gw *GeneratorWindow) savePatchWithMultiPartSupport(patch *utils.Patch, filename string, options *utils.PatchOptions, generator *patcher.Generator) error {
+	// Check if patch needs to be split into multiple parts
+	totalSize := generator.CalculatePatchSize(patch)
+
+	if totalSize > utils.DefaultMaxPartSize {
+		sizeGB := float64(totalSize) / (1024 * 1024 * 1024)
+		gw.appendLog(fmt.Sprintf("\nPatch size (%.2f GB) exceeds 4GB limit, splitting into multiple parts...", sizeGB))
+
+		// Split patch into parts using generator method
+		parts, err := generator.SplitPatchIntoParts(patch, utils.DefaultMaxPartSize)
+		if err != nil {
+			return fmt.Errorf("failed to split patch: %w", err)
+		}
+
+		// Save multi-part patch using generator method
+		compressionStr := options.Compression
+		if err := generator.SaveMultiPartPatch(parts, filename, compressionStr); err != nil {
+			return fmt.Errorf("failed to save multi-part patch: %w", err)
+		}
+
+		gw.appendLog(fmt.Sprintf("✓ Multi-part patch saved: %d parts", len(parts)))
+
+		// Report total size across all parts
+		totalSizeMB := float64(totalSize) / (1024 * 1024)
+		gw.appendLog(fmt.Sprintf("Total patch size: %.2f MB across %d parts", totalSizeMB, len(parts)))
+
+		// Report individual part sizes
+		for i, part := range parts {
+			partSize := generator.CalculatePatchSize(part)
+			partSizeMB := float64(partSize) / (1024 * 1024)
+			gw.appendLog(fmt.Sprintf("  Part %d: %.2f MB (%d operations)", i+1, partSizeMB, len(part.Operations)))
+		}
+
+		return nil
+	}
+
+	// Save single-part patch (existing logic)
+	if err := gw.savePatch(patch, filename, options); err != nil {
+		return err
+	}
+
+	// Get patch file size
+	info, err := os.Stat(filename)
+	if err == nil {
+		sizeKB := float64(info.Size()) / 1024.0
+		sizeMB := sizeKB / 1024.0
+		if sizeMB >= 1.0 {
+			gw.appendLog(fmt.Sprintf("Patch size: %.2f MB", sizeMB))
+		} else {
+			gw.appendLog(fmt.Sprintf("Patch size: %.2f KB", sizeKB))
+		}
+	}
+
+	return nil
+} // savePatch saves the patch to a file with compression and streaming to avoid memory exhaustion
 func (gw *GeneratorWindow) savePatch(patch *utils.Patch, filename string, options *utils.PatchOptions) error {
 	// Create output file
 	outFile, err := os.Create(filename)
