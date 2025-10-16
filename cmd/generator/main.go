@@ -39,6 +39,8 @@ func main() {
 	rescan := flag.Bool("rescan", false, "Force rescan of cached versions")
 	scanData := flag.String("scandata", "", "Custom directory for scan cache (default: .data)")
 	jobs := flag.Int("jobs", 0, "Number of parallel workers (0 = auto-detect CPU cores, 1 = single-threaded)")
+	splitSize := flag.String("splitsize", "", "Custom multi-part split size (e.g., '2G', '2GB', '500M', '500MB'). Default: 4GB")
+	bypassSplitLimit := flag.Bool("bypasssplitlimit", false, "Bypass 100MB minimum split size check")
 	versionFlag := flag.Bool("version", false, "Show version information")
 	help := flag.Bool("help", false, "Show help message")
 
@@ -88,6 +90,36 @@ func main() {
 		}
 	}
 
+	// Parse custom split size if provided
+	var customMaxPartSize int64
+	if *splitSize != "" {
+		parsedSize, err := parseSplitSize(*splitSize)
+		if err != nil {
+			fmt.Printf("Error: invalid split size: %v\n", err)
+			os.Exit(1)
+		}
+
+		// Check if below 100MB minimum and bypass flag not set
+		const minSplitSize = 100 * 1024 * 1024 // 100MB
+		if parsedSize < minSplitSize && !*bypassSplitLimit {
+			fmt.Printf("\nWarning: Split size %.2f MB is below recommended minimum of 100 MB\n", float64(parsedSize)/(1024*1024))
+			fmt.Printf("This may create many small parts and is not recommended unless upload space is very limited.\n")
+			fmt.Print("Do you want to continue? (yes/no): ")
+
+			var response string
+			fmt.Scanln(&response)
+			response = strings.ToLower(strings.TrimSpace(response))
+
+			if response != "yes" && response != "y" {
+				fmt.Println("Aborted. Use --bypasssplitlimit to skip this confirmation.")
+				os.Exit(0)
+			}
+		}
+
+		customMaxPartSize = parsedSize
+		fmt.Printf("✓ Custom split size: %.2f GB (%.0f MB)\n", float64(customMaxPartSize)/(1024*1024*1024), float64(customMaxPartSize)/(1024*1024))
+	}
+
 	// Set output directory
 	outputDir := *output
 	if outputDir == "" {
@@ -106,13 +138,13 @@ func main() {
 	// Handle different modes
 	if *newVersion != "" && *versionsDir != "" {
 		// Generate patches from all existing versions to new version
-		generateAllPatches(versionMgr, *versionsDir, *newVersion, outputDir, *keyFile, *compression, *level, *verify, *createExe, *crp)
+		generateAllPatches(versionMgr, *versionsDir, *newVersion, outputDir, *keyFile, *compression, *level, *verify, *createExe, *crp, customMaxPartSize)
 	} else if *fromDir != "" && *toDir != "" {
 		// Generate single patch using custom directory paths
-		generateSinglePatchCustomPaths(versionMgr, *fromDir, *toDir, outputDir, *keyFile, *compression, *level, *verify, *createExe, *crp)
+		generateSinglePatchCustomPaths(versionMgr, *fromDir, *toDir, outputDir, *keyFile, *compression, *level, *verify, *createExe, *crp, customMaxPartSize)
 	} else if *from != "" && *to != "" && *versionsDir != "" {
 		// Generate single patch using versions-dir
-		generateSinglePatch(versionMgr, *versionsDir, *from, *to, outputDir, *keyFile, *compression, *level, *verify, *createExe, *crp)
+		generateSinglePatch(versionMgr, *versionsDir, *from, *to, outputDir, *keyFile, *compression, *level, *verify, *createExe, *crp, customMaxPartSize)
 	} else {
 		fmt.Println("Error: insufficient arguments")
 		printHelp()
@@ -120,7 +152,62 @@ func main() {
 	}
 }
 
-func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, outputDir, customKeyFile, compression string, level int, verify, createExe, crp bool) {
+// parseSplitSize parses a size string like "2G", "2GB", "500M", "500MB" into bytes
+func parseSplitSize(sizeStr string) (int64, error) {
+	sizeStr = strings.ToUpper(strings.TrimSpace(sizeStr))
+
+	// Extract numeric part and unit
+	var numStr string
+	var unit string
+
+	for i, ch := range sizeStr {
+		if ch >= '0' && ch <= '9' || ch == '.' {
+			numStr += string(ch)
+		} else {
+			unit = sizeStr[i:]
+			break
+		}
+	}
+
+	if numStr == "" {
+		return 0, fmt.Errorf("no numeric value found in '%s'", sizeStr)
+	}
+
+	// Parse the number
+	var value float64
+	if _, err := fmt.Sscanf(numStr, "%f", &value); err != nil {
+		return 0, fmt.Errorf("invalid number '%s': %w", numStr, err)
+	}
+
+	if value <= 0 {
+		return 0, fmt.Errorf("size must be positive, got %.2f", value)
+	}
+
+	// Parse the unit
+	unit = strings.TrimSpace(unit)
+	var multiplier int64
+
+	switch unit {
+	case "G", "GB":
+		multiplier = 1024 * 1024 * 1024 // Gigabytes
+	case "M", "MB":
+		multiplier = 1024 * 1024 // Megabytes
+	case "":
+		// No unit specified - assume bytes
+		return 0, fmt.Errorf("unit required (use 'G', 'GB', 'M', or 'MB')")
+	default:
+		return 0, fmt.Errorf("invalid unit '%s' (use 'G', 'GB', 'M', or 'MB')", unit)
+	}
+
+	result := int64(value * float64(multiplier))
+	if result <= 0 {
+		return 0, fmt.Errorf("calculated size overflow or invalid")
+	}
+
+	return result, nil
+}
+
+func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, outputDir, customKeyFile, compression string, level int, verify, createExe, crp bool, customMaxPartSize int64) {
 	fmt.Printf("Generating patches for new version %s\n", newVersion)
 
 	// Scan for existing versions
@@ -215,7 +302,7 @@ func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, ou
 		if crp {
 			// Generate both patches efficiently using the same scan data
 			reversePatchFile := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.patch", newVersion, fromVersion))
-			if err := generatePatchWithReverse(fromVer, toVer, patchFile, reversePatchFile, compression, level, verify); err != nil {
+			if err := generatePatchWithReverse(fromVer, toVer, patchFile, reversePatchFile, compression, level, verify, customMaxPartSize); err != nil {
 				fmt.Printf("Error: failed to generate patches from %s: %v\n", fromVersion, err)
 				continue
 			}
@@ -241,7 +328,7 @@ func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, ou
 			patchCount += 2 // Count both patches
 		} else {
 			// Generate only forward patch
-			if err := generatePatch(fromVer, toVer, patchFile, compression, level, verify); err != nil {
+			if err := generatePatch(fromVer, toVer, patchFile, compression, level, verify, customMaxPartSize); err != nil {
 				fmt.Printf("Error: failed to generate patch from %s: %v\n", fromVersion, err)
 				continue
 			}
@@ -263,7 +350,7 @@ func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, ou
 	fmt.Printf("\nSuccessfully generated %d patches\n", patchCount)
 }
 
-func generateSinglePatch(versionMgr *version.Manager, versionsDir, from, to, outputDir, customKeyFile, compression string, level int, verify, createExe, crp bool) {
+func generateSinglePatch(versionMgr *version.Manager, versionsDir, from, to, outputDir, customKeyFile, compression string, level int, verify, createExe, crp bool, customMaxPartSize int64) {
 	fmt.Printf("Generating patch from %s to %s\n", from, to)
 
 	// Determine key file for FROM version
@@ -330,7 +417,7 @@ func generateSinglePatch(versionMgr *version.Manager, versionsDir, from, to, out
 		// Generate both patches efficiently using the same scan data
 		fmt.Printf("\nGenerating forward and reverse patches...\n")
 		reversePatchFile := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.patch", to, from))
-		if err := generatePatchWithReverse(fromVer, toVer, patchFile, reversePatchFile, compression, level, verify); err != nil {
+		if err := generatePatchWithReverse(fromVer, toVer, patchFile, reversePatchFile, compression, level, verify, customMaxPartSize); err != nil {
 			fmt.Printf("Error: failed to generate patches: %v\n", err)
 			os.Exit(1)
 		}
@@ -354,7 +441,7 @@ func generateSinglePatch(versionMgr *version.Manager, versionsDir, from, to, out
 		}
 	} else {
 		// Generate only forward patch
-		if err := generatePatch(fromVer, toVer, patchFile, compression, level, verify); err != nil {
+		if err := generatePatch(fromVer, toVer, patchFile, compression, level, verify, customMaxPartSize); err != nil {
 			fmt.Printf("Error: failed to generate patch: %v\n", err)
 			os.Exit(1)
 		}
@@ -374,7 +461,7 @@ func generateSinglePatch(versionMgr *version.Manager, versionsDir, from, to, out
 
 // generateSinglePatchCustomPaths generates a patch using custom directory paths
 // This allows versions to be on different drives or network locations
-func generateSinglePatchCustomPaths(versionMgr *version.Manager, fromPath, toPath, outputDir, customKeyFile, compression string, level int, verify, createExe, crp bool) {
+func generateSinglePatchCustomPaths(versionMgr *version.Manager, fromPath, toPath, outputDir, customKeyFile, compression string, level int, verify, createExe, crp bool, customMaxPartSize int64) {
 	// Extract version numbers from directory names
 	fromVersion := extractVersionFromPath(fromPath)
 	toVersion := extractVersionFromPath(toPath)
@@ -446,7 +533,7 @@ func generateSinglePatchCustomPaths(versionMgr *version.Manager, fromPath, toPat
 		// Generate both patches efficiently using the same scan data
 		fmt.Printf("\nGenerating forward and reverse patches...\n")
 		reversePatchFile := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.patch", toVersion, fromVersion))
-		if err := generatePatchWithReverse(fromVer, toVer, patchFile, reversePatchFile, compression, level, verify); err != nil {
+		if err := generatePatchWithReverse(fromVer, toVer, patchFile, reversePatchFile, compression, level, verify, customMaxPartSize); err != nil {
 			fmt.Printf("Error: failed to generate patches: %v\n", err)
 			os.Exit(1)
 		}
@@ -470,7 +557,7 @@ func generateSinglePatchCustomPaths(versionMgr *version.Manager, fromPath, toPat
 		}
 	} else {
 		// Generate only forward patch
-		if err := generatePatch(fromVer, toVer, patchFile, compression, level, verify); err != nil {
+		if err := generatePatch(fromVer, toVer, patchFile, compression, level, verify, customMaxPartSize); err != nil {
 			fmt.Printf("Error: failed to generate patch: %v\n", err)
 			os.Exit(1)
 		}
@@ -496,7 +583,7 @@ func extractVersionFromPath(path string) string {
 	return filepath.Base(path)
 }
 
-func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string, level int, verify bool) error {
+func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string, level int, verify bool, customMaxPartSize int64) error {
 	// Create patch options
 	options := &utils.PatchOptions{
 		Compression:      compression,
@@ -519,12 +606,17 @@ func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string
 
 	// Check if patch needs to be split into multiple parts
 	totalSize := generator.CalculatePatchSize(patch)
-	if totalSize > utils.DefaultMaxPartSize {
-		fmt.Printf("\nPatch size (%d bytes / %.2f GB) exceeds 4GB limit, splitting into multiple parts...\n",
-			totalSize, float64(totalSize)/(1024*1024*1024))
+	var maxPartSize int64 = utils.DefaultMaxPartSize
+	if customMaxPartSize > 0 {
+		maxPartSize = customMaxPartSize
+	}
+
+	if totalSize > maxPartSize {
+		fmt.Printf("\nPatch size (%d bytes / %.2f GB) exceeds %.2f GB limit, splitting into multiple parts...\n",
+			totalSize, float64(totalSize)/(1024*1024*1024), float64(maxPartSize)/(1024*1024*1024))
 
 		// Split patch into parts
-		parts, err := generator.SplitPatchIntoParts(patch, utils.DefaultMaxPartSize)
+		parts, err := generator.SplitPatchIntoParts(patch, maxPartSize)
 		if err != nil {
 			return fmt.Errorf("failed to split patch: %w", err)
 		}
@@ -549,7 +641,7 @@ func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string
 
 // generatePatchWithReverse generates both forward and reverse patches efficiently
 // by reusing the same generator and scan data (no need to rescan directories)
-func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, reverseFile, compression string, level int, verify bool) error {
+func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, reverseFile, compression string, level int, verify bool, customMaxPartSize int64) error {
 	// Create patch options
 	options := &utils.PatchOptions{
 		Compression:      compression,
@@ -571,7 +663,7 @@ func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, revers
 	}
 
 	// Save forward patch
-	if err := savePatch(forwardPatch, forwardFile, options); err != nil {
+	if err := savePatchWithCustomSize(forwardPatch, forwardFile, options, customMaxPartSize); err != nil {
 		return fmt.Errorf("failed to save forward patch: %w", err)
 	}
 	fmt.Printf("Patch saved to: %s\n", forwardFile)
@@ -590,7 +682,7 @@ func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, revers
 	}
 
 	// Save reverse patch
-	if err := savePatch(reversePatch, reverseFile, options); err != nil {
+	if err := savePatchWithCustomSize(reversePatch, reverseFile, options, customMaxPartSize); err != nil {
 		return fmt.Errorf("failed to save reverse patch: %w", err)
 	}
 	fmt.Printf("Reverse patch saved to: %s\n", reverseFile)
@@ -599,6 +691,10 @@ func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, revers
 }
 
 func savePatch(patch *utils.Patch, filename string, options *utils.PatchOptions) error {
+	return savePatchWithCustomSize(patch, filename, options, 0)
+}
+
+func savePatchWithCustomSize(patch *utils.Patch, filename string, options *utils.PatchOptions, customMaxPartSize int64) error {
 	// Create output file
 	outFile, err := os.Create(filename)
 	if err != nil {
@@ -995,6 +1091,8 @@ func printHelp() {
 	fmt.Println("  --rescan          Force rescan of cached versions (use with --savescans)")
 	fmt.Println("  --scandata        Custom directory for scan cache (default: .data)")
 	fmt.Println("  --jobs            Number of parallel workers (0=auto-detect CPU cores, 1=single-threaded, default: 0)")
+	fmt.Println("  --splitsize       Custom multi-part split size (e.g., '2G', '2GB', '500M', '500MB', default: 4GB)")
+	fmt.Println("  --bypasssplitlimit Bypass 100MB minimum split size confirmation")
 	fmt.Println("  --version         Show version information")
 	fmt.Println("  --help            Show this help message")
 	fmt.Println("\nExamples:")
@@ -1012,6 +1110,11 @@ func printHelp() {
 	fmt.Println("  patch-gen --from-dir C:\\\\v1 --to-dir C:\\\\v2 --output patches --jobs 8")
 	fmt.Println("\\n  # Force rescan of cached versions")
 	fmt.Println("  patch-gen --versions-dir C:\\\\versions --from 1.0.0 --to 1.0.1 --output patches --savescans --rescan")
+	fmt.Println("\\n  # Custom split size for multi-part patches")
+	fmt.Println("  patch-gen --from-dir C:\\\\v1 --to-dir C:\\\\v2 --output patches --splitsize 2G")
+	fmt.Println("  patch-gen --from-dir C:\\\\v1 --to-dir C:\\\\v2 --output patches --splitsize 500MB")
+	fmt.Println("\\n  # Small split size (below 100MB) with bypass")
+	fmt.Println("  patch-gen --from-dir C:\\\\v1 --to-dir C:\\\\v2 --output patches --splitsize 50M --bypasssplitlimit")
 	fmt.Println("\n  # Versions on different network locations")
 	fmt.Println("  patch-gen --from-dir \\\\\\\\server1\\\\app\\\\v1 --to-dir \\\\\\\\server2\\\\app\\\\v2 --output .")
 }
