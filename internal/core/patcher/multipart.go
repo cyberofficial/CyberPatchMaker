@@ -128,25 +128,29 @@ func (g *Generator) SaveMultiPartPatch(parts []*utils.Patch, basePath string, co
 	baseFile := filepath.Base(basePath)
 	baseFile = strings.TrimSuffix(baseFile, ".patch")
 
-	// Pre-calculate part hashes by saving parts to temporary files first
-	partHashes := make([]utils.PartHash, len(parts))
-	tempFiles := make([]string, len(parts))
-
+	// First, save all parts to their final locations (without PartHashes yet)
+	partPaths := make([]string, len(parts))
 	for i, part := range parts {
-		// Generate temporary filename
-		tempFile := fmt.Sprintf("%s.%02d.patch.tmp", baseFile, i+1)
-		tempPath := filepath.Join(baseDir, tempFile)
+		partFile := fmt.Sprintf("%s.%02d.patch", baseFile, i+1)
+		partPath := filepath.Join(baseDir, partFile)
+		partPaths[i] = partPath
 
-		// Save part to temporary file
-		if err := utils.SavePatch(part, tempPath, compression); err != nil {
-			return fmt.Errorf("failed to save part %d: %w", i+1, err)
+		// For parts 2+, don't include PartHashes in metadata
+		if i > 0 && part.MultiPart != nil {
+			part.MultiPart.PartHashes = nil
 		}
 
-		// Calculate hash of the temporary file
-		data, err := os.ReadFile(tempPath)
+		if err := utils.SavePatch(part, partPath, compression); err != nil {
+			return fmt.Errorf("failed to save part %d: %w", i+1, err)
+		}
+	}
+
+	// Now calculate hashes of all saved part files
+	partHashes := make([]utils.PartHash, len(parts))
+	for i, partPath := range partPaths {
+		data, err := os.ReadFile(partPath)
 		if err != nil {
-			os.Remove(tempPath) // Clean up on error
-			return fmt.Errorf("failed to read part %d for hashing: %w", i+1, err)
+			return fmt.Errorf("failed to read saved part %d for hashing: %w", i+1, err)
 		}
 
 		hash := sha256.Sum256(data)
@@ -155,36 +159,28 @@ func (g *Generator) SaveMultiPartPatch(parts []*utils.Patch, basePath string, co
 			Checksum:   fmt.Sprintf("%x", hash),
 			Size:       int64(len(data)),
 		}
-
-		tempFiles[i] = tempPath
 	}
 
-	// Update all parts with complete hash information
-	for _, part := range parts {
-		if part.MultiPart != nil {
-			part.MultiPart.PartHashes = partHashes
-		}
+	// Update part 1 with the correct PartHashes and save it again
+	parts[0].MultiPart.PartHashes = partHashes
+	if err := utils.SavePatch(parts[0], partPaths[0], compression); err != nil {
+		return fmt.Errorf("failed to save updated part 1: %w", err)
 	}
 
-	// Now save all parts with correct hash information
-	for i, part := range parts {
-		// Generate final filename
-		partFile := fmt.Sprintf("%s.%02d.patch", baseFile, i+1)
-		partPath := filepath.Join(baseDir, partFile)
-
-		// Remove temp file and save final version
-		os.Remove(tempFiles[i])
-		if err := utils.SavePatch(part, partPath, compression); err != nil {
-			return fmt.Errorf("failed to save final part %d: %w", i+1, err)
-		}
-
-		fmt.Printf("Saved part %d: %s (%d bytes)\n", i+1, partPath, partHashes[i].Size)
+	// Calculate final hash for part 1 after updating
+	data, err := os.ReadFile(partPaths[0])
+	if err != nil {
+		return fmt.Errorf("failed to read final part 1 for size update: %w", err)
 	}
+	partHashes[0].Size = int64(len(data))
 
-	fmt.Printf("\n✓ Multi-part patch saved successfully:\n")
+	fmt.Printf("✓ Multi-part patch saved successfully:\n")
 	fmt.Printf("  Base name: %s\n", baseFile)
 	fmt.Printf("  Total parts: %d\n", len(parts))
 	fmt.Printf("  Compression: %s\n", compression)
+	for i, ph := range partHashes {
+		fmt.Printf("  Part %d: %d bytes\n", i+1, ph.Size)
+	}
 
 	return nil
 }
