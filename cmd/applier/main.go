@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -489,14 +490,41 @@ func checkEmbeddedPatch(ignore1GB bool) (*utils.Patch, string, bool) {
 		return nil, "", false
 	}
 
-	// The embedded patch data is the raw .patch file content
-	// We need to parse it the same way loadPatch() does
-	patch, err := parsePatchDataStreaming(bytes.NewReader(patchData))
-	if err != nil {
-		return nil, "", false
-	}
+	// The embedded patch data is the raw .patch file content (part 01 if multi-part)
+	// Check if there are additional parts (.02, .03, etc.) in the same directory as the exe
+	exeDir := filepath.Dir(exePath)
+	exeBaseName := strings.TrimSuffix(filepath.Base(exePath), ".exe")
 
-	// Get current directory as default target
+	// Check if part 02 exists to determine if this is multi-part
+	part02Path := filepath.Join(exeDir, exeBaseName+".02.patch")
+	isMultiPart := utils.FileExists(part02Path)
+
+	var patch *utils.Patch
+	if isMultiPart {
+		// Multi-part patch: Save embedded part 01 temporarily and load all parts
+		// Save in exe directory with the correct base name so LoadMultiPartPatch finds the parts
+		tempPart01 := filepath.Join(exeDir, exeBaseName+".01.patch")
+
+		// Write part 01 data to temporary file
+		if err := os.WriteFile(tempPart01, patchData, 0644); err != nil {
+			return nil, "", false
+		}
+		defer os.Remove(tempPart01) // Clean up temporary file
+
+		// Load all parts using multi-part loader
+		patch, err = patcher.LoadMultiPartPatch(tempPart01)
+		if err != nil {
+			return nil, "", false
+		}
+
+		fmt.Printf("✓ Loaded multi-part patch from embedded part 01 + external parts\n")
+	} else {
+		// Single-part patch: Parse embedded data directly
+		patch, err = parsePatchDataStreaming(bytes.NewReader(patchData))
+		if err != nil {
+			return nil, "", false
+		}
+	} // Get current directory as default target
 	targetDir, _ := os.Getwd()
 
 	return patch, targetDir, true

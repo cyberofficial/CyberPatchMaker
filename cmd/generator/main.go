@@ -328,19 +328,9 @@ func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, ou
 			patchCount += 2 // Count both patches
 		} else {
 			// Generate only forward patch
-			if err := generatePatch(fromVer, toVer, patchFile, compression, level, verify, customMaxPartSize); err != nil {
+			if err := generatePatch(fromVer, toVer, patchFile, compression, level, createExe, customMaxPartSize); err != nil {
 				fmt.Printf("Error: failed to generate patch from %s: %v\n", fromVersion, err)
 				continue
-			}
-
-			// Create self-contained executable if requested
-			if createExe {
-				exePath := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.exe", fromVersion, newVersion))
-				if err := createStandaloneCLIExe(patchFile, exePath, compression); err != nil {
-					fmt.Printf("Warning: failed to create executable for %s: %v\n", fromVersion, err)
-				} else {
-					fmt.Printf("Created executable: %s\n", exePath)
-				}
 			}
 
 			patchCount++
@@ -441,21 +431,11 @@ func generateSinglePatch(versionMgr *version.Manager, versionsDir, from, to, out
 		}
 	} else {
 		// Generate only forward patch
-		if err := generatePatch(fromVer, toVer, patchFile, compression, level, verify, customMaxPartSize); err != nil {
+		if err := generatePatch(fromVer, toVer, patchFile, compression, level, createExe, customMaxPartSize); err != nil {
 			fmt.Printf("Error: failed to generate patch: %v\n", err)
 			os.Exit(1)
 		}
 		fmt.Println("Patch generated successfully")
-
-		// Create self-contained executable if requested
-		if createExe {
-			exePath := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.exe", from, to))
-			if err := createStandaloneCLIExe(patchFile, exePath, compression); err != nil {
-				fmt.Printf("Error: failed to create executable: %v\n", err)
-				os.Exit(1)
-			}
-			fmt.Printf("Created executable: %s\n", exePath)
-		}
 	}
 }
 
@@ -557,21 +537,11 @@ func generateSinglePatchCustomPaths(versionMgr *version.Manager, fromPath, toPat
 		}
 	} else {
 		// Generate only forward patch
-		if err := generatePatch(fromVer, toVer, patchFile, compression, level, verify, customMaxPartSize); err != nil {
+		if err := generatePatch(fromVer, toVer, patchFile, compression, level, createExe, customMaxPartSize); err != nil {
 			fmt.Printf("Error: failed to generate patch: %v\n", err)
 			os.Exit(1)
 		}
 		fmt.Printf("✓ Patch generated successfully: %s\n", patchFile)
-
-		// Create self-contained executable if requested
-		if createExe {
-			exePath := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.exe", fromVersion, toVersion))
-			if err := createStandaloneCLIExe(patchFile, exePath, compression); err != nil {
-				fmt.Printf("Error: failed to create executable: %v\n", err)
-				os.Exit(1)
-			}
-			fmt.Printf("✓ Created executable: %s\n", exePath)
-		}
 	}
 }
 
@@ -583,12 +553,12 @@ func extractVersionFromPath(path string) string {
 	return filepath.Base(path)
 }
 
-func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string, level int, verify bool, customMaxPartSize int64) error {
+func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string, level int, createExe bool, customMaxPartSize int64) error {
 	// Create patch options
 	options := &utils.PatchOptions{
 		Compression:      compression,
 		CompressionLevel: level,
-		VerifyAfter:      verify,
+		VerifyAfter:      true,
 		SkipIdentical:    true,
 	}
 
@@ -627,6 +597,40 @@ func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string
 		}
 
 		fmt.Printf("✓ Multi-part patch saved: %d parts\n", len(parts))
+
+		// If create-exe flag is set, check if part 01 can be turned into an exe
+		if createExe {
+			// Construct part 01 filename
+			part01File := strings.TrimSuffix(outputFile, ".patch") + ".01.patch"
+
+			// Check if part 01 exists and get its size
+			if fileInfo, err := os.Stat(part01File); err == nil {
+				part01Size := fileInfo.Size()
+				const maxExeSize int64 = 3*1024*1024*1024 + 768*1024*1024 // 3.75 GB
+
+				if part01Size < maxExeSize {
+					fmt.Printf("\n✓ Part 01 size (%.2f GB) is under 3.75 GB limit, creating self-contained executable...\n",
+						float64(part01Size)/(1024*1024*1024))
+
+					// Extract version info from output filename
+					baseName := filepath.Base(outputFile)
+					exeName := strings.TrimSuffix(baseName, ".patch") + ".exe"
+					exePath := filepath.Join(filepath.Dir(outputFile), exeName)
+
+					if err := createStandaloneCLIExe(part01File, exePath, compression); err != nil {
+						fmt.Printf("Warning: failed to create executable from part 01: %v\n", err)
+					} else {
+						fmt.Printf("✓ Created self-contained executable from part 01: %s\n", exePath)
+						fmt.Printf("  Note: This exe will automatically detect and use remaining parts (.02, .03, etc.)\n")
+						fmt.Printf("  You can distribute: (1) exe + remaining parts, or (2) all parts together\n")
+					}
+				} else {
+					fmt.Printf("\nℹ Part 01 size (%.2f GB) exceeds 3.75 GB Windows exe limit, skipping exe creation\n",
+						float64(part01Size)/(1024*1024*1024))
+					fmt.Printf("  Distribute all %d parts together (.01, .02, .03, etc.)\n", len(parts))
+				}
+			}
+		}
 	} else {
 		// Save single-part patch
 		if err := savePatch(patch, outputFile, options); err != nil {
@@ -634,6 +638,18 @@ func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string
 		}
 
 		fmt.Printf("Patch saved to: %s\n", outputFile)
+
+		// Create self-contained executable if requested
+		if createExe {
+			baseName := filepath.Base(outputFile)
+			exeName := strings.TrimSuffix(baseName, ".patch") + ".exe"
+			exePath := filepath.Join(filepath.Dir(outputFile), exeName)
+
+			if err := createStandaloneCLIExe(outputFile, exePath, compression); err != nil {
+				return fmt.Errorf("failed to create executable: %w", err)
+			}
+			fmt.Printf("✓ Created executable: %s\n", exePath)
+		}
 	}
 
 	return nil
