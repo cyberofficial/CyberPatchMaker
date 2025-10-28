@@ -94,6 +94,87 @@ func (d *Differ) GenerateDiffStreaming(oldFilePath, newFilePath string, output i
 	return nil
 }
 
+// IsLargeFile checks if a file exceeds the large file threshold
+func (d *Differ) IsLargeFile(filePath string) (bool, int64, error) {
+	info, err := os.Stat(filePath)
+	if err != nil {
+		return false, 0, fmt.Errorf("failed to stat file: %w", err)
+	}
+	// Import threshold from utils package
+	const largeFileThreshold = 1024 * 1024 * 1024 // 1GB
+	return info.Size() > largeFileThreshold, info.Size(), nil
+}
+
+// GenerateDiffChunked generates a diff for very large files by processing in chunks
+// For large files (>1GB), this uses full file replacement instead of binary diff:
+// - Binary diff (bsdiff) requires loading both files fully into memory (e.g., 2x1.5GB = 3GB)
+// - For large files, full replacement is more memory-efficient and reliable
+// - Returns the source file path so caller can stream it directly
+// - Applier will handle this as a full file replacement, copying in chunks
+func (d *Differ) GenerateDiffChunked(oldFilePath, newFilePath string, chunkSize int64, progressCallback func(processed, total int64)) (string, int64, error) {
+	// For large files (>1GB), always use full file replacement
+	// This avoids loading multiple GB into memory for bsdiff
+	fmt.Printf("    Large file detected, using full file replacement (memory-efficient)\n")
+
+	// Get file size for progress reporting
+	fileInfo, err := os.Stat(newFilePath)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to stat new file: %w", err)
+	}
+
+	// Return the file path and size instead of loading the data
+	// Caller will stream this directly to the patch file
+	return newFilePath, fileInfo.Size(), nil
+}
+
+// Removed readFileInChunks - it was pre-allocating huge buffers defeating the purpose of chunking
+// Large files are now handled by streaming directly from source to destination
+
+// CopyFileChunked copies a large file in chunks without loading entire file into memory
+func (d *Differ) CopyFileChunked(srcPath, dstPath string, chunkSize int64, progressCallback func(processed, total int64)) error {
+	srcInfo, err := os.Stat(srcPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat source file: %w", err)
+	}
+	totalSize := srcInfo.Size()
+
+	srcFile, err := os.Open(srcPath)
+	if err != nil {
+		return fmt.Errorf("failed to open source file: %w", err)
+	}
+	defer srcFile.Close()
+
+	dstFile, err := os.Create(dstPath)
+	if err != nil {
+		return fmt.Errorf("failed to create destination file: %w", err)
+	}
+	defer dstFile.Close()
+
+	buffer := make([]byte, chunkSize)
+	var processedBytes int64 = 0
+
+	for {
+		n, err := srcFile.Read(buffer)
+		if n > 0 {
+			if _, writeErr := dstFile.Write(buffer[:n]); writeErr != nil {
+				return fmt.Errorf("failed to write to destination: %w", writeErr)
+			}
+			processedBytes += int64(n)
+			if progressCallback != nil {
+				progressCallback(processedBytes, totalSize)
+			}
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return fmt.Errorf("failed to read from source: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // ApplyPatch applies a binary patch to a file
 func (d *Differ) ApplyPatch(oldFilePath string, patchData []byte) ([]byte, error) {
 	// Read old file

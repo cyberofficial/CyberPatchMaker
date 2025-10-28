@@ -11,7 +11,8 @@ import (
 
 // Applier handles patch application
 type Applier struct {
-	differ *differ.Differ
+	differ        *differ.Differ
+	patchFilePath string // Stores the patch file path during application for large file streaming
 }
 
 // NewApplier creates a new patch applier
@@ -23,6 +24,14 @@ func NewApplier() *Applier {
 
 // ApplyPatch applies a patch to a target directory
 func (a *Applier) ApplyPatch(patch *utils.Patch, targetDir string, verifyBefore, verifyAfter bool, createBackup bool) error {
+	return a.ApplyPatchWithPath(patch, targetDir, "", verifyBefore, verifyAfter, createBackup)
+}
+
+// ApplyPatchWithPath applies a patch to a target directory with knowledge of the patch file location
+func (a *Applier) ApplyPatchWithPath(patch *utils.Patch, targetDir string, patchFilePath string, verifyBefore, verifyAfter bool, createBackup bool) error {
+	// Store patch file path for large file streaming
+	a.patchFilePath = patchFilePath
+
 	fmt.Printf("Applying patch from %s to %s...\n", patch.FromVersion, patch.ToVersion)
 
 	// Verify target directory exists
@@ -143,9 +152,45 @@ func (a *Applier) applyAdd(targetPath string, op utils.PatchOperation) error {
 		return fmt.Errorf("failed to create directory: %w", err)
 	}
 
-	// Write new file
-	if err := os.WriteFile(targetPath, op.NewFile, 0644); err != nil {
-		return fmt.Errorf("failed to write new file: %w", err)
+	// Check if this is a large file operation (data embedded in patch)
+	fileSize := int64(len(op.NewFile))
+	isLarge := fileSize > utils.LargeFileThreshold
+
+	if isLarge {
+		// For large files, write in chunks to avoid memory pressure
+		fmt.Printf("  Large file add detected (%d MB), writing in chunks: %s\n", fileSize/(1024*1024), op.FilePath)
+
+		outFile, err := os.Create(targetPath)
+		if err != nil {
+			return fmt.Errorf("failed to create file: %w", err)
+		}
+		defer outFile.Close()
+
+		// Write data in chunks
+		written := int64(0)
+		for written < fileSize {
+			chunkSize := int64(utils.ChunkSize)
+			remaining := fileSize - written
+			if remaining < chunkSize {
+				chunkSize = remaining
+			}
+
+			n, err := outFile.Write(op.NewFile[written : written+chunkSize])
+			if err != nil {
+				return fmt.Errorf("failed to write chunk: %w", err)
+			}
+			written += int64(n)
+
+			// Show progress
+			percent := float64(written) / float64(fileSize) * 100
+			fmt.Printf("\r  Write progress: %.1f%% (%d/%d MB)", percent, written/(1024*1024), fileSize/(1024*1024))
+		}
+		fmt.Println() // New line after progress
+	} else {
+		// Write normal-sized file directly
+		if err := os.WriteFile(targetPath, op.NewFile, 0644); err != nil {
+			return fmt.Errorf("failed to write new file: %w", err)
+		}
 	}
 
 	// Verify checksum
@@ -156,12 +201,23 @@ func (a *Applier) applyAdd(targetPath string, op utils.PatchOperation) error {
 		return fmt.Errorf("checksum verification failed after add")
 	}
 
-	fmt.Printf("  Added: %s\n", op.FilePath)
+	if isLarge {
+		fmt.Printf("  Added (large): %s (%d MB)\n", op.FilePath, fileSize/(1024*1024))
+	} else {
+		fmt.Printf("  Added: %s\n", op.FilePath)
+	}
 	return nil
 }
 
 // applyModify modifies an existing file
 func (a *Applier) applyModify(targetPath string, op utils.PatchOperation) error {
+	// Check file size to determine if we need chunked processing
+	fileInfo, err := os.Stat(targetPath)
+	if err != nil {
+		return fmt.Errorf("failed to stat target file: %w", err)
+	}
+	isLarge := fileInfo.Size() > utils.LargeFileThreshold
+
 	// Verify old checksum
 	match, err := utils.VerifyFileChecksum(targetPath, op.OldChecksum)
 	if err != nil {
@@ -173,11 +229,29 @@ func (a *Applier) applyModify(targetPath string, op utils.PatchOperation) error 
 	var newData []byte
 
 	if len(op.BinaryDiff) > 0 {
-		// Apply binary diff
-		var patchErr error
-		newData, patchErr = a.differ.ApplyPatch(targetPath, op.BinaryDiff)
-		if patchErr != nil {
-			return fmt.Errorf("failed to apply binary diff: %w", patchErr)
+		// For large files (>1GB), the "diff" is actually the full new file
+		// (generator uses full replacement instead of binary diff for memory efficiency)
+		// We can detect this by checking if diff size is similar to the expected result size
+		diffSize := int64(len(op.BinaryDiff))
+
+		// If diff is >1GB, it's definitely a full file replacement
+		if diffSize > utils.LargeFileThreshold {
+			fmt.Printf("  Large file modify detected (%d MB), using full file replacement: %s\n",
+				diffSize/(1024*1024), op.FilePath)
+			newData = op.BinaryDiff
+		} else {
+			// Normal-sized diff, use bspatch
+			if isLarge {
+				fmt.Printf("  Large file modify detected (%d MB), applying binary patch: %s\n",
+					fileInfo.Size()/(1024*1024), op.FilePath)
+			}
+
+			// Apply binary diff
+			var patchErr error
+			newData, patchErr = a.differ.ApplyPatch(targetPath, op.BinaryDiff)
+			if patchErr != nil {
+				return fmt.Errorf("failed to apply binary diff: %w", patchErr)
+			}
 		}
 	} else if len(op.NewFile) > 0 {
 		// Use full file replacement
@@ -186,9 +260,60 @@ func (a *Applier) applyModify(targetPath string, op utils.PatchOperation) error 
 		return fmt.Errorf("no diff or new file data provided")
 	}
 
-	// Write modified file
-	if err := os.WriteFile(targetPath, newData, 0644); err != nil {
-		return fmt.Errorf("failed to write modified file: %w", err)
+	// Write modified file - use chunked writing for large results
+	resultSize := int64(len(newData))
+	if resultSize > utils.LargeFileThreshold {
+		fmt.Printf("  Writing large result (%d MB) in chunks...\n", resultSize/(1024*1024))
+
+		// Write to temporary file in current directory (same filesystem for atomic rename)
+		targetDir := filepath.Dir(targetPath)
+		targetBase := filepath.Base(targetPath)
+		tempFile, err := os.CreateTemp(targetDir, ".tmp_"+targetBase+"_*")
+		if err != nil {
+			return fmt.Errorf("failed to create temp file: %w", err)
+		}
+		tempPath := tempFile.Name()
+		defer func() {
+			tempFile.Close()
+			// Clean up temp file if it still exists (error case)
+			os.Remove(tempPath)
+		}()
+
+		// Write data in chunks
+		written := int64(0)
+		for written < resultSize {
+			chunkSize := int64(utils.ChunkSize)
+			remaining := resultSize - written
+			if remaining < chunkSize {
+				chunkSize = remaining
+			}
+
+			n, err := tempFile.Write(newData[written : written+chunkSize])
+			if err != nil {
+				return fmt.Errorf("failed to write chunk: %w", err)
+			}
+			written += int64(n)
+
+			// Show progress
+			percent := float64(written) / float64(resultSize) * 100
+			fmt.Printf("\r  Write progress: %.1f%% (%d/%d MB)", percent, written/(1024*1024), resultSize/(1024*1024))
+		}
+		fmt.Println() // New line after progress
+
+		// Close temp file before rename
+		if err := tempFile.Close(); err != nil {
+			return fmt.Errorf("failed to close temp file: %w", err)
+		}
+
+		// Atomic rename to target path
+		if err := os.Rename(tempPath, targetPath); err != nil {
+			return fmt.Errorf("failed to rename temp file to target: %w", err)
+		}
+	} else {
+		// Write normal-sized file directly
+		if err := os.WriteFile(targetPath, newData, 0644); err != nil {
+			return fmt.Errorf("failed to write modified file: %w", err)
+		}
 	}
 
 	// Verify new checksum
@@ -199,7 +324,11 @@ func (a *Applier) applyModify(targetPath string, op utils.PatchOperation) error 
 		return fmt.Errorf("checksum verification failed after modify")
 	}
 
-	fmt.Printf("  Modified: %s\n", op.FilePath)
+	if isLarge {
+		fmt.Printf("  Modified (large): %s (%d MB)\n", op.FilePath, op.Size/(1024*1024))
+	} else {
+		fmt.Printf("  Modified: %s\n", op.FilePath)
+	}
 	return nil
 }
 

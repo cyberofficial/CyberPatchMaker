@@ -485,36 +485,11 @@ See [Testing Guide](testing-guide.md) for details.
 
 ---
 
-## Experimental Features
-
-### GUI Application (In Development)
-
-> **Status: Experimental** - GUI tools are in development and not recommended for production use.
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    GUI Layer (Fyne v2.6.3)                   │
-├─────────────────────────────────────────────────────────────┤
-│  cmd/patch-gui/                                               │
-│  internal/gui/                                                │
-│  ├─ generator_window.go   Patch generation UI                │
-│  ├─ applier_window.go     Patch application UI               │
-│  ├─ components.go         Shared UI components               │
-│  └─ styles.go             Visual styling                     │
-└─────────────────────────────────────────────────────────────┘
-                              ↓
-        (Reuses all existing core business logic)
-```
-
-The GUI provides a visual interface for patch generation but is still under active development. For production use, the CLI tools are recommended.
-
----
-
 ## Self-Contained Executable Format
 
 ### Overview
 
-The generator GUI can create self-contained executables that embed patch data directly into a standalone `.exe` file. This provides a simpler distribution method for end users.
+The CLI generator can create self-contained executables that embed patch data directly into a standalone `.exe` file. This provides a simpler distribution method for end users.
 
 ### File Structure
 
@@ -523,9 +498,9 @@ A self-contained executable consists of three parts concatenated together:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                 Base Applier Executable                      │
-│              (patch-apply-gui.exe ~50 MB)                    │
+│              (patch-apply.exe ~50 MB)                        │
 │                                                              │
-│  Full GUI applier with all dependencies                      │
+│  Full CLI applier with all dependencies                      │
 ├─────────────────────────────────────────────────────────────┤
 │                    Patch Data                                │
 │           (compressed JSON patch file)                       │
@@ -572,7 +547,7 @@ type Header struct {
 
 When the generator creates a self-contained executable:
 
-1. **Read base applier**: Load `patch-apply-gui.exe` from same directory
+1. **Read base applier**: Load `patch-apply.exe` from same directory
 2. **Read patch data**: Load the generated `.patch` file
 3. **Calculate checksum**: SHA-256 hash of patch data
 4. **Build header**: Populate 128-byte header with metadata
@@ -581,7 +556,7 @@ When the generator creates a self-contained executable:
    output.exe = applier + patchData + header
    ```
 
-**Generator Code Location:** `internal/gui/generator_window.go` (lines ~1053-1134)
+**Generator Code Location:** `cmd/generator/main.go` (createStandaloneExe function)
 
 ### Detection Process
 
@@ -601,9 +576,9 @@ When a self-contained executable runs:
 8. **Verify checksum**: Validates SHA-256 hash of patch data
 9. **Decompress**: Decompresses based on `Compression` field
 10. **Parse JSON**: Decodes patch manifest
-11. **Load UI**: Populates GUI with patch information automatically
+11. **Load console**: Populates console interface with patch information automatically
 
-**Detection Code Location:** `cmd/applier-gui/main.go` (lines 82-198)
+**Detection Code Location:** `cmd/applier/main.go` (checkEmbeddedPatch function)
 
 ### Security
 
@@ -615,7 +590,7 @@ When a self-contained executable runs:
   - Ensures all offsets are within file bounds before reading
   - Prevents buffer overruns and out-of-range seeks
 - **Allocation protection**: Maximum 1 GB patch size limit prevents memory exhaustion attacks
-  - Can be bypassed with explicit user consent via `--ignore1gb` CLI flag or GUI checkbox
+  - Can be bypassed with explicit user consent via `--ignore1gb` CLI flag
   - When bypassed, user assumes responsibility for sufficient memory availability
 - **Checksum verification**: SHA-256 hash ensures data integrity and detects tampering
 - **Size validation**: Header contains exact sizes validated before allocation
@@ -632,7 +607,7 @@ When a self-contained executable runs:
 
 ### Limitations
 
-- **File size**: Always ~50 MB + patch size (includes full GUI)
+- **File size**: Always ~50 MB + patch size (includes full CLI applier)
 - **Windows only**: Currently only generates `.exe` files
 - **No streaming**: Entire file must be downloaded before use
 - **Fixed format**: Cannot mix compression methods in header
@@ -640,16 +615,14 @@ When a self-contained executable runs:
 ### Related Code
 
 **Generator:**
-- `internal/gui/generator_window.go` - `createStandaloneExe()` function
-- Checkbox: "Create self-contained executable"
+- `cmd/generator/main.go` - `createStandaloneExe()` function
+- Flag: `--create-exe`
 
 **Applier:**
-- `cmd/applier-gui/main.go` - `checkEmbeddedPatch()` function
-- `internal/gui/applier_window.go` - `LoadEmbeddedPatch()` method
+- `cmd/applier/main.go` - `checkEmbeddedPatch()` function
 
 **Documentation:**
 - [Self-Contained Executables Guide](self-contained-executables.md) - Complete user guide
-- [GUI Usage Guide](gui-usage.md) - How to create self-contained executables
 
 ---
 

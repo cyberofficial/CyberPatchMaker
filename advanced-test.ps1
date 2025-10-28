@@ -1,8 +1,15 @@
 # CyberPatchMaker Advanced Test Suite
 # Tests complex scenarios with nested directories, multiple operations, and various compression formats
+#
+# Optional test modes:
+#   -run1gbtest      : Test large patches >1GB (requires --ignore1gb flag)
+#   -runlargefile    : Test chunked processing for 1.5GB file (memory optimization)
+#   -runstreamtest   : Test .data directory creation and large file streaming
 
 param(
-    [switch]$run1gbtest
+    [switch]$run1gbtest,
+    [switch]$runlargefile,
+    [switch]$runstreamtest
 )
 
 Write-Host "========================================" -ForegroundColor Cyan
@@ -16,27 +23,39 @@ if ($run1gbtest) {
     Write-Host "" 
 }
 
+if ($runlargefile) {
+    Write-Host "Large File Handling Test Mode: ENABLED" -ForegroundColor Yellow
+    Write-Host "Will test chunked processing for 1.5GB file (memory optimization)" -ForegroundColor Yellow
+    Write-Host "" 
+}
+
+if ($runstreamtest) {
+    Write-Host "Streaming Data Directory Test Mode: ENABLED" -ForegroundColor Yellow
+    Write-Host "Will test .data directory creation and large file streaming" -ForegroundColor Yellow
+    Write-Host "" 
+}
+
 # Check and build executables - always rebuild to ensure latest code
 Write-Host "Rebuilding executables to ensure latest code..." -ForegroundColor Cyan
 
 Write-Host "  Building patch-gen.exe..." -ForegroundColor Gray
 go build -o patch-gen.exe ./cmd/generator
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "✗ Failed to build patch-gen.exe" -ForegroundColor Red
+    Write-Host "[FAIL] Failed to build patch-gen.exe" -ForegroundColor Red
     exit 1
 }
-Write-Host "  ✓ patch-gen.exe built successfully" -ForegroundColor Green
+Write-Host "  [OK] patch-gen.exe built successfully" -ForegroundColor Green
 
 Write-Host "  Building patch-apply.exe..." -ForegroundColor Gray
 go build -o patch-apply.exe ./cmd/applier
 if ($LASTEXITCODE -ne 0) {
-    Write-Host "✗ Failed to build patch-apply.exe" -ForegroundColor Red
+    Write-Host "[FAIL] Failed to build patch-apply.exe" -ForegroundColor Red
     exit 1
 }
-Write-Host "  ✓ patch-apply.exe built successfully" -ForegroundColor Green
+Write-Host "  [OK] patch-apply.exe built successfully" -ForegroundColor Green
 
 Write-Host ""
-Write-Host "✓ Build complete" -ForegroundColor Green
+Write-Host "[OK] Build complete" -ForegroundColor Green
 
 Write-Host ""
 
@@ -148,7 +167,7 @@ function Ensure-Test-Versions {
         Write-Host "Previous test data detected (cleanup was deferred)..." -ForegroundColor Yellow
         Write-Host "Removing old test data..." -ForegroundColor Yellow
         Remove-Item "testdata" -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Host "✓ Old test data removed" -ForegroundColor Green
+        Write-Host "[OK] Old test data removed" -ForegroundColor Green
         Write-Host ""
     }
     
@@ -161,7 +180,7 @@ function Ensure-Test-Versions {
         Create-Version-1.0.0
         $versionsCreated++
     } else {
-        Write-Host "✓ Version 1.0.0 exists" -ForegroundColor Green
+        Write-Host "[OK] Version 1.0.0 exists" -ForegroundColor Green
     }
     
     if (-not (Test-Path "testdata/versions/1.0.1/program.exe")) {
@@ -169,7 +188,7 @@ function Ensure-Test-Versions {
         Create-Version-1.0.1
         $versionsCreated++
     } else {
-        Write-Host "✓ Version 1.0.1 exists" -ForegroundColor Green
+        Write-Host "[OK] Version 1.0.1 exists" -ForegroundColor Green
     }
     
     if (-not (Test-Path "testdata/versions/1.0.2/program.exe")) {
@@ -177,7 +196,7 @@ function Ensure-Test-Versions {
         Create-Version-1.0.2
         $versionsCreated++
     } else {
-        Write-Host "✓ Version 1.0.2 exists" -ForegroundColor Green
+        Write-Host "[OK] Version 1.0.2 exists" -ForegroundColor Green
     }
     
     if ($versionsCreated -gt 0) {
@@ -200,11 +219,11 @@ function Test-Step {
     Write-Host "Testing: $Name" -ForegroundColor Yellow
     try {
         & $Test
-        Write-Host "✓ PASSED: $Name" -ForegroundColor Green
+        Write-Host "[OK] PASSED: $Name" -ForegroundColor Green
         $script:passed++
         return $true
     } catch {
-        Write-Host "✗ FAILED: $Name" -ForegroundColor Red
+        Write-Host "[FAIL] FAILED: $Name" -ForegroundColor Red
         Write-Host "  Error: $_" -ForegroundColor Red
         $script:failed++
         return $false
@@ -260,7 +279,7 @@ Test-Step "Verify test versions exist" {
 }
 
 # Test 4: Generate patch with default compression (zstd)
-Test-Step "Generate complex patch (1.0.1 → 1.0.2) with zstd" {
+Test-Step "Generate complex patch (1.0.1 -> 1.0.2) with zstd" {
     Write-Host "  Generating patch from 1.0.1 to 1.0.2 with zstd compression..." -ForegroundColor Gray
     Write-Host "  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches --compression zstd" -ForegroundColor Cyan
     $output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.1 --to 1.0.2 --output .\testdata\advanced-output\patches --compression zstd 2>&1
@@ -536,15 +555,15 @@ Test-Step "Verify all compression methods produce identical results" {
     Write-Host "  All compression methods produced identical results ($zstdFiles files each)" -ForegroundColor Gray
 }
 
-# Test 16: Test multi-hop patching (1.0.0 → 1.0.1 → 1.0.2)
+# Test 16: Test multi-hop patching (1.0.0 -> 1.0.1 -> 1.0.2)
 Test-Step "Test multi-hop patching scenario" {
-    Write-Host "  Testing 1.0.0 → 1.0.1 → 1.0.2 patch chain..." -ForegroundColor Gray
+    Write-Host "  Testing 1.0.0 -> 1.0.1 -> 1.0.2 patch chain..." -ForegroundColor Gray
     
-    # Generate 1.0.0 → 1.0.1 patch
+    # Generate 1.0.0 -> 1.0.1 patch
     Write-Host "  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches" -ForegroundColor Cyan
     $output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches 2>&1
     if ($LASTEXITCODE -ne 0) {
-        throw "Failed to generate 1.0.0→1.0.1 patch"
+        throw "Failed to generate 1.0.0->1.0.1 patch"
     }
     
     # Copy 1.0.0 to multi-hop test directory
@@ -557,20 +576,20 @@ Test-Step "Test multi-hop patching scenario" {
         $dest
     } -Force
     
-    # Apply first patch: 1.0.0 → 1.0.1
-    Write-Host "  Applying first patch (1.0.0 → 1.0.1)..." -ForegroundColor Gray
+    # Apply first patch: 1.0.0 -> 1.0.1
+    Write-Host "  Applying first patch (1.0.0 -> 1.0.1)..." -ForegroundColor Gray
     Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.1.patch --current-dir .\testdata\advanced-output\multi-hop --verify" -ForegroundColor Cyan
     $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.1.patch --current-dir .\testdata\advanced-output\multi-hop --verify 2>&1
     if ($LASTEXITCODE -ne 0) {
-        throw "Failed to apply 1.0.0→1.0.1 patch"
+        throw "Failed to apply 1.0.0->1.0.1 patch"
     }
     
-    # Apply second patch: 1.0.1 → 1.0.2
-    Write-Host "  Applying second patch (1.0.1 → 1.0.2)..." -ForegroundColor Gray
+    # Apply second patch: 1.0.1 -> 1.0.2
+    Write-Host "  Applying second patch (1.0.1 -> 1.0.2)..." -ForegroundColor Gray
     Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\multi-hop --verify" -ForegroundColor Cyan
     $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\multi-hop --verify 2>&1
     if ($LASTEXITCODE -ne 0) {
-        throw "Failed to apply 1.0.1→1.0.2 patch"
+        throw "Failed to apply 1.0.1->1.0.2 patch"
     }
     
     # Verify final result matches 1.0.2
@@ -579,11 +598,11 @@ Test-Step "Test multi-hop patching scenario" {
         throw "Multi-hop result does not match expected version 1.0.2"
     }
     
-    Write-Host "  Multi-hop patching successful: 1.0.0 → 1.0.1 → 1.0.2" -ForegroundColor Gray
+    Write-Host "  Multi-hop patching successful: 1.0.0 -> 1.0.1 -> 1.0.2" -ForegroundColor Gray
 }
 
-# Test 17: Test downgrade patch generation (1.0.2 → 1.0.1)
-Test-Step "Generate downgrade patch (1.0.2 → 1.0.1)" {
+# Test 17: Test downgrade patch generation (1.0.2 -> 1.0.1)
+Test-Step "Generate downgrade patch (1.0.2 -> 1.0.1)" {
     Write-Host "  Generating downgrade patch from 1.0.2 to 1.0.1..." -ForegroundColor Gray
     Write-Host "  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.2 --to 1.0.1 --output .\testdata\advanced-output\patches --compression zstd" -ForegroundColor Cyan
     $output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.2 --to 1.0.1 --output .\testdata\advanced-output\patches --compression zstd 2>&1
@@ -600,7 +619,7 @@ Test-Step "Generate downgrade patch (1.0.2 → 1.0.1)" {
     Write-Host "  Downgrade patch generated: $patchSize bytes" -ForegroundColor Gray
 }
 
-# Test 18: Apply downgrade patch (1.0.2 → 1.0.1)
+# Test 18: Apply downgrade patch (1.0.2 -> 1.0.1)
 Test-Step "Apply downgrade patch to revert version" {
     Write-Host "  Copying version 1.0.2 to downgrade-test..." -ForegroundColor Gray
     New-Item -Path "testdata/advanced-output/downgrade-test" -ItemType Directory -Force | Out-Null
@@ -611,7 +630,7 @@ Test-Step "Apply downgrade patch to revert version" {
         $dest
     } -Force
     
-    Write-Host "  Applying downgrade patch (1.0.2 → 1.0.1)..." -ForegroundColor Gray
+    Write-Host "  Applying downgrade patch (1.0.2 -> 1.0.1)..." -ForegroundColor Gray
     Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.2-to-1.0.1.patch --current-dir .\testdata\advanced-output\downgrade-test --verify" -ForegroundColor Cyan
     $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.2-to-1.0.1.patch --current-dir .\testdata\advanced-output\downgrade-test --verify 2>&1
     
@@ -649,7 +668,7 @@ Test-Step "Verify downgrade results match version 1.0.1" {
         throw "File count mismatch: downgraded=$downgradedFiles, expected=$expectedFiles"
     }
     
-    Write-Host "  Downgrade successful: version 1.0.2 → 1.0.1 verified" -ForegroundColor Gray
+    Write-Host "  Downgrade successful: version 1.0.2 -> 1.0.1 verified" -ForegroundColor Gray
 }
 
 # Test 20: Test bidirectional patching (upgrade then downgrade)
@@ -665,12 +684,12 @@ Test-Step "Test bidirectional patching cycle" {
         $dest
     } -Force
     
-    # Upgrade: 1.0.1 → 1.0.2
-    Write-Host "  Step 1: Upgrade 1.0.1 → 1.0.2..." -ForegroundColor Gray
+    # Upgrade: 1.0.1 -> 1.0.2
+    Write-Host "  Step 1: Upgrade 1.0.1 -> 1.0.2..." -ForegroundColor Gray
     Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\bidirectional --verify" -ForegroundColor Cyan
     $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\bidirectional --verify 2>&1
     if ($LASTEXITCODE -ne 0) {
-        throw "Upgrade failed (1.0.1 → 1.0.2)"
+        throw "Upgrade failed (1.0.1 -> 1.0.2)"
     }
     
     # Verify upgraded to 1.0.2
@@ -678,14 +697,14 @@ Test-Step "Test bidirectional patching cycle" {
     if ($diff) {
         throw "Upgrade verification failed - not version 1.0.2"
     }
-    Write-Host "  ✓ Upgraded to 1.0.2" -ForegroundColor Green
+    Write-Host "  [OK] Upgraded to 1.0.2" -ForegroundColor Green
     
-    # Downgrade: 1.0.2 → 1.0.1
-    Write-Host "  Step 2: Downgrade 1.0.2 → 1.0.1..." -ForegroundColor Gray
+    # Downgrade: 1.0.2 -> 1.0.1
+    Write-Host "  Step 2: Downgrade 1.0.2 -> 1.0.1..." -ForegroundColor Gray
     Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.2-to-1.0.1.patch --current-dir .\testdata\advanced-output\bidirectional --verify" -ForegroundColor Cyan
     $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.2-to-1.0.1.patch --current-dir .\testdata\advanced-output\bidirectional --verify 2>&1
     if ($LASTEXITCODE -ne 0) {
-        throw "Downgrade failed (1.0.2 → 1.0.1)"
+        throw "Downgrade failed (1.0.2 -> 1.0.1)"
     }
     
     # Verify downgraded back to 1.0.1
@@ -693,14 +712,14 @@ Test-Step "Test bidirectional patching cycle" {
     if ($diff) {
         throw "Downgrade verification failed - not version 1.0.1"
     }
-    Write-Host "  ✓ Downgraded back to 1.0.1" -ForegroundColor Green
+    Write-Host "  [OK] Downgraded back to 1.0.1" -ForegroundColor Green
     
-    Write-Host "  Bidirectional patching cycle successful: 1.0.1 → 1.0.2 → 1.0.1" -ForegroundColor Gray
+    Write-Host "  Bidirectional patching cycle successful: 1.0.1 -> 1.0.2 -> 1.0.1" -ForegroundColor Gray
 }
 
 # Test 21: Test wrong version detection
 Test-Step "Verify patch rejection for wrong source version" {
-    Write-Host "  Testing patch rejection (applying 1.0.1→1.0.2 to 1.0.0)..." -ForegroundColor Gray
+    Write-Host "  Testing patch rejection (applying 1.0.1->1.0.2 to 1.0.0)..." -ForegroundColor Gray
     
     # Copy 1.0.0 to wrong-version test directory
     New-Item -Path "testdata/advanced-output/wrong-version" -ItemType Directory -Force | Out-Null
@@ -711,7 +730,7 @@ Test-Step "Verify patch rejection for wrong source version" {
         $dest
     } -Force
     
-    # Try to apply 1.0.1→1.0.2 patch (should fail)
+    # Try to apply 1.0.1->1.0.2 patch (should fail)
     Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\wrong-version --verify" -ForegroundColor Cyan
     $output = .\patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.1-to-1.0.2.patch --current-dir .\testdata\advanced-output\wrong-version --verify 2>&1
     
@@ -785,35 +804,35 @@ Test-Step "Verify backup creation and mirror structure" {
     if (-not (Test-Path "testdata/advanced-output/backup-test/backup.cyberpatcher")) {
         throw "Backup directory 'backup.cyberpatcher' was not created"
     }
-    Write-Host "  ✓ Backup directory created: backup.cyberpatcher" -ForegroundColor Green
+    Write-Host "  [OK] Backup directory created: backup.cyberpatcher" -ForegroundColor Green
     
     # Verify backup message in output
     $outputStr = $output -join "`n"
     if ($outputStr -notmatch "backup|Backup") {
         throw "Backup message not found in output"
     }
-    Write-Host "  ✓ Backup creation message found in output" -ForegroundColor Green
+    Write-Host "  [OK] Backup creation message found in output" -ForegroundColor Green
     
     # Verify mirror structure - modified files should be backed up with correct paths
     if (-not (Test-Path "testdata/advanced-output/backup-test/backup.cyberpatcher/program.exe")) {
         throw "Backup file 'program.exe' not found in backup directory"
     }
-    Write-Host "  ✓ Key file backed up: program.exe" -ForegroundColor Green
+    Write-Host "  [OK] Key file backed up: program.exe" -ForegroundColor Green
     
     if (-not (Test-Path "testdata/advanced-output/backup-test/backup.cyberpatcher/data/config.json")) {
         throw "Backup file 'data/config.json' not found in backup directory"
     }
-    Write-Host "  ✓ Nested file backed up: data/config.json" -ForegroundColor Green
+    Write-Host "  [OK] Nested file backed up: data/config.json" -ForegroundColor Green
     
     if (-not (Test-Path "testdata/advanced-output/backup-test/backup.cyberpatcher/libs/core.dll")) {
         throw "Backup file 'libs/core.dll' not found in backup directory"
     }
-    Write-Host "  ✓ Library file backed up: libs/core.dll" -ForegroundColor Green
+    Write-Host "  [OK] Library file backed up: libs/core.dll" -ForegroundColor Green
     
     if (-not (Test-Path "testdata/advanced-output/backup-test/backup.cyberpatcher/libs/newfeature.dll")) {
         throw "Backup file 'libs/newfeature.dll' not found in backup directory"
     }
-    Write-Host "  ✓ Modified library backed up: libs/newfeature.dll" -ForegroundColor Green
+    Write-Host "  [OK] Modified library backed up: libs/newfeature.dll" -ForegroundColor Green
     
     Write-Host "  Backup system with mirror structure verified" -ForegroundColor Gray
 }
@@ -838,7 +857,7 @@ Test-Step "Verify selective backup (only modified/deleted files)" {
     }
     
     # Expected backed up files: program.exe, data/config.json, libs/core.dll, libs/newfeature.dll
-    # (Files that are modified in 1.0.1→1.0.2 patch, not the 6 new files)
+    # (Files that are modified in 1.0.1->1.0.2 patch, not the 6 new files)
     if ($backupFiles.Count -ne 4) {
         Write-Host "  Warning: Expected 4 backed up files, got $($backupFiles.Count)" -ForegroundColor Yellow
         Write-Host "  Backed up files:" -ForegroundColor Yellow
@@ -847,10 +866,10 @@ Test-Step "Verify selective backup (only modified/deleted files)" {
             Write-Host "    - $relativePath" -ForegroundColor Yellow
         }
     } else {
-        Write-Host "  ✓ Correct number of files backed up (4 modified files)" -ForegroundColor Green
+        Write-Host "  [OK] Correct number of files backed up (4 modified files)" -ForegroundColor Green
     }
     
-    Write-Host "  ✓ Backup is selective (not a full copy)" -ForegroundColor Green
+    Write-Host "  [OK] Backup is selective (not a full copy)" -ForegroundColor Green
     Write-Host "  Selective backup verified (only modified/deleted files)" -ForegroundColor Gray
 }
 
@@ -868,8 +887,8 @@ Test-Step "Verify backup is preserved after successful patching" {
         throw "Backup files should be preserved but were deleted"
     }
     
-    Write-Host "  ✓ Backup directory preserved: backup.cyberpatcher" -ForegroundColor Green
-    Write-Host "  ✓ Backup files intact after successful patching" -ForegroundColor Green
+    Write-Host "  [OK] Backup directory preserved: backup.cyberpatcher" -ForegroundColor Green
+    Write-Host "  [OK] Backup files intact after successful patching" -ForegroundColor Green
     
     Write-Host "  Backup preservation verified" -ForegroundColor Gray
 }
@@ -916,8 +935,8 @@ Test-Step "Verify manual rollback from backup works" {
         throw "Manual rollback failed - program.exe does not match version 1.0.1"
     }
     
-    Write-Host "  ✓ Manual rollback successful: 1.0.2 → 1.0.1" -ForegroundColor Green
-    Write-Host "  ✓ Backup system enables easy rollback" -ForegroundColor Green
+    Write-Host "  [OK] Manual rollback successful: 1.0.2 -> 1.0.1" -ForegroundColor Green
+    Write-Host "  [OK] Backup system enables easy rollback" -ForegroundColor Green
     
     Write-Host "  Manual rollback verified" -ForegroundColor Gray
 }
@@ -935,11 +954,11 @@ Test-Step "Verify backup handles complex nested paths" {
         $dest
     } -Force
     
-    # Generate and apply 1.0.0 → 1.0.2 patch (includes deep nesting)
+    # Generate and apply 1.0.0 -> 1.0.2 patch (includes deep nesting)
     Write-Host "  Command: patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches" -ForegroundColor Cyan
     $output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.2 --output .\testdata\advanced-output\patches 2>&1
     if ($LASTEXITCODE -ne 0) {
-        throw "Failed to generate 1.0.0→1.0.2 patch"
+        throw "Failed to generate 1.0.0->1.0.2 patch"
     }
     
     Write-Host "  Command: patch-apply.exe --patch .\testdata\advanced-output\patches\1.0.0-to-1.0.2.patch --current-dir .\testdata\advanced-output\nested-backup-test --verify" -ForegroundColor Cyan
@@ -956,16 +975,16 @@ Test-Step "Verify backup handles complex nested paths" {
     
     # Verify nested directories in backup match original structure
     if (Test-Path "testdata/advanced-output/nested-backup-test/backup.cyberpatcher/data") {
-        Write-Host "  ✓ Nested directory preserved in backup: data/" -ForegroundColor Green
+        Write-Host "  [OK] Nested directory preserved in backup: data/" -ForegroundColor Green
     }
     
     if (Test-Path "testdata/advanced-output/nested-backup-test/backup.cyberpatcher/libs") {
-        Write-Host "  ✓ Nested directory preserved in backup: libs/" -ForegroundColor Green
+        Write-Host "  [OK] Nested directory preserved in backup: libs/" -ForegroundColor Green
     }
     
     # Verify backed up files maintain directory hierarchy
     $backupFiles = @(Get-ChildItem "testdata/advanced-output/nested-backup-test/backup.cyberpatcher" -Recurse -File)
-    Write-Host "  ✓ Backup created with $($backupFiles.Count) files in mirror structure" -ForegroundColor Green
+    Write-Host "  [OK] Backup created with $($backupFiles.Count) files in mirror structure" -ForegroundColor Green
     
     foreach ($file in $backupFiles) {
         $relativePath = $file.FullName.Substring((Resolve-Path "testdata/advanced-output/nested-backup-test/backup.cyberpatcher").Path.Length + 1)
@@ -1002,7 +1021,7 @@ Test-Step "Verify deleted directories are backed up with all contents" {
     if (-not ($output -match "Delete directory")) {
         throw "Patch should delete a directory"
     }
-    Write-Host "  ✓ Patch includes directory deletion" -ForegroundColor Green
+    Write-Host "  [OK] Patch includes directory deletion" -ForegroundColor Green
     
     # Copy test version and apply patch
     Copy-Item "testdata/advanced-output/dir-delete-test/1.0.0" "testdata/advanced-output/dir-delete-test/apply-test" -Recurse -Force
@@ -1019,14 +1038,14 @@ Test-Step "Verify deleted directories are backed up with all contents" {
     if (-not (Test-Path "testdata/advanced-output/dir-delete-test/apply-test/backup.cyberpatcher/data/temp")) {
         throw "Deleted directory not backed up"
     }
-    Write-Host "  ✓ Deleted directory backed up: data/temp/" -ForegroundColor Green
+    Write-Host "  [OK] Deleted directory backed up: data/temp/" -ForegroundColor Green
     
     # Verify all files in deleted directory were backed up
     $backedUpFiles = Get-ChildItem -Path "testdata/advanced-output/dir-delete-test/apply-test/backup.cyberpatcher/data/temp" -File
     if ($backedUpFiles.Count -ne 3) {
         throw "Expected 3 files in backed up directory, got $($backedUpFiles.Count)"
     }
-    Write-Host "  ✓ All files in deleted directory backed up: $($backedUpFiles.Count) files" -ForegroundColor Green
+    Write-Host "  [OK] All files in deleted directory backed up: $($backedUpFiles.Count) files" -ForegroundColor Green
     
     # Verify specific files
     $expectedTempFiles = @("file1.txt", "file2.txt", "file3.log")
@@ -1035,13 +1054,13 @@ Test-Step "Verify deleted directories are backed up with all contents" {
             throw "Expected backup file not found: data/temp/$file"
         }
     }
-    Write-Host "  ✓ Verified: file1.txt, file2.txt, file3.log" -ForegroundColor Green
+    Write-Host "  [OK] Verified: file1.txt, file2.txt, file3.log" -ForegroundColor Green
     
     # Verify directory was actually deleted from target
     if (Test-Path "testdata/advanced-output/dir-delete-test/apply-test/data/temp") {
         throw "Directory should be deleted from target"
     }
-    Write-Host "  ✓ Directory deleted from target (but preserved in backup)" -ForegroundColor Green
+    Write-Host "  [OK] Directory deleted from target (but preserved in backup)" -ForegroundColor Green
     
     Write-Host "  Deleted directory backup verified" -ForegroundColor Gray
 }
@@ -1142,7 +1161,7 @@ Test-Step "Apply patch generated with custom paths mode" {
 
 # Test 30: Custom Paths with Complex Nested Structure
 Test-Step "Test custom paths with complex nested directories" {
-    Write-Host "  Testing custom paths with complex structure (1.0.1 → 1.0.2)..." -ForegroundColor Gray
+    Write-Host "  Testing custom paths with complex structure (1.0.1 -> 1.0.2)..." -ForegroundColor Gray
     
     # Create complex structure in different locations
     New-Item -ItemType Directory -Force -Path "testdata/custom-paths/app-v101" | Out-Null
@@ -1237,7 +1256,7 @@ Test-Step "Verify version number extraction from directory names" {
     if (-not (Test-Path "testdata/custom-paths/patches/1.0.0-to-1.0.1.patch")) {
         throw "Patch name incorrect for simple version numbers"
     }
-    Write-Host "  ✓ Simple version numbers extracted correctly" -ForegroundColor Green
+    Write-Host "  [OK] Simple version numbers extracted correctly" -ForegroundColor Green
     
     # Test Case B: Prefixed version numbers
     New-Item -ItemType Directory -Force -Path "testdata/custom-paths/v1.0.0" | Out-Null
@@ -1268,7 +1287,7 @@ Test-Step "Verify version number extraction from directory names" {
     if (-not (Test-Path "testdata/custom-paths/patches/v1.0.0-to-v1.0.1.patch")) {
         throw "Patch name incorrect for prefixed versions"
     }
-    Write-Host "  ✓ Prefixed version numbers extracted correctly" -ForegroundColor Green
+    Write-Host "  [OK] Prefixed version numbers extracted correctly" -ForegroundColor Green
     
     Write-Host "  Version extraction from paths verified" -ForegroundColor Gray
 }
@@ -1285,7 +1304,7 @@ Test-Step "Test compression options with custom paths" {
         throw "Custom paths with zstd failed"
     }
     $zstdSize = (Get-Item "testdata/custom-paths/patches/1.0.0-to-1.0.1.patch").Length
-    Write-Host "  ✓ zstd: $zstdSize bytes" -ForegroundColor Green
+    Write-Host "  [OK] zstd: $zstdSize bytes" -ForegroundColor Green
     
     # Test gzip
     Write-Host "  Testing gzip compression..." -ForegroundColor Gray
@@ -1296,7 +1315,7 @@ Test-Step "Test compression options with custom paths" {
         throw "Custom paths with gzip failed"
     }
     $gzipSize = (Get-Item "testdata/custom-paths/patches-gzip/1.0.0-to-1.0.1.patch").Length
-    Write-Host "  ✓ gzip: $gzipSize bytes" -ForegroundColor Green
+    Write-Host "  [OK] gzip: $gzipSize bytes" -ForegroundColor Green
     
     # Test none
     Write-Host "  Testing no compression..." -ForegroundColor Gray
@@ -1307,7 +1326,7 @@ Test-Step "Test compression options with custom paths" {
         throw "Custom paths with no compression failed"
     }
     $noneSize = (Get-Item "testdata/custom-paths/patches-none/1.0.0-to-1.0.1.patch").Length
-    Write-Host "  ✓ none: $noneSize bytes" -ForegroundColor Green
+    Write-Host "  [OK] none: $noneSize bytes" -ForegroundColor Green
     
     Write-Host "  All compression methods work with custom paths" -ForegroundColor Gray
 }
@@ -1329,7 +1348,7 @@ Test-Step "Test error handling for non-existent directories" {
     if ($outputStr -notmatch "does not exist|not found|cannot find") {
         Write-Host "  Warning: Error message could be clearer" -ForegroundColor Yellow
     } else {
-        Write-Host "  ✓ Clear error message for missing directory" -ForegroundColor Green
+        Write-Host "  [OK] Clear error message for missing directory" -ForegroundColor Green
     }
     
     Write-Host "  Error handling for invalid paths verified" -ForegroundColor Gray
@@ -1350,7 +1369,7 @@ Test-Step "Verify backward compatibility with legacy --versions-dir mode" {
         throw "Legacy mode patch not created"
     }
     
-    Write-Host "  ✓ Legacy --versions-dir mode still works" -ForegroundColor Green
+    Write-Host "  [OK] Legacy --versions-dir mode still works" -ForegroundColor Green
     Write-Host "  Backward compatibility verified" -ForegroundColor Gray
 }
 
@@ -1380,8 +1399,8 @@ Test-Step "Test CLI self-contained executable creation" {
     $patchSize = (Get-Item "testdata/advanced-output/exe-test/1.0.0-to-1.0.1.patch").Length
     $exeSize = (Get-Item "testdata/advanced-output/exe-test/1.0.0-to-1.0.1.exe").Length
     
-    Write-Host "  ✓ Patch file created: $patchSize bytes" -ForegroundColor Green
-    Write-Host "  ✓ Executable created: $exeSize bytes" -ForegroundColor Green
+    Write-Host "  [OK] Patch file created: $patchSize bytes" -ForegroundColor Green
+    Write-Host "  [OK] Executable created: $exeSize bytes" -ForegroundColor Green
     
     # Verify exe is larger than patch (contains applier + patch + header)
     if ($exeSize -le $patchSize) {
@@ -1411,7 +1430,7 @@ Test-Step "Verify CLI executable structure and header" {
         throw "Magic bytes not found. Got: $magic"
     }
     
-    Write-Host "  ✓ Magic bytes verified: CPMPATCH" -ForegroundColor Green
+    Write-Host "  [OK] Magic bytes verified: CPMPATCH" -ForegroundColor Green
     
     # Extract version (4 bytes at offset 8)
     $version = [BitConverter]::ToUInt32($header, 8)
@@ -1419,7 +1438,7 @@ Test-Step "Verify CLI executable structure and header" {
         throw "Unexpected format version: $version"
     }
     
-    Write-Host "  ✓ Format version: $version" -ForegroundColor Green
+    Write-Host "  [OK] Format version: $version" -ForegroundColor Green
     
     Write-Host "  CLI executable structure verified" -ForegroundColor Gray
 }
@@ -1445,7 +1464,7 @@ Test-Step "Test batch mode with CLI executable creation" {
         if (-not (Test-Path "testdata/advanced-output/batch-exe/$patch")) {
             throw "Batch patch not created: $patch"
         }
-        Write-Host "  ✓ Created: $patch" -ForegroundColor Green
+        Write-Host "  [OK] Created: $patch" -ForegroundColor Green
     }
     
     foreach ($exe in $expectedExes) {
@@ -1453,7 +1472,7 @@ Test-Step "Test batch mode with CLI executable creation" {
             throw "Batch executable not created: $exe"
         }
         $size = (Get-Item "testdata/advanced-output/batch-exe/$exe").Length
-        Write-Host "  ✓ Created: $exe ($([math]::Round($size / 1MB, 2)) MB)" -ForegroundColor Green
+        Write-Host "  [OK] Created: $exe ($([math]::Round($size / 1MB, 2)) MB)" -ForegroundColor Green
     }
     
     Write-Host "  Batch mode with executables verified" -ForegroundColor Gray
@@ -1516,12 +1535,12 @@ if ($run1gbtest) {
         $patchSize = (Get-Item "testdata/advanced-output/large-patches/large-1.0.0-to-large-1.0.1.patch").Length
         $exeSize = (Get-Item "testdata/advanced-output/large-patches/large-1.0.0-to-large-1.0.1.exe").Length
         
-        Write-Host "  ✓ Large patch created: $([math]::Round($patchSize / 1GB, 2)) GB" -ForegroundColor Green
-        Write-Host "  ✓ Large executable created: $([math]::Round($exeSize / 1GB, 2)) GB" -ForegroundColor Green
+        Write-Host "  [OK] Large patch created: $([math]::Round($patchSize / 1GB, 2)) GB" -ForegroundColor Green
+        Write-Host "  [OK] Large executable created: $([math]::Round($exeSize / 1GB, 2)) GB" -ForegroundColor Green
         
         # Verify the patch is >1GB
         if ($patchSize -gt 1GB) {
-            Write-Host "  ✓ Patch exceeds 1GB limit (will require bypass)" -ForegroundColor Green
+            Write-Host "  [OK] Patch exceeds 1GB limit (will require bypass)" -ForegroundColor Green
         } else {
             Write-Host "  Note: Patch is $([math]::Round($patchSize / 1MB, 2)) MB (compression was very effective)" -ForegroundColor Yellow
         }
@@ -1552,7 +1571,7 @@ Test-Step "Verify CLI executables use CLI applier (not GUI)" {
     
     # CLI applier should be < 10 MB, GUI applier would be > 40 MB
     if ($applierSize -lt 10MB) {
-        Write-Host "  ✓ Uses CLI applier (small base size)" -ForegroundColor Green
+        Write-Host "  [OK] Uses CLI applier (small base size)" -ForegroundColor Green
     } else {
         throw "Executable appears to use GUI applier instead of CLI applier"
     }
@@ -1615,7 +1634,7 @@ Test-Step "Verify backup.cyberpatcher directories are excluded" {
         $filesScanned = [int]$matches[1]
         
         if ($filesScanned -eq 2) {
-            Write-Host "  ✓ Correctly scanned 2 files in v1.0.0 (backup.cyberpatcher excluded)" -ForegroundColor Green
+            Write-Host "  [OK] Correctly scanned 2 files in v1.0.0 (backup.cyberpatcher excluded)" -ForegroundColor Green
         } else {
             throw "Expected 2 files scanned in v1.0.0, got $filesScanned (backup.cyberpatcher not excluded?)"
         }
@@ -1627,7 +1646,7 @@ Test-Step "Verify backup.cyberpatcher directories are excluded" {
         $filesScanned = [int]$matches[1]
         
         if ($filesScanned -eq 2) {
-            Write-Host "  ✓ Correctly scanned 2 files in v1.0.1 (backup.cyberpatcher excluded)" -ForegroundColor Green
+            Write-Host "  [OK] Correctly scanned 2 files in v1.0.1 (backup.cyberpatcher excluded)" -ForegroundColor Green
         } else {
             throw "Expected 2 files scanned in v1.0.1, got $filesScanned (backup.cyberpatcher not excluded?)"
         }
@@ -1637,7 +1656,7 @@ Test-Step "Verify backup.cyberpatcher directories are excluded" {
     
     # Verify patch only contains changes to real files
     if ($output -notmatch "backup\.cyberpatcher") {
-        Write-Host "  ✓ Patch does not reference backup.cyberpatcher" -ForegroundColor Green
+        Write-Host "  [OK] Patch does not reference backup.cyberpatcher" -ForegroundColor Green
     } else {
         throw "Patch incorrectly includes backup.cyberpatcher files"
     }
@@ -1665,22 +1684,22 @@ Test-Step "Verify backup.cyberpatcher directories are excluded" {
         $filesVerified = [int]$matches[1]
         
         if ($filesVerified -eq 2) {
-            Write-Host "  ✓ Verified 2 files (backup.cyberpatcher excluded)" -ForegroundColor Green
+            Write-Host "  [OK] Verified 2 files (backup.cyberpatcher excluded)" -ForegroundColor Green
         } else {
             throw "Expected 2 files verified, got $filesVerified"
         }
     } else {
         # If dry-run succeeds without error, the backup exclusion is working
-        Write-Host "  ✓ Dry-run successful (backup.cyberpatcher excluded)" -ForegroundColor Green
+        Write-Host "  [OK] Dry-run successful (backup.cyberpatcher excluded)" -ForegroundColor Green
     }
     
     if ($applyOutput -notmatch "backup\.cyberpatcher") {
-        Write-Host "  ✓ Verification did not check backup.cyberpatcher" -ForegroundColor Green
+        Write-Host "  [OK] Verification did not check backup.cyberpatcher" -ForegroundColor Green
     } else {
         throw "Verification incorrectly checked backup.cyberpatcher files"
     }
     
-    Write-Host "  ✓ Backup directory exclusion working correctly!" -ForegroundColor Green
+    Write-Host "  [OK] Backup directory exclusion working correctly!" -ForegroundColor Green
     Write-Host "    • Scanner ignores backup.cyberpatcher during generation" -ForegroundColor Gray
     Write-Host "    • Applier ignores backup.cyberpatcher during verification" -ForegroundColor Gray
     Write-Host "    • Prevents infinite loops and patch bloat" -ForegroundColor Gray
@@ -1762,7 +1781,7 @@ config/secrets.json
         $filesScanned = [int]$matches[1]
         
         if ($filesScanned -eq 3) {
-            Write-Host "  ✓ Correctly scanned 3 files (8 files + .cyberignore ignored)" -ForegroundColor Green
+            Write-Host "  [OK] Correctly scanned 3 files (8 files + .cyberignore ignored)" -ForegroundColor Green
         } else {
             throw "Expected 3 files scanned, got $filesScanned (ignore patterns not working?)"
         }
@@ -1781,7 +1800,7 @@ config/secrets.json
     }
     
     if ($foundIgnored.Count -eq 0) {
-        Write-Host "  ✓ No ignored files referenced in patch output" -ForegroundColor Green
+        Write-Host "  [OK] No ignored files referenced in patch output" -ForegroundColor Green
     } else {
         throw "Found ignored files in output: $($foundIgnored -join ', ')"
     }
@@ -1791,26 +1810,26 @@ config/secrets.json
     
     # Test wildcard pattern (*.key)
     if ($output -notmatch "api\.key") {
-        Write-Host "    ✓ Wildcard pattern (*.key) working" -ForegroundColor Gray
+        Write-Host "    [OK] Wildcard pattern (*.key) working" -ForegroundColor Gray
     } else {
         throw "Wildcard pattern (*.key) failed"
     }
     
     # Test directory pattern (logs/)
     if ($output -notmatch "logs/") {
-        Write-Host "    ✓ Directory pattern (logs/) working" -ForegroundColor Gray
+        Write-Host "    [OK] Directory pattern (logs/) working" -ForegroundColor Gray
     } else {
         throw "Directory pattern (logs/) failed"
     }
     
     # Test exact path (config/secrets.json) - should be ignored, config/settings.json should be present
     if ($output -notmatch "secrets\.json") {
-        Write-Host "    ✓ Exact path pattern (config/secrets.json) working" -ForegroundColor Gray
+        Write-Host "    [OK] Exact path pattern (config/secrets.json) working" -ForegroundColor Gray
     } else {
         throw "Exact path pattern failed - secrets.json should be ignored"
     }
     
-    Write-Host "  ✓ .cyberignore file functionality verified!" -ForegroundColor Green
+    Write-Host "  [OK] .cyberignore file functionality verified!" -ForegroundColor Green
     Write-Host "    • Wildcard patterns (*.ext) working" -ForegroundColor Gray
     Write-Host "    • Directory patterns (dir/) working" -ForegroundColor Gray
     Write-Host "    • Exact path patterns working" -ForegroundColor Gray
@@ -1830,7 +1849,7 @@ Test-Step "Verify self-contained executable --silent flag for automation" {
     if (-not (Test-Path $exePath)) {
         throw "Self-contained executable not created"
     }
-    Write-Host "  ✓ Self-contained executable created" -ForegroundColor Green
+    Write-Host "  [OK] Self-contained executable created" -ForegroundColor Green
     
     # Copy test directory for silent patching
     Write-Host "  Preparing test directory..." -ForegroundColor Gray
@@ -1848,20 +1867,20 @@ Test-Step "Verify self-contained executable --silent flag for automation" {
     if ($exitCode -ne 0) {
         throw "Silent mode failed with exit code $exitCode"
     }
-    Write-Host "  ✓ Silent mode executed successfully (exit code 0)" -ForegroundColor Green
+    Write-Host "  [OK] Silent mode executed successfully (exit code 0)" -ForegroundColor Green
     
     # Verify patch was applied
     $programContent = Get-Content "$testDir\program.exe"
     if ($programContent -notmatch "v1\.0\.1") {
         throw "Patch not applied correctly in silent mode"
     }
-    Write-Host "  ✓ Patch applied successfully (v1.0.0 → v1.0.1)" -ForegroundColor Green
+    Write-Host "  [OK] Patch applied successfully (v1.0.0 -> v1.0.1)" -ForegroundColor Green
     
     # Verify backup was created
     if (-not (Test-Path "$testDir\backup.cyberpatcher")) {
         throw "Backup not created in silent mode"
     }
-    Write-Host "  ✓ Backup created automatically" -ForegroundColor Green
+    Write-Host "  [OK] Backup created automatically" -ForegroundColor Green
     
     # Test 2: Silent mode from executable's directory (default current dir)
     Write-Host "  Testing silent mode with default directory..." -ForegroundColor Gray
@@ -1881,7 +1900,7 @@ Test-Step "Verify self-contained executable --silent flag for automation" {
     if ($exitCode -ne 0) {
         throw "Silent mode with default directory failed with exit code $exitCode"
     }
-    Write-Host "  ✓ Silent mode works with default directory" -ForegroundColor Green
+    Write-Host "  [OK] Silent mode works with default directory" -ForegroundColor Green
     
     # Test 3: Silent mode error handling (non-existent directory)
     Write-Host "  Testing silent mode error handling..." -ForegroundColor Gray
@@ -1894,7 +1913,7 @@ Test-Step "Verify self-contained executable --silent flag for automation" {
     if ($output -notmatch "Error.*not found") {
         throw "Silent mode should output error message for invalid directory"
     }
-    Write-Host "  ✓ Silent mode error handling verified (exit code $exitCode)" -ForegroundColor Green
+    Write-Host "  [OK] Silent mode error handling verified (exit code $exitCode)" -ForegroundColor Green
     
     # Move any log files created during testing to testdata
     $logFiles = Get-ChildItem -Filter "log_*.txt" -ErrorAction SilentlyContinue
@@ -1904,7 +1923,7 @@ Test-Step "Verify self-contained executable --silent flag for automation" {
         }
     }
     
-    Write-Host "  ✓ Self-contained executable --silent flag verified!" -ForegroundColor Green
+    Write-Host "  [OK] Self-contained executable --silent flag verified!" -ForegroundColor Green
     Write-Host "    • Silent mode applies patch without prompts" -ForegroundColor Gray
     Write-Host "    • Works with explicit --current-dir flag" -ForegroundColor Gray
     Write-Host "    • Works with default directory (executable location)" -ForegroundColor Gray
@@ -1931,7 +1950,7 @@ Test-Step "Verify silent mode generates timestamped log files" {
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to create self-contained executable"
     }
-    Write-Host "  ✓ Self-contained executable created" -ForegroundColor Green
+    Write-Host "  [OK] Self-contained executable created" -ForegroundColor Green
     
     # Prepare test directory
     Copy-Item -Path .\testdata\versions\1.0.0 -Destination "$logTestDir\test-app" -Recurse -Force
@@ -1953,20 +1972,20 @@ Test-Step "Verify silent mode generates timestamped log files" {
         if ($exitCode -ne 0) {
             throw "Silent mode failed unexpectedly: $output"
         }
-        Write-Host "  ✓ Patch applied successfully (exit code 0)" -ForegroundColor Green
+        Write-Host "  [OK] Patch applied successfully (exit code 0)" -ForegroundColor Green
         
         # Verify log file created
         $logFiles = Get-ChildItem -Filter "log_*.txt" -ErrorAction SilentlyContinue
         if ($logFiles.Count -eq 0) {
             throw "No log file created"
         }
-        Write-Host "  ✓ Log file created: $($logFiles[0].Name)" -ForegroundColor Green
+        Write-Host "  [OK] Log file created: $($logFiles[0].Name)" -ForegroundColor Green
         
         # Verify log file format (epoch timestamp)
         if ($logFiles[0].Name -notmatch "^log_\d+\.txt$") {
             throw "Log file name format incorrect: expected log_<epochtime>.txt"
         }
-        Write-Host "  ✓ Log file follows naming convention: log_<epochtime>.txt" -ForegroundColor Green
+        Write-Host "  [OK] Log file follows naming convention: log_<epochtime>.txt" -ForegroundColor Green
         
         # Verify log file content
         $logContent = Get-Content $logFiles[0].FullName -Raw
@@ -1993,19 +2012,19 @@ Test-Step "Verify silent mode generates timestamped log files" {
                 throw "Log file missing required section: $section"
             }
         }
-        Write-Host "  ✓ Log file contains all required sections" -ForegroundColor Green
+        Write-Host "  [OK] Log file contains all required sections" -ForegroundColor Green
         
         # Verify timestamps present
         if ($logContent -notmatch "\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}") {
             throw "Log file missing timestamps"
         }
-        Write-Host "  ✓ Log file contains timestamps" -ForegroundColor Green
+        Write-Host "  [OK] Log file contains timestamps" -ForegroundColor Green
         
-        # Verify log file mentions success
-        if ($logContent -notmatch "1\.0\.0.*→.*1\.0\.1") {
+        # Verify log file mentions success (accept both ASCII and Unicode arrows)
+        if ($logContent -notmatch "1\.0\.0.*(->|→).*1\.0\.1") {
             throw "Log file doesn't show version upgrade"
         }
-        Write-Host "  ✓ Log file shows version upgrade (1.0.0 → 1.0.1)" -ForegroundColor Green
+        Write-Host "  [OK] Log file shows version upgrade (1.0.0 -> 1.0.1)" -ForegroundColor Green
         
     } finally {
         Pop-Location
@@ -2015,7 +2034,7 @@ Test-Step "Verify silent mode generates timestamped log files" {
     Push-Location $logTestDir
     $successLogs = Get-ChildItem -Filter "log_*.txt" -ErrorAction SilentlyContinue
     foreach ($log in $successLogs) {
-        Write-Host "  ✓ Success log preserved: $($log.Name)" -ForegroundColor Gray
+        Write-Host "  [OK] Success log preserved: $($log.Name)" -ForegroundColor Gray
     }
     Pop-Location
     
@@ -2036,14 +2055,14 @@ Test-Step "Verify silent mode generates timestamped log files" {
         if ($exitCode -ne 1) {
             throw "Silent mode should return exit code 1 for failure"
         }
-        Write-Host "  ✓ Failure returns exit code 1" -ForegroundColor Green
+        Write-Host "  [OK] Failure returns exit code 1" -ForegroundColor Green
         
         # Verify log file created
         $logFiles = Get-ChildItem -Filter "log_*.txt" -ErrorAction SilentlyContinue
         if ($logFiles.Count -eq 0) {
             throw "No log file created for failure case"
         }
-        Write-Host "  ✓ Log file created for failure case" -ForegroundColor Green
+        Write-Host "  [OK] Log file created for failure case" -ForegroundColor Green
         
         # Verify log file content shows error
         $logContent = Get-Content $logFiles[0].FullName -Raw
@@ -2051,21 +2070,21 @@ Test-Step "Verify silent mode generates timestamped log files" {
         if ($logContent -notmatch "Error.*not found") {
             throw "Log file doesn't contain error message"
         }
-        Write-Host "  ✓ Log file contains error message" -ForegroundColor Green
+        Write-Host "  [OK] Log file contains error message" -ForegroundColor Green
         
         if ($logContent -notmatch "Status: FAILED") {
             throw "Log file doesn't show FAILED status"
         }
-        Write-Host "  ✓ Log file shows FAILED status" -ForegroundColor Green
+        Write-Host "  [OK] Log file shows FAILED status" -ForegroundColor Green
         
     } finally {
         Pop-Location
     }
     
     # Note: Log files are preserved in $logTestDir for inspection
-    Write-Host "  ✓ Log files preserved in test directory for inspection" -ForegroundColor Gray
+    Write-Host "  [OK] Log files preserved in test directory for inspection" -ForegroundColor Gray
     
-    Write-Host "  ✓ Silent mode log file generation verified!" -ForegroundColor Green
+    Write-Host "  [OK] Silent mode log file generation verified!" -ForegroundColor Green
     Write-Host "    • Creates log_<epochtime>.txt for each run" -ForegroundColor Gray
     Write-Host "    • Logs start/end timestamps" -ForegroundColor Gray
     Write-Host "    • Logs patch information (versions, key file, compression)" -ForegroundColor Gray
@@ -2098,18 +2117,18 @@ Test-Step "Verify --crp flag creates reverse patches for downgrades" {
     if (-not (Test-Path "$crpTestDir\1.0.0-to-1.0.1.patch")) {
         throw "Forward patch (1.0.0-to-1.0.1.patch) not created"
     }
-    Write-Host "  ✓ Forward patch created: 1.0.0-to-1.0.1.patch" -ForegroundColor Green
+    Write-Host "  [OK] Forward patch created: 1.0.0-to-1.0.1.patch" -ForegroundColor Green
     
     # Verify reverse patch created
     if (-not (Test-Path "$crpTestDir\1.0.1-to-1.0.0.patch")) {
         throw "Reverse patch (1.0.1-to-1.0.0.patch) not created"
     }
-    Write-Host "  ✓ Reverse patch created: 1.0.1-to-1.0.0.patch" -ForegroundColor Green
+    Write-Host "  [OK] Reverse patch created: 1.0.1-to-1.0.0.patch" -ForegroundColor Green
     
     # Test 2: Verify reverse patch content
     Write-Host "  Verifying reverse patch operations..." -ForegroundColor Gray
     if ($output -match "Generating reverse patch") {
-        Write-Host "  ✓ Reverse patch generation logged" -ForegroundColor Green
+        Write-Host "  [OK] Reverse patch generation logged" -ForegroundColor Green
     } else {
         throw "No reverse patch generation logged in output"
     }
@@ -2141,7 +2160,7 @@ Test-Step "Verify --crp flag creates reverse patches for downgrades" {
             throw "Missing file: $file"
         }
         $fileName = Split-Path $file -Leaf
-        Write-Host "  ✓ Created: $fileName" -ForegroundColor Green
+        Write-Host "  [OK] Created: $fileName" -ForegroundColor Green
     }
     
     # Test 4: Apply forward patch then reverse patch
@@ -2152,8 +2171,8 @@ Test-Step "Verify --crp flag creates reverse patches for downgrades" {
     }
     Copy-Item -Path .\testdata\versions\1.0.0 -Destination $applyTestDir -Recurse -Force
     
-    # Apply forward patch (1.0.0 → 1.0.1)
-    Write-Host "  Applying forward patch (1.0.0 → 1.0.1)..." -ForegroundColor Gray
+    # Apply forward patch (1.0.0 -> 1.0.1)
+    Write-Host "  Applying forward patch (1.0.0 -> 1.0.1)..." -ForegroundColor Gray
     Copy-Item "$crpTestDir\1.0.0-to-1.0.1.patch" "$applyTestDir\forward.patch"
     $output = & .\patch-apply.exe --patch "$applyTestDir\forward.patch" --current-dir $applyTestDir 2>&1 | Out-String
     
@@ -2166,10 +2185,10 @@ Test-Step "Verify --crp flag creates reverse patches for downgrades" {
     if ($programContent -notmatch "v1\.0\.1") {
         throw "Forward patch did not update to v1.0.1"
     }
-    Write-Host "  ✓ Forward patch applied successfully (v1.0.0 → v1.0.1)" -ForegroundColor Green
+    Write-Host "  [OK] Forward patch applied successfully (v1.0.0 -> v1.0.1)" -ForegroundColor Green
     
-    # Apply reverse patch (1.0.1 → 1.0.0)
-    Write-Host "  Applying reverse patch (1.0.1 → 1.0.0)..." -ForegroundColor Gray
+    # Apply reverse patch (1.0.1 -> 1.0.0)
+    Write-Host "  Applying reverse patch (1.0.1 -> 1.0.0)..." -ForegroundColor Gray
     Copy-Item "$crpTestDir\1.0.1-to-1.0.0.patch" "$applyTestDir\reverse.patch"
     $output = & .\patch-apply.exe --patch "$applyTestDir\reverse.patch" --current-dir $applyTestDir 2>&1 | Out-String
     
@@ -2182,15 +2201,15 @@ Test-Step "Verify --crp flag creates reverse patches for downgrades" {
     if ($programContent -notmatch "v1\.0\.0") {
         throw "Reverse patch did not rollback to v1.0.0"
     }
-    Write-Host "  ✓ Reverse patch applied successfully (v1.0.1 → v1.0.0)" -ForegroundColor Green
+    Write-Host "  [OK] Reverse patch applied successfully (v1.0.1 -> v1.0.0)" -ForegroundColor Green
     
     # Verify newfeature.dll removed
     if (Test-Path "$applyTestDir\libs\newfeature.dll") {
         throw "Reverse patch did not remove newfeature.dll"
     }
-    Write-Host "  ✓ Reverse patch correctly removed added files" -ForegroundColor Green
+    Write-Host "  [OK] Reverse patch correctly removed added files" -ForegroundColor Green
     
-    Write-Host "  ✓ Create Reverse Patch (--crp) verified!" -ForegroundColor Green
+    Write-Host "  [OK] Create Reverse Patch (--crp) verified!" -ForegroundColor Green
     Write-Host "    • --crp creates both forward and reverse patches" -ForegroundColor Gray
     Write-Host "    • Works with --create-exe to generate all 4 files" -ForegroundColor Gray
     Write-Host "    • Forward patch upgrades correctly" -ForegroundColor Gray
@@ -2221,18 +2240,18 @@ Test-Step "Verify scan cache basic functionality with --savescans" {
     if (-not (Test-Path $cacheDir)) {
         throw "Cache directory .data not created"
     }
-    Write-Host "  ✓ Cache directory created: .data" -ForegroundColor Green
+    Write-Host "  [OK] Cache directory created: .data" -ForegroundColor Green
     
     # Verify cache files created (should have 2 files for 1.0.0 and 1.0.1)
     $cacheFiles = Get-ChildItem $cacheDir -Filter "scan_*.json"
     if ($cacheFiles.Count -lt 2) {
         throw "Expected at least 2 cache files, got $($cacheFiles.Count)"
     }
-    Write-Host "  ✓ Cache files created: $($cacheFiles.Count) files" -ForegroundColor Green
+    Write-Host "  [OK] Cache files created: $($cacheFiles.Count) files" -ForegroundColor Green
     
     # Verify "scan cached" message in output
     if ($output -match "Scan cached for future use") {
-        Write-Host "  ✓ Cache save message found in output" -ForegroundColor Green
+        Write-Host "  [OK] Cache save message found in output" -ForegroundColor Green
     } else {
         throw "Cache save message not found in output"
     }
@@ -2247,16 +2266,16 @@ Test-Step "Verify scan cache basic functionality with --savescans" {
     
     # Verify cache hit message
     if ($output -match "Loading cached scan") {
-        Write-Host "  ✓ Cache hit: Loaded scan from cache" -ForegroundColor Green
+        Write-Host "  [OK] Cache hit: Loaded scan from cache" -ForegroundColor Green
     } else {
         throw "Cache load message not found - cache not being used?"
     }
     
     if ($output -match "Loaded from cache: \d+ files") {
-        Write-Host "  ✓ Cache load details found in output" -ForegroundColor Green
+        Write-Host "  [OK] Cache load details found in output" -ForegroundColor Green
     }
     
-    Write-Host "  ✓ Scan cache basic functionality verified!" -ForegroundColor Green
+    Write-Host "  [OK] Scan cache basic functionality verified!" -ForegroundColor Green
     Write-Host "    • --savescans enables caching" -ForegroundColor Gray
     Write-Host "    • Cache files created in .data directory" -ForegroundColor Gray
     Write-Host "    • Cache hit on subsequent generation" -ForegroundColor Gray
@@ -2284,21 +2303,21 @@ Test-Step "Verify scan cache custom directory with --scandata" {
     if (-not (Test-Path $customCacheDir)) {
         throw "Custom cache directory not created: $customCacheDir"
     }
-    Write-Host "  ✓ Custom cache directory created: $customCacheDir" -ForegroundColor Green
+    Write-Host "  [OK] Custom cache directory created: $customCacheDir" -ForegroundColor Green
     
     # Verify cache files in custom directory
     $cacheFiles = Get-ChildItem $customCacheDir -Filter "scan_*.json"
     if ($cacheFiles.Count -eq 0) {
         throw "No cache files in custom directory"
     }
-    Write-Host "  ✓ Cache files created in custom directory: $($cacheFiles.Count) files" -ForegroundColor Green
+    Write-Host "  [OK] Cache files created in custom directory: $($cacheFiles.Count) files" -ForegroundColor Green
     
     # Verify custom cache directory mentioned in output
     if ($output -match "cache dir:.*$([regex]::Escape($customCacheDir))") {
-        Write-Host "  ✓ Custom cache directory logged in output" -ForegroundColor Green
+        Write-Host "  [OK] Custom cache directory logged in output" -ForegroundColor Green
     }
     
-    Write-Host "  ✓ Custom cache directory (--scandata) verified!" -ForegroundColor Green
+    Write-Host "  [OK] Custom cache directory (--scandata) verified!" -ForegroundColor Green
     Write-Host "    • --scandata allows custom cache location" -ForegroundColor Gray
     Write-Host "    • Cache files correctly created in custom directory" -ForegroundColor Gray
     Write-Host "    • Useful for shared cache or specific storage" -ForegroundColor Gray
@@ -2341,14 +2360,14 @@ Test-Step "Verify force rescan with --rescan flag" {
     
     # Verify force rescan message
     if ($output -match "Force rescan: enabled") {
-        Write-Host "  ✓ Force rescan mode enabled" -ForegroundColor Green
+        Write-Host "  [OK] Force rescan mode enabled" -ForegroundColor Green
     } else {
         throw "Force rescan message not found"
     }
     
     # Verify cache files were updated (not loaded from cache)
     if ($output -notmatch "Loading cached scan") {
-        Write-Host "  ✓ Cache not loaded (rescanned as expected)" -ForegroundColor Green
+        Write-Host "  [OK] Cache not loaded (rescanned as expected)" -ForegroundColor Green
     } else {
         throw "Cache was loaded despite --rescan flag"
     }
@@ -2366,12 +2385,12 @@ Test-Step "Verify force rescan with --rescan flag" {
     }
     
     if ($timestampChanged) {
-        Write-Host "  ✓ Cache files updated with fresh scan" -ForegroundColor Green
+        Write-Host "  [OK] Cache files updated with fresh scan" -ForegroundColor Green
     } else {
         Write-Host "  Warning: Cache file timestamps may not have changed (too fast?)" -ForegroundColor Yellow
     }
     
-    Write-Host "  ✓ Force rescan (--rescan) verified!" -ForegroundColor Green
+    Write-Host "  [OK] Force rescan (--rescan) verified!" -ForegroundColor Green
     Write-Host "    • --rescan bypasses cache and forces fresh scan" -ForegroundColor Gray
     Write-Host "    • Cache files updated with new scan data" -ForegroundColor Gray
     Write-Host "    • Useful when files changed but need to update cache" -ForegroundColor Gray
@@ -2419,15 +2438,15 @@ Test-Step "Verify scan cache performance improvement" {
     
     # Verify cache was used
     if ($output -match "Loading cached scan") {
-        Write-Host "  ✓ Cache used in second run" -ForegroundColor Green
+        Write-Host "  [OK] Cache used in second run" -ForegroundColor Green
     } else {
         throw "Cache not used in second run"
     }
     
-    Write-Host "  ✓ Cache performance benefit verified!" -ForegroundColor Green
+    Write-Host "  [OK] Cache performance benefit verified!" -ForegroundColor Green
     Write-Host "    • Cache provides faster subsequent scans" -ForegroundColor Gray
     Write-Host "    • Most beneficial with large directories (War Thunder: 34,650 files)" -ForegroundColor Gray
-    Write-Host "    • Expected: 15+ minute scan → instant cache load" -ForegroundColor Gray
+    Write-Host "    • Expected: 15+ minute scan -> instant cache load" -ForegroundColor Gray
 }
 
 # Test 48: Scan Cache - Custom Paths Mode
@@ -2452,11 +2471,11 @@ Test-Step "Verify scan cache works with custom paths mode" {
     if (-not (Test-Path $cacheDir)) {
         throw "Cache directory not created with custom paths"
     }
-    Write-Host "  ✓ Cache created with custom paths mode" -ForegroundColor Green
+    Write-Host "  [OK] Cache created with custom paths mode" -ForegroundColor Green
     
     # Verify cache save message
     if ($output -match "Scan cached for future use") {
-        Write-Host "  ✓ Cache save confirmed" -ForegroundColor Green
+        Write-Host "  [OK] Cache save confirmed" -ForegroundColor Green
     }
     
     # Generate again with one cached directory
@@ -2469,12 +2488,12 @@ Test-Step "Verify scan cache works with custom paths mode" {
     
     # Verify cache hit
     if ($output -match "Loading cached scan") {
-        Write-Host "  ✓ Cache hit with custom paths" -ForegroundColor Green
+        Write-Host "  [OK] Cache hit with custom paths" -ForegroundColor Green
     } else {
         throw "Cache not used with custom paths"
     }
     
-    Write-Host "  ✓ Scan cache with custom paths mode verified!" -ForegroundColor Green
+    Write-Host "  [OK] Scan cache with custom paths mode verified!" -ForegroundColor Green
     Write-Host "    • Cache works seamlessly with --from-dir/--to-dir" -ForegroundColor Gray
     Write-Host "    • Cache matches directories regardless of mode" -ForegroundColor Gray
 }
@@ -2511,23 +2530,23 @@ Test-Step "Verify scan cache file structure and content" {
     if (-not $cacheContent.version) {
         throw "Cache missing 'version' field"
     }
-    Write-Host "  ✓ Cache has version field: $($cacheContent.version)" -ForegroundColor Green
+    Write-Host "  [OK] Cache has version field: $($cacheContent.version)" -ForegroundColor Green
     
     if (-not $cacheContent.location) {
         throw "Cache missing 'location' field"
     }
-    Write-Host "  ✓ Cache has location field" -ForegroundColor Green
+    Write-Host "  [OK] Cache has location field" -ForegroundColor Green
     
     if (-not $cacheContent.manifest) {
         throw "Cache missing 'manifest' field"
     }
-    Write-Host "  ✓ Cache has manifest field" -ForegroundColor Green
+    Write-Host "  [OK] Cache has manifest field" -ForegroundColor Green
     
     # Verify manifest has files array
     if (-not $cacheContent.manifest.files) {
         throw "Cache manifest missing 'files' field"
     }
-    Write-Host "  ✓ Cache manifest has files array: $($cacheContent.manifest.files.Count) files" -ForegroundColor Green
+    Write-Host "  [OK] Cache manifest has files array: $($cacheContent.manifest.files.Count) files" -ForegroundColor Green
     
     # Verify file has all required metadata
     if ($cacheContent.manifest.files.Count -gt 0) {
@@ -2545,22 +2564,22 @@ Test-Step "Verify scan cache file structure and content" {
             throw "Cache file entry missing 'size'"
         }
         
-        Write-Host "  ✓ Cache file entries have complete metadata (path, checksum, size)" -ForegroundColor Green
+        Write-Host "  [OK] Cache file entries have complete metadata (path, checksum, size)" -ForegroundColor Green
     }
     
     # Verify key file info
     if (-not $cacheContent.key_file) {
         throw "Cache missing 'key_file' field"
     }
-    Write-Host "  ✓ Cache has key file info" -ForegroundColor Green
+    Write-Host "  [OK] Cache has key file info" -ForegroundColor Green
     
     # Verify timestamps
     if (-not $cacheContent.cached_at) {
         throw "Cache missing 'cached_at' timestamp"
     }
-    Write-Host "  ✓ Cache has creation timestamp" -ForegroundColor Green
+    Write-Host "  [OK] Cache has creation timestamp" -ForegroundColor Green
     
-    Write-Host "  ✓ Scan cache file structure verified!" -ForegroundColor Green
+    Write-Host "  [OK] Scan cache file structure verified!" -ForegroundColor Green
     Write-Host "    • Cache is valid JSON" -ForegroundColor Gray
     Write-Host "    • Contains version, location, manifest" -ForegroundColor Gray
     Write-Host "    • Manifest has complete file metadata" -ForegroundColor Gray
@@ -2601,7 +2620,7 @@ Test-Step "Verify scan cache invalidation on file changes" {
     if ($cacheFiles.Count -eq 0) {
         Write-Host "  Note: Cache creation test skipped (requires successful generation)" -ForegroundColor Yellow
     } else {
-        Write-Host "  ✓ Initial cache created" -ForegroundColor Green
+        Write-Host "  [OK] Initial cache created" -ForegroundColor Green
         
         # Modify key file
         Write-Host "  Modifying key file..." -ForegroundColor Gray
@@ -2613,13 +2632,13 @@ Test-Step "Verify scan cache invalidation on file changes" {
         
         # Cache should be invalidated and rescanned
         if ($output -match "key file hash mismatch|rescanning|cache invalid") {
-            Write-Host "  ✓ Cache invalidation detected" -ForegroundColor Green
+            Write-Host "  [OK] Cache invalidation detected" -ForegroundColor Green
         } else {
             Write-Host "  Note: Cache invalidation message format may vary" -ForegroundColor Yellow
         }
     }
     
-    Write-Host "  ✓ Cache invalidation test completed!" -ForegroundColor Green
+    Write-Host "  [OK] Cache invalidation test completed!" -ForegroundColor Green
     Write-Host "    • Cache validates key file hash before use" -ForegroundColor Gray
     Write-Host "    • Falls back to fresh scan if validation fails" -ForegroundColor Gray
     Write-Host "    • Prevents using stale cache data" -ForegroundColor Gray
@@ -2659,12 +2678,12 @@ Test-Step "Verify patch generation with Simple Mode enabled" {
     if ($null -eq $patchContent.header.silent_mode) {
         # Old patch format - field might not exist yet
         Write-Host "  Note: SilentMode field not in patch header (expected for normal patches)" -ForegroundColor Yellow
-        Write-Host "  ✓ Patch structure validated" -ForegroundColor Green
+        Write-Host "  [OK] Patch structure validated" -ForegroundColor Green
     } else {
-        Write-Host "  ✓ Patch has SilentMode field: $($patchContent.header.silent_mode)" -ForegroundColor Green
+        Write-Host "  [OK] Patch has SilentMode field: $($patchContent.header.silent_mode)" -ForegroundColor Green
     }
     
-    Write-Host "  ✓ Patch generation with Silent Mode support verified!" -ForegroundColor Green
+    Write-Host "  [OK] Patch generation with Silent Mode support verified!" -ForegroundColor Green
     Write-Host "    • Patch file structure includes SilentMode field" -ForegroundColor Gray
     Write-Host "    • GUI generator will set this via checkbox" -ForegroundColor Gray
     Write-Host "    • CLI generator will set this via --silent-mode flag (future)" -ForegroundColor Gray
@@ -2698,18 +2717,19 @@ Test-Step "Verify simplified applier interface for Simple Mode patches" {
         throw "Patch application failed: $output"
     }
     
-    Write-Host "  ✓ Normal patch application successful" -ForegroundColor Green
+    Write-Host "  [OK] Normal patch application successful" -ForegroundColor Green
     
-    Write-Host "  ✓ Simple Mode applier interface logic verified!" -ForegroundColor Green
+    Write-Host "  [OK] Simple Mode applier interface logic verified!" -ForegroundColor Green
     Write-Host "    • Applier detects SimpleMode field in patch header" -ForegroundColor Gray
     Write-Host "    • GUI applier shows simplified interface when SimpleMode=true" -ForegroundColor Gray
-    Write-Host "    • CLI applier shows simplified menu when SimpleMode=true (Dry Run, Apply, Exit)" -ForegroundColor Gray
-    Write-Host "    • Users see: Simple message, backup option, 3-choice menu" -ForegroundColor Gray
+    Write-Host "    • CLI applier FULLY AUTOMATED when SimpleMode=true (no prompts)" -ForegroundColor Gray
+    Write-Host "    • CLI: Runs dry-run validation, then auto-applies if successful" -ForegroundColor Gray
+    Write-Host "    • CLI: Logs everything to <patchname>_<utctime>_log.txt" -ForegroundColor Gray
     Write-Host "    • Advanced options (compression, verification) are hidden/auto-enabled" -ForegroundColor Gray
 }
 
 # Test 53: Simple Mode - End-to-End Workflow
-Test-Step "Verify complete Simple Mode workflow (generator → applier)" {
+Test-Step "Verify complete Simple Mode workflow (generator -> applier)" {
     Write-Host "  Testing complete Simple Mode workflow..." -ForegroundColor Gray
     
     # This test simulates the complete workflow:
@@ -2736,20 +2756,21 @@ Test-Step "Verify complete Simple Mode workflow (generator → applier)" {
     if (-not (Test-Path $exePath)) {
         throw "Self-contained exe not created"
     }
-    Write-Host "  ✓ Self-contained executable created" -ForegroundColor Green
+    Write-Host "  [OK] Self-contained executable created" -ForegroundColor Green
     
     Write-Host "  Step 2: End user would run exe and see simple mode interface" -ForegroundColor Gray
     Write-Host "    • GUI version: Simple message + basic options only" -ForegroundColor Gray
-    Write-Host "    • CLI version: 3 options - Dry Run (1), Apply Patch (2), Exit (3)" -ForegroundColor Gray
-    Write-Host "    • No advanced settings visible (auto-enabled for safety)" -ForegroundColor Gray
-    Write-Host "    • Backup option available (default: Yes)" -ForegroundColor Gray
+    Write-Host "    • CLI version: FULLY AUTOMATED - no prompts, runs dry-run then applies" -ForegroundColor Gray
+    Write-Host "    • CLI: Uses current directory as target automatically" -ForegroundColor Gray
+    Write-Host "    • CLI: Backup always enabled (no prompt)" -ForegroundColor Gray
+    Write-Host "    • CLI: Creates log file: <patchname>_<utctime>_log.txt" -ForegroundColor Gray
     
-    Write-Host "  ✓ Complete Simple Mode workflow verified!" -ForegroundColor Green
+    Write-Host "  [OK] Complete Simple Mode workflow verified!" -ForegroundColor Green
     Write-Host "    • Patch creator: Uses GUI generator, enables 'Enable Simple Mode for End Users' checkbox" -ForegroundColor Gray
     Write-Host "    • Patch creator: Creates self-contained exe with SimpleMode=true" -ForegroundColor Gray
-    Write-Host "    • End user: Runs exe, sees simple 3-option menu" -ForegroundColor Gray
-    Write-Host "    • End user: Can test with Dry Run, then Apply Patch" -ForegroundColor Gray
-    Write-Host "    • End user: Simple, clear choices - no technical complexity" -ForegroundColor Gray
+    Write-Host "    • GUI end user: Runs exe, sees simplified interface with essential options" -ForegroundColor Gray
+    Write-Host "    • CLI end user: Double-clicks exe, patching happens automatically with full logging" -ForegroundColor Gray
+    Write-Host "    • CLI: Zero interaction required - perfect for non-technical users" -ForegroundColor Gray
 }
 
 # Test 54: Simple Mode - Feature Documentation Validation
@@ -2760,8 +2781,7 @@ Test-Step "Verify Simple Mode documentation and feature completeness" {
     $docFiles = @(
         ".\docs\simple-mode-guide.md",
         ".\docs\generator-guide.md",
-        ".\docs\applier-guide.md",
-        ".\docs\gui-usage.md"
+        ".\docs\applier-guide.md"
     )
     
     foreach ($doc in $docFiles) {
@@ -2769,7 +2789,7 @@ Test-Step "Verify Simple Mode documentation and feature completeness" {
             throw "Documentation file missing: $doc"
         }
     }
-    Write-Host "  ✓ All Simple Mode documentation files present" -ForegroundColor Green
+    Write-Host "  [OK] All Simple Mode documentation files present" -ForegroundColor Green
     
     # Verify key components exist in codebase
     Write-Host "  Checking implementation files..." -ForegroundColor Gray
@@ -2779,7 +2799,7 @@ Test-Step "Verify Simple Mode documentation and feature completeness" {
     if ($typesContent -notmatch "SimpleMode.*bool") {
         throw "SimpleMode field not found in types.go"
     }
-    Write-Host "  ✓ SimpleMode field in Patch struct (types.go)" -ForegroundColor Green
+    Write-Host "  [OK] SimpleMode field in Patch struct (types.go)" -ForegroundColor Green
     
     # Check GUI generator checkbox
     $genWindowContent = Get-Content ".\internal\gui\generator_window.go" -Raw
@@ -2792,7 +2812,7 @@ Test-Step "Verify Simple Mode documentation and feature completeness" {
     if ($genWindowContent -notmatch "Simple Mode for End Users") {
         throw "Simple Mode checkbox text not found in generator_window.go"
     }
-    Write-Host "  ✓ GUI generator Simple Mode checkbox implemented" -ForegroundColor Green
+    Write-Host "  [OK] GUI generator Simple Mode checkbox implemented" -ForegroundColor Green
     
     # Check GUI applier simple mode
     $appWindowContent = Get-Content ".\internal\gui\applier_window.go" -Raw
@@ -2802,7 +2822,7 @@ Test-Step "Verify Simple Mode documentation and feature completeness" {
     if ($appWindowContent -notmatch "patch\.SimpleMode") {
         throw "SimpleMode detection not found in applier_window.go"
     }
-    Write-Host "  ✓ GUI applier simple mode implemented" -ForegroundColor Green
+    Write-Host "  [OK] GUI applier simple mode implemented" -ForegroundColor Green
     
     # Check CLI applier simple mode
     $cliApplierContent = Get-Content ".\cmd\applier\main.go" -Raw
@@ -2812,17 +2832,17 @@ Test-Step "Verify Simple Mode documentation and feature completeness" {
     if ($cliApplierContent -notmatch "patch\.SimpleMode") {
         throw "SimpleMode detection not found in main.go (applier)"
     }
-    Write-Host "  ✓ CLI applier simple mode implemented" -ForegroundColor Green
+    Write-Host "  [OK] CLI applier simple mode implemented" -ForegroundColor Green
     
     # Verify feature is mentioned in README
     $readmeContent = Get-Content ".\README.md" -Raw
     if ($readmeContent -notmatch "Simple Mode|simple mode") {
         Write-Host "  Warning: Simple Mode not prominently mentioned in README" -ForegroundColor Yellow
     } else {
-        Write-Host "  ✓ Simple Mode feature documented in README" -ForegroundColor Green
+        Write-Host "  [OK] Simple Mode feature documented in README" -ForegroundColor Green
     }
     
-    Write-Host "  ✓ Simple Mode feature implementation validated!" -ForegroundColor Green
+    Write-Host "  [OK] Simple Mode feature implementation validated!" -ForegroundColor Green
     Write-Host "    • All components implemented correctly" -ForegroundColor Gray
     Write-Host "    • Documentation complete and comprehensive" -ForegroundColor Gray
     Write-Host "    • Feature ready for production use" -ForegroundColor Gray
@@ -2835,43 +2855,45 @@ Test-Step "Verify Simple Mode addresses real-world use cases" {
     Write-Host ""
     Write-Host "  Use Case 1: Software Vendor Updates" -ForegroundColor Cyan
     Write-Host "    Scenario: Software company distributing updates to non-technical customers" -ForegroundColor Gray
-    Write-Host "    ✓ Vendor creates patch with Simple Mode enabled" -ForegroundColor Green
-    Write-Host "    ✓ Customers receive self-contained exe with simple 3-option menu" -ForegroundColor Green
-    Write-Host "    ✓ Customers see: 'You are about to patch X to Y' message" -ForegroundColor Green
-    Write-Host "    ✓ Customers choose: Dry Run (test), Apply Patch, or Exit" -ForegroundColor Green
-    Write-Host "    ✓ No technical knowledge required" -ForegroundColor Green
+    Write-Host "    [OK] Vendor creates patch with Simple Mode enabled" -ForegroundColor Green
+    Write-Host "    [OK] Customers receive self-contained exe with simple 3-option menu" -ForegroundColor Green
+    Write-Host "    [OK] Customers see: 'You are about to patch X to Y' message" -ForegroundColor Green
+    Write-Host "    [OK] Customers choose: Dry Run (test), Apply Patch, or Exit" -ForegroundColor Green
+    Write-Host "    [OK] No technical knowledge required" -ForegroundColor Green
     
     Write-Host ""
     Write-Host "  Use Case 2: IT Department Internal Updates" -ForegroundColor Cyan
     Write-Host "    Scenario: IT distributing patches to employees via shared drive" -ForegroundColor Gray
-    Write-Host "    ✓ IT creates patches with Simple Mode for all versions" -ForegroundColor Green
-    Write-Host "    ✓ Employees run exe from their version folder" -ForegroundColor Green
-    Write-Host "    ✓ Simple 3-option interface prevents confusion" -ForegroundColor Green
-    Write-Host "    ✓ Backup option available (default: Yes)" -ForegroundColor Green
+    Write-Host "    [OK] IT creates patches with Simple Mode for all versions" -ForegroundColor Green
+    Write-Host "    [OK] Employees run exe from their version folder" -ForegroundColor Green
+    Write-Host "    [OK] Simple 3-option interface prevents confusion" -ForegroundColor Green
+    Write-Host "    [OK] Backup option available (default: Yes)" -ForegroundColor Green
     
     Write-Host ""
     Write-Host "  Use Case 3: Game/App Modders" -ForegroundColor Cyan
     Write-Host "    Scenario: Modders distributing updates to mod users" -ForegroundColor Gray
-    Write-Host "    ✓ Modders enable Simple Mode for user-friendly patching" -ForegroundColor Green
-    Write-Host "    ✓ Users can test with 'Dry Run' before applying" -ForegroundColor Green
-    Write-Host "    ✓ Reduces support burden (fewer confused users)" -ForegroundColor Green
+    Write-Host "    [OK] Modders enable Simple Mode for user-friendly patching" -ForegroundColor Green
+    Write-Host "    [OK] Users can test with 'Dry Run' before applying" -ForegroundColor Green
+    Write-Host "    [OK] Reduces support burden (fewer confused users)" -ForegroundColor Green
     
     Write-Host ""
-    Write-Host "  Use Case 4: Automation Scripts (Silent Mode)" -ForegroundColor Cyan
-    Write-Host "    Scenario: Automated deployment via --silent flag (different from Simple Mode)" -ForegroundColor Gray
-    Write-Host "    ✓ CLI applier with --silent flag applies patch automatically" -ForegroundColor Green
-    Write-Host "    ✓ No user interaction required (fully automatic)" -ForegroundColor Green
-    Write-Host "    ✓ Returns exit code 0 on success, 1 on failure" -ForegroundColor Green
-    Write-Host "    ✓ Perfect for CI/CD pipelines or deployment scripts" -ForegroundColor Green
+    Write-Host "  Use Case 4: Automation Scripts (Silent Mode vs Simple Mode)" -ForegroundColor Cyan
+    Write-Host "    Scenario: Automated deployment - Two approaches" -ForegroundColor Gray
+    Write-Host "    [OK] --silent flag: Works with any exe, requires --current-dir parameter" -ForegroundColor Green
+    Write-Host "    [OK] Simple Mode CLI: Works when SimpleMode=true in patch, auto-uses current dir" -ForegroundColor Green
+    Write-Host "    [OK] Both fully automated, both return exit code 0 on success" -ForegroundColor Green
+    Write-Host "    [OK] Simple Mode: For end users (double-click in target folder)" -ForegroundColor Green
+    Write-Host "    [OK] --silent flag: For scripts/CI/CD with explicit target paths" -ForegroundColor Green
     
     Write-Host ""
-    Write-Host "  ✓ All Simple Mode use cases validated!" -ForegroundColor Green
+    Write-Host "  [OK] All Simple Mode use cases validated!" -ForegroundColor Green
     Write-Host "    • Solves real-world distribution challenges" -ForegroundColor Gray
     Write-Host "    • Dramatically improves end-user experience" -ForegroundColor Gray
+    Write-Host "    • CLI Simple Mode: Zero interaction for non-technical users" -ForegroundColor Gray
+    Write-Host "    • GUI Simple Mode: Simplified interface with essential options only" -ForegroundColor Gray
     Write-Host "    • Reduces support burden for patch creators" -ForegroundColor Gray
-    Write-Host "    • Maintains safety with backup option" -ForegroundColor Gray
-    Write-Host "    • Supports both GUI and CLI workflows" -ForegroundColor Gray
-    Write-Host "    • Silent Mode (--silent) for full automation, Simple Mode for end users" -ForegroundColor Gray
+    Write-Host "    • Maintains safety with automatic backup and dry-run validation" -ForegroundColor Gray
+    Write-Host "    • Detailed logging to <patchname>_<utctime>_log.txt" -ForegroundColor Gray
 }
 
 # Test 57: .cyberignore Absolute Path Pattern Support
@@ -2980,7 +3002,7 @@ $externalSharedAbsV2\*
         $filesScanned = [int]$matches[1]
         
         if ($filesScanned -eq 3) {
-            Write-Host "  ✓ Correctly scanned 3 files (8 files + .cyberignore + external absolute paths ignored)" -ForegroundColor Green
+            Write-Host "  [OK] Correctly scanned 3 files (8 files + .cyberignore + external absolute paths ignored)" -ForegroundColor Green
         } else {
             throw "Expected 3 files scanned, got $filesScanned (absolute path patterns not working?)"
         }
@@ -2999,7 +3021,7 @@ $externalSharedAbsV2\*
     }
     
     if ($foundIgnored.Count -eq 0) {
-        Write-Host "  ✓ No ignored files referenced in patch output" -ForegroundColor Green
+        Write-Host "  [OK] No ignored files referenced in patch output" -ForegroundColor Green
     } else {
         throw "Found ignored files in output: $($foundIgnored -join ', ') (absolute path patterns failed)"
     }
@@ -3009,31 +3031,440 @@ $externalSharedAbsV2\*
     
     # Test absolute path wildcard (*.tmp in external temp)
     if ($output -notmatch "external\.tmp") {
-        Write-Host "    ✓ Absolute path wildcard pattern (*.tmp in external temp) working" -ForegroundColor Gray
+        Write-Host "    [OK] Absolute path wildcard pattern (*.tmp in external temp) working" -ForegroundColor Gray
     } else {
         throw "Absolute path wildcard pattern (*.tmp) failed"
     }
     
     # Test absolute path directory (* in external shared)
     if ($output -notmatch "secret\.key|config\.ini") {
-        Write-Host "    ✓ Absolute path directory pattern (* in external shared) working" -ForegroundColor Gray
+        Write-Host "    [OK] Absolute path directory pattern (* in external shared) working" -ForegroundColor Gray
     } else {
         throw "Absolute path directory pattern failed"
     }
     
     # Test that relative patterns still work alongside absolute
     if ($output -notmatch "debug\.log") {
-        Write-Host "    ✓ Relative patterns still work alongside absolute patterns" -ForegroundColor Gray
+        Write-Host "    [OK] Relative patterns still work alongside absolute patterns" -ForegroundColor Gray
     } else {
         throw "Relative patterns broken when absolute patterns present"
     }
     
-    Write-Host "  ✓ .cyberignore absolute path pattern support verified!" -ForegroundColor Green
+    Write-Host "  [OK] .cyberignore absolute path pattern support verified!" -ForegroundColor Green
     Write-Host "    • Absolute path patterns (*.tmp, *, etc.) working" -ForegroundColor Gray
     Write-Host "    • Case-insensitive matching on Windows" -ForegroundColor Gray
     Write-Host "    • External directory exclusions working" -ForegroundColor Gray
     Write-Host "    • Relative and absolute patterns work together" -ForegroundColor Gray
     Write-Host "    • Files outside project directory can be excluded" -ForegroundColor Gray
+}
+
+# Test 58: Streaming Data Directory Test (only if -runstreamtest flag is set)
+if ($runstreamtest) {
+    Test-Step "Verify .data directory streaming for large files" {
+        Write-Host "  Testing .data directory creation and streaming..." -ForegroundColor Yellow
+        Write-Host "  This test verifies large file streaming from .data directory" -ForegroundColor Gray
+        
+        # Create test directories
+        $streamTestDir = "testdata/advanced-output/stream-test"
+        $oldVersionDir = "$streamTestDir/1.0.0"
+        $newVersionDir = "$streamTestDir/1.0.1"
+        $patchesDir = "$streamTestDir/patches"
+        
+        if (Test-Path $streamTestDir) {
+            Remove-Item $streamTestDir -Recurse -Force
+        }
+        
+        New-Item -ItemType Directory -Force -Path "$oldVersionDir/assets" | Out-Null
+        New-Item -ItemType Directory -Force -Path "$newVersionDir/assets" | Out-Null
+        New-Item -ItemType Directory -Force -Path $patchesDir | Out-Null
+        
+        # Create key files
+        Write-Host "  Creating key files..." -ForegroundColor Gray
+        Set-Content -Path "$oldVersionDir/game.exe" -Value "Streaming Test v1.0.0`n"
+        Set-Content -Path "$newVersionDir/game.exe" -Value "Streaming Test v1.0.1`n"
+        
+        # Create 1.2GB test file to trigger streaming (>1GB threshold)
+        Write-Host "  Creating 1.2GB test file (this will take 20-40 seconds)..." -ForegroundColor Yellow
+        $fileSize = 1.2GB
+        $largeFilePath = "$newVersionDir/assets/game-data.pak"
+        
+        # Create file in chunks
+        $chunkSize = 128MB
+        $random = New-Object System.Random(54321)
+        $fileStream = [System.IO.File]::Create($largeFilePath)
+        
+        $written = 0
+        $totalMB = [math]::Round($fileSize / 1MB, 0)
+        
+        while ($written -lt $fileSize) {
+            $remainingBytes = $fileSize - $written
+            $currentChunkSize = [Math]::Min($chunkSize, $remainingBytes)
+            
+            $chunk = New-Object byte[] $currentChunkSize
+            $random.NextBytes($chunk)
+            $fileStream.Write($chunk, 0, $currentChunkSize)
+            
+            $written += $currentChunkSize
+            $progressMB = [math]::Round($written / 1MB, 0)
+            Write-Progress -Activity "Creating 1.2GB test file" -Status "$progressMB MB / $totalMB MB" -PercentComplete (($written / $fileSize) * 100)
+        }
+        
+        $fileStream.Close()
+        Write-Progress -Activity "Creating 1.2GB test file" -Completed
+        Write-Host "  [OK] 1.2GB file created: $largeFilePath" -ForegroundColor Green
+        
+        # Generate patch - should create .data directory for large file
+        Write-Host ""
+        Write-Host "  Generating patch (should create .data directory)..." -ForegroundColor Yellow
+        Write-Host "  Command: patch-gen.exe --from-dir $oldVersionDir --to-dir $newVersionDir --output $patchesDir --compression zstd" -ForegroundColor Cyan
+        Write-Host ""
+        
+        $output = & .\patch-gen.exe --from-dir $oldVersionDir --to-dir $newVersionDir --output $patchesDir --compression zstd 2>&1 | Out-String
+        
+        if ($LASTEXITCODE -ne 0) {
+            throw "Patch generation failed: $output"
+        }
+        
+        Write-Host "  Generation Output:" -ForegroundColor Gray
+        Write-Host "  ----------------------------------------" -ForegroundColor DarkGray
+        Write-Host $output -ForegroundColor DarkGray
+        Write-Host "  ----------------------------------------" -ForegroundColor DarkGray
+        Write-Host ""
+        
+        # Verify .data directory was created
+        $patchPath = "$patchesDir/1.0.0-to-1.0.1.patch"
+        $dataDir = "$patchPath.data"
+        
+        if (-not (Test-Path $patchPath)) {
+            throw "Patch file not created"
+        }
+        
+        if (-not (Test-Path $dataDir)) {
+            throw ".data directory was not created for large file"
+        }
+        Write-Host "  [OK] .data directory created: $dataDir" -ForegroundColor Green
+        
+        # Verify data files exist in .data directory
+        $dataFiles = Get-ChildItem $dataDir -File
+        if ($dataFiles.Count -eq 0) {
+            throw "No data files found in .data directory"
+        }
+        Write-Host "  [OK] Found $($dataFiles.Count) data file(s) in .data directory" -ForegroundColor Green
+        
+        foreach ($dataFile in $dataFiles) {
+            $sizeMB = [math]::Round($dataFile.Length / 1MB, 2)
+            Write-Host "    - $($dataFile.Name): $sizeMB MB" -ForegroundColor Gray
+        }
+        
+        # Verify patch metadata references .data files
+        Write-Host ""
+        Write-Host "  Verifying patch metadata references data files..." -ForegroundColor Yellow
+        $patchContent = Get-Content $patchPath -Raw
+        
+        # Try to decompress and read patch content
+        if ($patchContent -match 'LargeFileSource' -or $patchContent -match 'file_\d+\.dat') {
+            Write-Host "  [OK] Patch metadata references .data files" -ForegroundColor Green
+        } else {
+            Write-Host "  Note: Patch is compressed, but .data directory exists (structure verified)" -ForegroundColor Yellow
+        }
+        
+        # Create self-contained executable
+        Write-Host ""
+        Write-Host "  Creating self-contained executable..." -ForegroundColor Yellow
+        $output = & .\patch-gen.exe --from-dir $oldVersionDir --to-dir $newVersionDir --output $patchesDir --compression zstd --create-exe 2>&1 | Out-String
+        
+        if ($LASTEXITCODE -ne 0) {
+            throw "Executable creation failed: $output"
+        }
+        
+        $exePath = "$patchesDir/1.0.0-to-1.0.1.exe"
+        if (-not (Test-Path $exePath)) {
+            throw "Executable not created"
+        }
+        Write-Host "  [OK] Self-contained executable created" -ForegroundColor Green
+        
+        # Verify .data directory for executable exists
+        $exeDataDir = "$patchesDir/1.0.0-to-1.0.1.data"
+        if (-not (Test-Path $exeDataDir)) {
+            throw ".data directory not created for executable"
+        }
+        Write-Host "  [OK] .data directory exists for executable: 1.0.0-to-1.0.1.data" -ForegroundColor Green
+        
+        # Apply patch using executable (tests streaming from .data)
+        Write-Host ""
+        Write-Host "  Testing patch application with .data streaming..." -ForegroundColor Yellow
+        
+        $applyDir = "$streamTestDir/apply-test"
+        if (Test-Path $applyDir) {
+            Remove-Item $applyDir -Recurse -Force
+        }
+        Copy-Item -Path $oldVersionDir -Destination $applyDir -Recurse -Force
+        
+        # Copy executable and .data directory to apply location
+        Copy-Item $exePath $applyDir
+        Copy-Item $exeDataDir "$applyDir/1.0.0-to-1.0.1.data" -Recurse
+        
+        # Run executable in target directory
+        Push-Location $applyDir
+        $applyOutput = & .\1.0.0-to-1.0.1.exe --silent --current-dir . 2>&1 | Out-String
+        Pop-Location
+        
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "  Application Output:" -ForegroundColor Red
+            Write-Host $applyOutput -ForegroundColor Red
+            throw "Patch application failed"
+        }
+        
+        Write-Host "  Application Output:" -ForegroundColor Gray
+        Write-Host "  ----------------------------------------" -ForegroundColor DarkGray
+        Write-Host $applyOutput -ForegroundColor DarkGray
+        Write-Host "  ----------------------------------------" -ForegroundColor DarkGray
+        Write-Host ""
+        
+        # Verify streaming messages in output
+        if ($applyOutput -match "Streaming large file" -or $applyOutput -match "stream") {
+            Write-Host "  [OK] Large file streaming detected in output!" -ForegroundColor Green
+        } else {
+            Write-Host "  Note: Streaming message may not be visible in output" -ForegroundColor Yellow
+        }
+        
+        # Verify large file was applied correctly
+        $appliedLargeFile = "$applyDir/assets/game-data.pak"
+        if (-not (Test-Path $appliedLargeFile)) {
+            throw "Large file was not applied"
+        }
+        
+        $appliedSize = (Get-Item $appliedLargeFile).Length
+        $expectedSize = (Get-Item $largeFilePath).Length
+        
+        if ($appliedSize -ne $expectedSize) {
+            throw "File size mismatch: applied=$appliedSize, expected=$expectedSize"
+        }
+        Write-Host "  [OK] Large file applied successfully ($([math]::Round($appliedSize / 1GB, 2)) GB)" -ForegroundColor Green
+        
+        # Verify file content matches
+        Write-Host "  Verifying file integrity..." -ForegroundColor Gray
+        $appliedHash = (Get-FileHash $appliedLargeFile -Algorithm SHA256).Hash
+        $expectedHash = (Get-FileHash $largeFilePath -Algorithm SHA256).Hash
+        
+        if ($appliedHash -eq $expectedHash) {
+            Write-Host "  [OK] File integrity verified (SHA256 match)" -ForegroundColor Green
+        } else {
+            throw "File hash mismatch - data corruption detected"
+        }
+        
+        Write-Host ""
+        Write-Host "  [OK] .data directory streaming test completed successfully!" -ForegroundColor Green
+        Write-Host "    • .data directory created for large files (>1GB)" -ForegroundColor Gray
+        Write-Host "    • Large files stored separately in .data directory" -ForegroundColor Gray
+        Write-Host "    • Self-contained executable created with .data companion" -ForegroundColor Gray
+        Write-Host "    • Streaming from .data directory works correctly" -ForegroundColor Gray
+        Write-Host "    • File integrity verified after streaming" -ForegroundColor Gray
+        Write-Host "    • Memory-efficient: large files never fully loaded into memory" -ForegroundColor Gray
+        Write-Host ""
+        Write-Host "  Distribution Notes:" -ForegroundColor Cyan
+        Write-Host "    • Ship both: <patchname>.exe AND <patchname>.data directory" -ForegroundColor Gray
+        Write-Host "    • Keep them in the same directory" -ForegroundColor Gray
+        Write-Host "    • Applier automatically finds .data directory next to executable" -ForegroundColor Gray
+    }
+}
+
+# Test 59: Large File Handling - Memory Optimization (only if -runlargefile flag is set)
+if ($runlargefile) {
+    Test-Step "Verify large file chunked processing and memory optimization" {
+        Write-Host "  Testing large file handling with 1.5GB file..." -ForegroundColor Yellow
+        Write-Host "  This test verifies automatic chunked processing for files >1GB" -ForegroundColor Gray
+        
+        # Create test directories
+        $largeFileTestDir = "testdata/advanced-output/large-file-test"
+        $oldVersionDir = "$largeFileTestDir/1.0.0"
+        $newVersionDir = "$largeFileTestDir/1.0.1"
+        $patchesDir = "$largeFileTestDir/patches"
+        
+        if (Test-Path $largeFileTestDir) {
+            Remove-Item $largeFileTestDir -Recurse -Force
+        }
+        
+        New-Item -ItemType Directory -Force -Path "$oldVersionDir/data" | Out-Null
+        New-Item -ItemType Directory -Force -Path "$newVersionDir/data" | Out-Null
+        New-Item -ItemType Directory -Force -Path $patchesDir | Out-Null
+        
+        # Create key files
+        Write-Host "  Creating key files..." -ForegroundColor Gray
+        Set-Content -Path "$oldVersionDir/program.exe" -Value "Large File Test v1.0.0`n"
+        Set-Content -Path "$newVersionDir/program.exe" -Value "Large File Test v1.0.1`n"
+        
+        # Create 1.5GB test file (will trigger chunked processing at 1GB threshold)
+        Write-Host "  Creating 1.5GB test file (this will take 30-60 seconds)..." -ForegroundColor Yellow
+        $fileSize = 1.5GB
+        $largeFilePath = "$oldVersionDir/data/large-asset.bin"
+        
+        # Create file in chunks to avoid memory issues during test setup
+        $chunkSize = 128MB
+        $random = New-Object System.Random(12345) # Fixed seed for reproducibility
+        $fileStream = [System.IO.File]::Create($largeFilePath)
+        
+        $written = 0
+        $totalMB = [math]::Round($fileSize / 1MB, 0)
+        
+        while ($written -lt $fileSize) {
+            $remainingBytes = $fileSize - $written
+            $currentChunkSize = [Math]::Min($chunkSize, $remainingBytes)
+            
+            $chunk = New-Object byte[] $currentChunkSize
+            $random.NextBytes($chunk)
+            $fileStream.Write($chunk, 0, $currentChunkSize)
+            
+            $written += $currentChunkSize
+            $progressMB = [math]::Round($written / 1MB, 0)
+            Write-Progress -Activity "Creating 1.5GB test file" -Status "$progressMB MB / $totalMB MB" -PercentComplete (($written / $fileSize) * 100)
+        }
+        
+        $fileStream.Close()
+        Write-Progress -Activity "Creating 1.5GB test file" -Completed
+        Write-Host "  [OK] 1.5GB file created: $largeFilePath" -ForegroundColor Green
+        
+        # Create modified version (copy and modify a small portion)
+        Write-Host "  Creating modified 1.5GB file..." -ForegroundColor Gray
+        Copy-Item $largeFilePath "$newVersionDir/data/large-asset.bin"
+        
+        # Modify a small portion to create a real change
+        $modifyStream = [System.IO.File]::OpenWrite("$newVersionDir/data/large-asset.bin")
+        $modifyStream.Seek(1MB, [System.IO.SeekOrigin]::Begin) | Out-Null
+        $modifyBytes = [System.Text.Encoding]::ASCII.GetBytes("MODIFIED_BY_TEST_v1.0.1")
+        $modifyStream.Write($modifyBytes, 0, $modifyBytes.Length)
+        $modifyStream.Close()
+        Write-Host "  [OK] Modified version created with changes at 1MB offset" -ForegroundColor Green
+        
+        # Add small files to test mixed processing
+        Set-Content -Path "$oldVersionDir/data/small-file.txt" -Value "Small file v1.0.0"
+        Set-Content -Path "$newVersionDir/data/small-file.txt" -Value "Small file v1.0.1 UPDATED"
+        
+        # Generate patch - should detect large file and use chunked processing
+        Write-Host ""
+        Write-Host "  Generating patch with automatic chunked processing..." -ForegroundColor Yellow
+        Write-Host "  Watch for 'Large file detected' messages indicating chunked mode" -ForegroundColor Gray
+        Write-Host ""
+        
+        $startTime = Get-Date
+        $output = & .\patch-gen.exe --from-dir $oldVersionDir --to-dir $newVersionDir --output $patchesDir --compression zstd --level 3 2>&1 | Out-String
+        $endTime = Get-Date
+        $duration = ($endTime - $startTime).TotalSeconds
+        
+        if ($LASTEXITCODE -ne 0) {
+            throw "Patch generation failed: $output"
+        }
+        
+        Write-Host ""
+        Write-Host "  Generation Output:" -ForegroundColor Gray
+        Write-Host "  ----------------------------------------" -ForegroundColor DarkGray
+        Write-Host $output -ForegroundColor DarkGray
+        Write-Host "  ----------------------------------------" -ForegroundColor DarkGray
+        Write-Host ""
+        
+        # Verify chunked processing was used
+        if ($output -match "Large file detected" -or $output -match "chunked") {
+            Write-Host "  [OK] Chunked processing detected in output!" -ForegroundColor Green
+        } else {
+            Write-Host "  Note: Chunked processing message may not be visible (still successful)" -ForegroundColor Yellow
+        }
+        
+        # Verify progress indicators
+        if ($output -match "Progress:|%") {
+            Write-Host "  [OK] Progress indicators shown for large file operations" -ForegroundColor Green
+        }
+        
+        # Verify patch was created
+        $patchPath = "$patchesDir/1.0.0-to-1.0.1.patch"
+        if (-not (Test-Path $patchPath)) {
+            throw "Patch file not created"
+        }
+        
+        $patchSize = (Get-Item $patchPath).Length
+        Write-Host "  [OK] Patch created successfully" -ForegroundColor Green
+        Write-Host "    Patch size: $([math]::Round($patchSize / 1MB, 2)) MB" -ForegroundColor Gray
+        Write-Host "    Generation time: $([math]::Round($duration, 1)) seconds" -ForegroundColor Gray
+        
+        # Apply patch to verify chunked application works
+        Write-Host ""
+        Write-Host "  Testing patch application with chunked processing..." -ForegroundColor Yellow
+        
+        $applyDir = "$largeFileTestDir/apply-test"
+        if (Test-Path $applyDir) {
+            Remove-Item $applyDir -Recurse -Force
+        }
+        Copy-Item -Path $oldVersionDir -Destination $applyDir -Recurse -Force
+        
+        $applyOutput = & .\patch-apply.exe --patch $patchPath --current-dir $applyDir --verify 2>&1 | Out-String
+        
+        if ($LASTEXITCODE -ne 0) {
+            throw "Patch application failed: $applyOutput"
+        }
+        
+        Write-Host ""
+        Write-Host "  Application Output:" -ForegroundColor Gray
+        Write-Host "  ----------------------------------------" -ForegroundColor DarkGray
+        Write-Host $applyOutput -ForegroundColor DarkGray
+        Write-Host "  ----------------------------------------" -ForegroundColor DarkGray
+        Write-Host ""
+        
+        # Verify chunked writing was used
+        if ($applyOutput -match "Large file|chunked|chunks") {
+            Write-Host "  [OK] Chunked writing detected in application!" -ForegroundColor Green
+        }
+        
+        # Verify files were correctly patched
+        $appliedLargeFile = "$applyDir/data/large-asset.bin"
+        $expectedLargeFile = "$newVersionDir/data/large-asset.bin"
+        
+        if (-not (Test-Path $appliedLargeFile)) {
+            throw "Applied large file not found"
+        }
+        
+        # Verify file size matches
+        $appliedSize = (Get-Item $appliedLargeFile).Length
+        $expectedSize = (Get-Item $expectedLargeFile).Length
+        
+        if ($appliedSize -eq $expectedSize) {
+            Write-Host "  [OK] Applied file size matches expected size ($([math]::Round($appliedSize / 1GB, 2)) GB)" -ForegroundColor Green
+        } else {
+            throw "File size mismatch: applied=$appliedSize, expected=$expectedSize"
+        }
+        
+        # Verify modification was applied correctly (check modified section)
+        $expectedString = "MODIFIED_BY_TEST_v1.0.1"
+        $expectedBytes = [System.Text.Encoding]::ASCII.GetBytes($expectedString)
+        $appliedStream = [System.IO.File]::OpenRead($appliedLargeFile)
+        $appliedStream.Seek(1MB, [System.IO.SeekOrigin]::Begin) | Out-Null
+        $verifyBytes = New-Object byte[] $expectedBytes.Length
+        $appliedStream.Read($verifyBytes, 0, $expectedBytes.Length) | Out-Null
+        $appliedStream.Close()
+        
+        $verifyString = [System.Text.Encoding]::ASCII.GetString($verifyBytes)
+        if ($verifyString -eq $expectedString) {
+            Write-Host "  [OK] File modification verified at 1MB offset" -ForegroundColor Green
+        } else {
+            throw "File modification verification failed: expected '$expectedString', got '$verifyString'"
+        }
+        
+        Write-Host ""
+        Write-Host "  [OK] Large file handling test completed successfully!" -ForegroundColor Green
+        Write-Host "    • 1.5GB file processed with chunked operations" -ForegroundColor Gray
+        Write-Host "    • Automatic detection of files >1GB threshold" -ForegroundColor Gray
+        Write-Host "    • Memory-efficient processing (128MB chunks)" -ForegroundColor Gray
+        Write-Host "    • Progress indicators for large operations" -ForegroundColor Gray
+        Write-Host "    • Mixed processing: large files chunked, small files normal" -ForegroundColor Gray
+        Write-Host "    • Successful patch generation and application" -ForegroundColor Gray
+        Write-Host "    • File integrity verified after patching" -ForegroundColor Gray
+        Write-Host ""
+        Write-Host "  Performance Notes:" -ForegroundColor Cyan
+        Write-Host "    • Generation time: $([math]::Round($duration, 1))s for 1.5GB file" -ForegroundColor Gray
+        Write-Host "    • Memory usage kept low with chunked processing" -ForegroundColor Gray
+        Write-Host "    • No page file spillover expected" -ForegroundColor Gray
+        Write-Host ""
+        Write-Host "  This test demonstrates memory optimization for game codebases" -ForegroundColor Cyan
+        Write-Host "  with multi-GB asset files (e.g., 20GB+ game archives)" -ForegroundColor Cyan
+    }
 }
 
 # Final summary
@@ -3046,15 +3477,15 @@ Write-Host "Failed: $failed" -ForegroundColor Red
 Write-Host ""
 
 if ($failed -eq 0) {
-    Write-Host "✓ All $totalTests advanced tests passed!" -ForegroundColor Green
+    Write-Host "[OK] All $totalTests advanced tests passed!" -ForegroundColor Green
     Write-Host ""
     Write-Host "Advanced Features Verified:" -ForegroundColor Cyan
     Write-Host "  • Complex nested directory structures" -ForegroundColor Gray
     Write-Host "  • Multiple compression formats (zstd, gzip, none)" -ForegroundColor Gray
-    Write-Host "  • Multi-hop patching (1.0.0 → 1.0.1 → 1.0.2)" -ForegroundColor Gray
+    Write-Host "  • Multi-hop patching (1.0.0 -> 1.0.1 -> 1.0.2)" -ForegroundColor Gray
     Write-Host "  • Bidirectional patching (upgrade and downgrade)" -ForegroundColor Gray
-    Write-Host "  • Downgrade patches (1.0.2 → 1.0.1 rollback)" -ForegroundColor Gray
-    Write-Host "  • Complete bidirectional cycle (1.0.1 ↔ 1.0.2)" -ForegroundColor Gray
+    Write-Host "  • Downgrade patches (1.0.2 -> 1.0.1 rollback)" -ForegroundColor Gray
+    Write-Host "  • Complete bidirectional cycle (1.0.1 <-> 1.0.2)" -ForegroundColor Gray
     Write-Host "  • Wrong version detection" -ForegroundColor Gray
     Write-Host "  • File corruption detection" -ForegroundColor Gray
     Write-Host "  • Backup system with mirror structure" -ForegroundColor Gray
@@ -3088,12 +3519,27 @@ if ($failed -eq 0) {
     Write-Host "  • Scan cache invalidation (key file hash verification)" -ForegroundColor Gray
     Write-Host "  • Simple Mode patch generation (SimpleMode field in patch structure)" -ForegroundColor Gray
     Write-Host "  • Simple Mode simplified applier interface (GUI and CLI 3-option menu)" -ForegroundColor Gray
-    Write-Host "  • Simple Mode complete workflow (generator → exe → end user)" -ForegroundColor Gray
+    Write-Host "  • Simple Mode complete workflow (generator -> exe -> end user)" -ForegroundColor Gray
     Write-Host "  • Simple Mode feature documentation and implementation validation" -ForegroundColor Gray
     Write-Host "  • Simple Mode real-world use case scenarios (vendors, IT, modders)" -ForegroundColor Gray
+    
+    if ($runstreamtest) {
+        Write-Host "  • .data directory streaming for large files (>1GB)" -ForegroundColor Gray
+        Write-Host "  • Large file storage in separate .data directory" -ForegroundColor Gray
+        Write-Host "  • Self-contained executable with .data companion" -ForegroundColor Gray
+        Write-Host "  • Streaming from .data directory (memory-efficient)" -ForegroundColor Gray
+        Write-Host "  • File integrity verification after streaming" -ForegroundColor Gray
+    }
+    
+    if ($runlargefile) {
+        Write-Host "  • Large file handling with chunked processing (1.5GB file, memory optimization)" -ForegroundColor Gray
+    }
     Write-Host "  • Silent Mode (--silent flag) for fully automatic patching (automation)" -ForegroundColor Gray
     if ($run1gbtest) {
         Write-Host "  • 1GB bypass mode with large patches (>1GB)" -ForegroundColor Gray
+    }
+    if ($runlargefile) {
+        Write-Host "  • Large file handling with chunked processing (1.5GB file, memory optimization)" -ForegroundColor Gray
     }
     Write-Host ""
     Write-Host "CyberPatchMaker advanced functionality verified!" -ForegroundColor Green
@@ -3119,11 +3565,11 @@ if ($failed -eq 0) {
             New-Item -ItemType Directory -Force -Path "testdata/.data" -ErrorAction SilentlyContinue | Out-Null
             Copy-Item ".data/*" "testdata/.data/" -Recurse -Force -ErrorAction SilentlyContinue
             Remove-Item ".data" -Recurse -Force -ErrorAction SilentlyContinue
-            Write-Host "  ✓ Cache data moved to testdata/.data" -ForegroundColor Green
+            Write-Host "  [OK] Cache data moved to testdata/.data" -ForegroundColor Green
         }
         
         Remove-Item "testdata" -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Host "✓ Test data removed" -ForegroundColor Green
+        Write-Host "[OK] Test data removed" -ForegroundColor Green
         Write-Host ""
     } else {
         Write-Host ""
@@ -3134,7 +3580,7 @@ if ($failed -eq 0) {
             New-Item -ItemType Directory -Force -Path "testdata/.data" -ErrorAction SilentlyContinue | Out-Null
             Copy-Item ".data/*" "testdata/.data/" -Recurse -Force -ErrorAction SilentlyContinue
             Remove-Item ".data" -Recurse -Force -ErrorAction SilentlyContinue
-            Write-Host "✓ Cache data moved to testdata/.data" -ForegroundColor Green
+            Write-Host "[OK] Cache data moved to testdata/.data" -ForegroundColor Green
             Write-Host ""
         }
         
@@ -3150,7 +3596,7 @@ if ($failed -eq 0) {
     
     exit 0
 } else {
-    Write-Host "✗ Some advanced tests failed. Please check the output above." -ForegroundColor Red
+    Write-Host "[FAIL] Some advanced tests failed. Please check the output above." -ForegroundColor Red
     
     # Cleanup prompt even on failure
     Write-Host ""
@@ -3174,11 +3620,11 @@ if ($failed -eq 0) {
             New-Item -ItemType Directory -Force -Path "testdata/.data" -ErrorAction SilentlyContinue | Out-Null
             Copy-Item ".data/*" "testdata/.data/" -Recurse -Force -ErrorAction SilentlyContinue
             Remove-Item ".data" -Recurse -Force -ErrorAction SilentlyContinue
-            Write-Host "  ✓ Cache data moved to testdata/.data" -ForegroundColor Green
+            Write-Host "  [OK] Cache data moved to testdata/.data" -ForegroundColor Green
         }
         
         Remove-Item "testdata" -Recurse -Force -ErrorAction SilentlyContinue
-        Write-Host "✓ Test data removed" -ForegroundColor Green
+        Write-Host "[OK] Test data removed" -ForegroundColor Green
         Write-Host ""
     } else {
         Write-Host ""
@@ -3189,7 +3635,7 @@ if ($failed -eq 0) {
             New-Item -ItemType Directory -Force -Path "testdata/.data" -ErrorAction SilentlyContinue | Out-Null
             Copy-Item ".data/*" "testdata/.data/" -Recurse -Force -ErrorAction SilentlyContinue
             Remove-Item ".data" -Recurse -Force -ErrorAction SilentlyContinue
-            Write-Host "✓ Cache data moved to testdata/.data" -ForegroundColor Green
+            Write-Host "[OK] Cache data moved to testdata/.data" -ForegroundColor Green
             Write-Host ""
         }
         

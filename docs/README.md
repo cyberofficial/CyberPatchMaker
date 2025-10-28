@@ -13,6 +13,8 @@ Welcome to the CyberPatchMaker documentation wiki. This comprehensive guide cove
 - [GUI Usage Guide](gui-usage.md) - Using the graphical interface **(Experimental)**
 - [Self-Contained Executables](self-contained-executables.md) - Create standalone patch executables **(New!)**
 - [Downgrade Guide](downgrade-guide.md) - Rollback to previous versions
+- [Large File Handling](large-file-handling.md) - Memory-efficient processing for 20GB+ files **(New in v1.0.6!)**
+- [Multi-Part Patches](multipart-patches.md) - Automatic splitting of patches >4GB into manageable parts **(New!)**
 - [CLI Reference](cli-reference.md) - Quick command-line reference
 - [CLI Examples](CLI-EXAMPLES.md) - Real-world command examples
 - [Version Management](version-management.md) - Managing multiple versions
@@ -44,6 +46,7 @@ Welcome to the CyberPatchMaker documentation wiki. This comprehensive guide cove
 - **Generating Patches?** See [Generator Tool Guide](generator-guide.md)
 - **Applying Patches?** See [Applier Tool Guide](applier-guide.md)
 - **Want Simple Distribution?** Check out [Self-Contained Executables](self-contained-executables.md)
+- **Working with Large Patches (>4GB)?** See [Multi-Part Patches](multipart-patches.md)
 - **Understanding Backups?** Read [Backup System](backup-system.md)
 - **Something Not Working?** Check [Troubleshooting](troubleshooting.md)
 - **Want to Contribute?** Read [Development Setup](development-setup.md)
