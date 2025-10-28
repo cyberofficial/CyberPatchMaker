@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 # CyberPatchMaker Build Script
-# Builds CLI tools and GUI application
+# Builds CLI tools (GUI components removed as deprecated)
 
 param(
     [switch]$Clean,
@@ -150,7 +150,7 @@ Write-Info "Building components..."
 Write-Info ""
 
 # Build CLI Generator
-Write-Info "[1/4] Building patch generator (CLI)..."
+Write-Info "[1/2] Building patch generator (CLI)..."
 $generatorPath = Join-Path $versionDir "patch-gen.exe"
 & go build @buildFlags $generatorPath ./cmd/generator
 if ($LASTEXITCODE -eq 0) {
@@ -161,35 +161,13 @@ if ($LASTEXITCODE -eq 0) {
 }
 
 # Build CLI Applier
-Write-Info "[2/4] Building patch applier (CLI)..."
+Write-Info "[2/2] Building patch applier (CLI)..."
 $applierPath = Join-Path $versionDir "patch-apply.exe"
 & go build @buildFlags $applierPath ./cmd/applier
 if ($LASTEXITCODE -eq 0) {
     Write-Success "  [OK] patch-apply.exe"
 } else {
     Write-Error "  [FAIL] Failed to build patch-apply.exe"
-    exit 1
-}
-
-# Build Generator GUI
-Write-Info "[3/4] Building patch generator GUI..."
-$genGuiPath = Join-Path $versionDir "patch-gen-gui.exe"
-& go build @buildFlags $genGuiPath ./cmd/patch-gui
-if ($LASTEXITCODE -eq 0) {
-    Write-Success "  [OK] patch-gen-gui.exe"
-} else {
-    Write-Error "  [FAIL] Failed to build patch-gen-gui.exe"
-    exit 1
-}
-
-# Build Applier GUI
-Write-Info "[4/4] Building patch applier GUI..."
-$appGuiPath = Join-Path $versionDir "patch-apply-gui.exe"
-& go build @buildFlags $appGuiPath ./cmd/applier-gui
-if ($LASTEXITCODE -eq 0) {
-    Write-Success "  [OK] patch-apply-gui.exe"
-} else {
-    Write-Error "  [FAIL] Failed to build patch-apply-gui.exe"
     exit 1
 }
 
@@ -207,6 +185,4 @@ Write-Info ""
 Write-Info "To run:"
 Write-Info "  CLI Generator:      .\dist\$version\patch-gen.exe --help"
 Write-Info "  CLI Applier:        .\dist\$version\patch-apply.exe --help"
-Write-Info "  Generator GUI:      .\dist\$version\patch-gen-gui.exe"
-Write-Info "  Applier GUI:        .\dist\$version\patch-apply-gui.exe"
 Write-Info ""

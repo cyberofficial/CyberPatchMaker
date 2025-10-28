@@ -2781,8 +2781,7 @@ Test-Step "Verify Simple Mode documentation and feature completeness" {
     $docFiles = @(
         ".\docs\simple-mode-guide.md",
         ".\docs\generator-guide.md",
-        ".\docs\applier-guide.md",
-        ".\docs\gui-usage.md"
+        ".\docs\applier-guide.md"
     )
     
     foreach ($doc in $docFiles) {

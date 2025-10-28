@@ -191,11 +191,6 @@ patch-apply --patch 1.0.0-to-1.0.2.patch --current-dir ./myapp --verify
 - Handles files from 1KB to 20GB+ with automatic memory optimization
 - Multiple compression formats (zstd, gzip)
 
-**Experimental GUI (In Development):**
-- Basic graphical interface available for patch generation
-- Not yet recommended for production use
-- CLI tools are the primary, supported interface
-
 **Documentation:** [Full Documentation Index](docs/README.md)
 
 ## Testing

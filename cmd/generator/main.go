@@ -33,8 +33,6 @@ func main() {
 	verify := flag.Bool("verify", true, "Verify patches after creation")
 	createExe := flag.Bool("create-exe", false, "Create self-contained CLI executable")
 	crp := flag.Bool("crp", false, "Create reverse patch (for downgrades)")
-	// TODO: Implement silent mode flag support for CLI generator (currently only GUI supports this)
-	_ = flag.Bool("silent-mode", false, "Enable simplified UI for end users (silent mode)")
 	saveScans := flag.Bool("savescans", false, "Save directory scans to cache for faster subsequent patches")
 	rescan := flag.Bool("rescan", false, "Force rescan of cached versions")
 	scanData := flag.String("scandata", "", "Custom directory for scan cache (default: .data)")

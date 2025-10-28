@@ -98,9 +98,22 @@ patch-gen.exe --from-dir "C:\Version1" --to-dir "C:\Version2" --output patches
 # ✓ Multi-part patch saved: 5 parts
 ```
 
-### GUI Generator
+### CLI Generator
 
-The GUI automatically detects and splits large patches. Progress indicators show:
+The CLI automatically detects and splits large patches. Use `--splitsize` to customize the part size:
+
+```bash
+# Auto-split with default 4GB limit
+patch-gen.exe --from-dir "C:\v1" --to-dir "C:\v2" --output patches
+
+# Custom split size (2GB parts)
+patch-gen.exe --from-dir "C:\v1" --to-dir "C:\v2" --output patches --splitsize 2G
+
+# Small parts for limited upload space
+patch-gen.exe --from-dir "C:\v1" --to-dir "C:\v2" --output patches --splitsize 500MB --bypasssplitlimit
+```
+
+Progress indicators show:
 - Total patch size
 - Number of parts
 - Part generation progress
