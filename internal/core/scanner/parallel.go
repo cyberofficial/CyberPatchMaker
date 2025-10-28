@@ -41,7 +41,8 @@ func (s *Scanner) ScanDirectoryParallel(workers int) ([]utils.FileEntry, []strin
 		}
 
 		// Check .cyberignore patterns
-		if s.ignorePatterns.ShouldIgnore(relPath) {
+		absPath, _ := filepath.Abs(path)
+		if s.ignorePatterns.ShouldIgnoreWithAbsPath(relPath, absPath) {
 			if info.IsDir() {
 				return filepath.SkipDir
 			}
@@ -154,7 +155,8 @@ func (s *Scanner) ScanDirectoryParallelWithProgress(workers int, progressCallbac
 		}
 
 		// Check .cyberignore patterns
-		if s.ignorePatterns.ShouldIgnore(relPath) {
+		absPath, _ := filepath.Abs(path)
+		if s.ignorePatterns.ShouldIgnoreWithAbsPath(relPath, absPath) {
 			if info.IsDir() {
 				return filepath.SkipDir
 			}

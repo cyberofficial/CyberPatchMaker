@@ -1,6 +1,6 @@
 #!/usr/bin/env pwsh
 # CyberPatchMaker Build Script
-# Builds CLI tools and GUI application
+# Builds CLI tools (GUI components removed as deprecated)
 
 param(
     [switch]$Clean,
@@ -44,7 +44,7 @@ if ($iii) {
         # Write back to file
         Set-Content $versionFile -Value $content -NoNewline
         
-        Write-Success "✓ Incremented major version: $currentMajor -> $newMajor (minor and patch reset to 0)"
+        Write-Success "[OK] Incremented major version: $currentMajor -> $newMajor (minor and patch reset to 0)"
     } else {
         Write-Error "Failed to parse major version from $versionFile"
         exit 1
@@ -71,7 +71,7 @@ elseif ($ii) {
         # Write back to file
         Set-Content $versionFile -Value $content -NoNewline
         
-        Write-Success "✓ Incremented minor version: $currentMinor -> $newMinor (patch reset to 0)"
+        Write-Success "[OK] Incremented minor version: $currentMinor -> $newMinor (patch reset to 0)"
     } else {
         Write-Error "Failed to parse minor version from $versionFile"
         exit 1
@@ -95,7 +95,7 @@ elseif ($i) {
         # Write back to file
         Set-Content $versionFile -Value $content -NoNewline
         
-        Write-Success "✓ Incremented patch version: $currentPatch -> $newPatch"
+        Write-Success "[OK] Incremented patch version: $currentPatch -> $newPatch"
     } else {
         Write-Error "Failed to parse patch version from $versionFile"
         exit 1
@@ -116,9 +116,9 @@ Write-Info ""
 # Ensure TDM-GCC is in PATH for CGO (required for Fyne GUI)
 if (Test-Path "C:\TDM-GCC-64\bin\gcc.exe") {
     $env:PATH = "C:\TDM-GCC-64\bin;" + $env:PATH
-    Write-Info "✓ Using TDM-GCC for CGO compilation"
+    Write-Info "[OK] Using TDM-GCC for CGO compilation"
 } else {
-    Write-Info "⚠ TDM-GCC not found, using system GCC (may cause issues with GUI)"
+    Write-Info "[WARN] TDM-GCC not found, using system GCC (may cause issues with GUI)"
 }
 
 # Create dist directory with version subdirectory
@@ -136,7 +136,7 @@ if (-not (Test-Path $distDir)) {
 
 if (-not (Test-Path $versionDir)) {
     New-Item -ItemType Directory -Path $versionDir | Out-Null
-    Write-Info "✓ Created version directory: $versionDir"
+    Write-Info "[OK] Created version directory: $versionDir"
 }
 
 # Build flags
@@ -150,46 +150,24 @@ Write-Info "Building components..."
 Write-Info ""
 
 # Build CLI Generator
-Write-Info "[1/4] Building patch generator (CLI)..."
+Write-Info "[1/2] Building patch generator (CLI)..."
 $generatorPath = Join-Path $versionDir "patch-gen.exe"
 & go build @buildFlags $generatorPath ./cmd/generator
 if ($LASTEXITCODE -eq 0) {
-    Write-Success "  ✓ patch-gen.exe"
+    Write-Success "  [OK] patch-gen.exe"
 } else {
-    Write-Error "  ✗ Failed to build patch-gen.exe"
+    Write-Error "  [FAIL] Failed to build patch-gen.exe"
     exit 1
 }
 
 # Build CLI Applier
-Write-Info "[2/4] Building patch applier (CLI)..."
+Write-Info "[2/2] Building patch applier (CLI)..."
 $applierPath = Join-Path $versionDir "patch-apply.exe"
 & go build @buildFlags $applierPath ./cmd/applier
 if ($LASTEXITCODE -eq 0) {
-    Write-Success "  ✓ patch-apply.exe"
+    Write-Success "  [OK] patch-apply.exe"
 } else {
-    Write-Error "  ✗ Failed to build patch-apply.exe"
-    exit 1
-}
-
-# Build Generator GUI
-Write-Info "[3/4] Building patch generator GUI..."
-$genGuiPath = Join-Path $versionDir "patch-gen-gui.exe"
-& go build @buildFlags $genGuiPath ./cmd/patch-gui
-if ($LASTEXITCODE -eq 0) {
-    Write-Success "  ✓ patch-gen-gui.exe"
-} else {
-    Write-Error "  ✗ Failed to build patch-gen-gui.exe"
-    exit 1
-}
-
-# Build Applier GUI
-Write-Info "[4/4] Building patch applier GUI..."
-$appGuiPath = Join-Path $versionDir "patch-apply-gui.exe"
-& go build @buildFlags $appGuiPath ./cmd/applier-gui
-if ($LASTEXITCODE -eq 0) {
-    Write-Success "  ✓ patch-apply-gui.exe"
-} else {
-    Write-Error "  ✗ Failed to build patch-apply-gui.exe"
+    Write-Error "  [FAIL] Failed to build patch-apply.exe"
     exit 1
 }
 
@@ -200,13 +178,11 @@ Write-Info "Version: $version"
 Write-Info "Built files in $versionDir :"
 Get-ChildItem $versionDir -Filter *.exe | ForEach-Object {
     $size = "{0:N2} MB" -f ($_.Length / 1MB)
-    Write-Info "  • $($_.Name) ($size)"
+    Write-Info "  - $($_.Name) ($size)"
 }
 
 Write-Info ""
 Write-Info "To run:"
 Write-Info "  CLI Generator:      .\dist\$version\patch-gen.exe --help"
 Write-Info "  CLI Applier:        .\dist\$version\patch-apply.exe --help"
-Write-Info "  Generator GUI:      .\dist\$version\patch-gen-gui.exe"
-Write-Info "  Applier GUI:        .\dist\$version\patch-apply-gui.exe"
 Write-Info ""

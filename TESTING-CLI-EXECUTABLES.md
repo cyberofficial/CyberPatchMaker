@@ -179,18 +179,18 @@ Select option 2, then type "no" when prompted - should cancel gracefully.
    - Warning displayed when enabled
    - State persists during session
 
-## Comparison: GUI vs CLI Executables
+## CLI Executable Features
 
-| Feature | GUI Executable | CLI Executable |
-|---------|----------------|----------------|
-| Created by | `patch-gen-gui.exe --create-exe` | `patch-gen.exe --create-exe` |
-| Uses | `patch-apply-gui.exe` | `patch-apply.exe` |
-| Interface | Graphical windows | Interactive console |
-| Dry Run | Button click | Menu option 1 |
-| Apply | Button click | Menu option 2 |
-| 1GB Bypass | Checkbox | Menu option 3 |
-| Target Dir | Browse button | Menu option 4 |
-| Best For | Non-technical users | Scripters, CLI users |
+| Feature | CLI Executable |
+|---------|----------------|
+| Created by | `patch-gen.exe --create-exe` |
+| Uses | `patch-apply.exe` |
+| Interface | Interactive console |
+| Dry Run | Menu option 1 |
+| Apply | Menu option 2 |
+| 1GB Bypass | Menu option 3 |
+| Target Dir | Menu option 4 |
+| Best For | Scripters, CLI users, automation |
 
 ## Known Limitations
 

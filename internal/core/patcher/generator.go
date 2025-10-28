@@ -106,10 +106,20 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 	for _, file := range added {
 		fullPath := filepath.Join(toVersion.Location, file.Path)
 
-		// Read new file
+		// Read file directly (no streaming for large files)
 		fileData, err := os.ReadFile(fullPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read new file %s: %w", file.Path, err)
+		}
+
+		// Verify the file data matches the manifest
+		if int64(len(fileData)) != file.Size {
+			return nil, fmt.Errorf("file %s size mismatch: expected %d bytes, got %d bytes (file may have changed since scanning)", file.Path, file.Size, len(fileData))
+		}
+
+		actualChecksum := utils.CalculateDataChecksum(fileData)
+		if actualChecksum != file.Checksum {
+			return nil, fmt.Errorf("file %s checksum mismatch: expected %s, got %s (file may have changed since scanning)", file.Path, file.Checksum, actualChecksum)
 		}
 
 		patch.Operations = append(patch.Operations, utils.PatchOperation{
@@ -147,26 +157,38 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 			continue
 		}
 
-		// Always generate binary diff for modified files
-		oldPath := filepath.Join(fromVersion.Location, file.Path)
+		// Use full file replacement for all modified files (no streaming)
+		fmt.Printf("  Processing modified file: %s\n", file.Path)
+
+		// Get file path
 		newPath := filepath.Join(toVersion.Location, file.Path)
 
-		diffData, err := g.differ.GenerateDiff(oldPath, newPath)
+		// Read the new file data directly
+		newFileData, err := os.ReadFile(newPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to generate diff for %s: %w", file.Path, err)
+			return nil, fmt.Errorf("failed to read new file %s: %w", file.Path, err)
+		}
+
+		// Verify the file data matches the manifest
+		if int64(len(newFileData)) != file.Size {
+			return nil, fmt.Errorf("file %s size mismatch: expected %d bytes, got %d bytes (file may have changed since scanning)", file.Path, file.Size, len(newFileData))
+		}
+
+		actualChecksum := utils.CalculateDataChecksum(newFileData)
+		if actualChecksum != file.Checksum {
+			return nil, fmt.Errorf("file %s checksum mismatch: expected %s, got %s (file may have changed since scanning)", file.Path, file.Checksum, actualChecksum)
 		}
 
 		patch.Operations = append(patch.Operations, utils.PatchOperation{
 			Type:        utils.OpModify,
 			FilePath:    file.Path,
-			BinaryDiff:  diffData,
+			NewFile:     newFileData,
 			OldChecksum: sourceFile.Checksum,
 			NewChecksum: file.Checksum,
-			Size:        int64(len(diffData)),
+			Size:        file.Size,
 		})
 
-		fmt.Printf("  Modify (diff): %s (diff: %d bytes, orig: %d bytes, new: %d bytes)\n",
-			file.Path, len(diffData), sourceFile.Size, file.Size)
+		fmt.Printf("  Modify (full replacement): %s (%d bytes)\n", file.Path, file.Size)
 	}
 
 	// Create patch header
@@ -174,7 +196,7 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 		FormatVersion: 1,
 		CreatedAt:     time.Now(),
 		Compression:   options.Compression,
-		PatchSize:     g.calculatePatchSize(patch),
+		PatchSize:     g.CalculatePatchSize(patch),
 		Checksum:      "", // Will be calculated when saving
 	}
 
@@ -183,8 +205,8 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 	return patch, nil
 }
 
-// calculatePatchSize calculates the total size of patch operations
-func (g *Generator) calculatePatchSize(patch *utils.Patch) int64 {
+// CalculatePatchSize calculates the total size of patch operations
+func (g *Generator) CalculatePatchSize(patch *utils.Patch) int64 {
 	var totalSize int64
 	for _, op := range patch.Operations {
 		totalSize += op.Size
@@ -255,8 +277,8 @@ func (g *Generator) ValidatePatch(patch *utils.Patch) error {
 
 		switch op.Type {
 		case utils.OpAdd:
-			if len(op.NewFile) == 0 {
-				return fmt.Errorf("operation %d (add): new file data is empty", i)
+			if len(op.NewFile) != int(op.Size) {
+				return fmt.Errorf("operation %d (add): file data size mismatch (expected %d bytes, got %d bytes)", i, op.Size, len(op.NewFile))
 			}
 			if op.NewChecksum == "" {
 				return fmt.Errorf("operation %d (add): new checksum is empty", i)
@@ -264,6 +286,9 @@ func (g *Generator) ValidatePatch(patch *utils.Patch) error {
 		case utils.OpModify:
 			if len(op.BinaryDiff) == 0 && len(op.NewFile) == 0 {
 				return fmt.Errorf("operation %d (modify): both diff and new file are empty", i)
+			}
+			if len(op.NewFile) > 0 && len(op.NewFile) != int(op.Size) {
+				return fmt.Errorf("operation %d (modify): file data size mismatch (expected %d bytes, got %d bytes)", i, op.Size, len(op.NewFile))
 			}
 			if op.OldChecksum == "" {
 				return fmt.Errorf("operation %d (modify): old checksum is empty", i)

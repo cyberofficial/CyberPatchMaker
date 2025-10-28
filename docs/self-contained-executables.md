@@ -14,11 +14,11 @@ Self-contained patch executables combine the patch applier and patch data into a
 ```
 User downloads:
 ├── patch-1.0.0-to-1.0.1.patch    ← Patch file
-└── patch-apply-gui.exe            ← Applier tool
+└── patch-apply.exe               ← Applier tool
 
 User must:
 1. Download both files
-2. Run patch-apply-gui.exe
+2. Run patch-apply.exe
 3. Browse for .patch file
 4. Select target directory
 5. Click apply
@@ -38,22 +38,9 @@ User must:
 
 ## Creating Self-Contained Executables
 
-### Using the GUI Generator
-
-1. Open `patch-gen-gui.exe`
-2. Configure your patch as normal:
-   - Select versions directory
-   - Choose from/to versions (or use batch mode)
-   - Set compression and options
-3. **Check the "Create self-contained executable" checkbox**
-4. Click "Generate Patch"
-5. Both files are created:
-   - `patch-1.0.0-to-1.0.1.patch` (standard patch file)
-   - `patch-1.0.0-to-1.0.1.exe` (self-contained executable with chosen type)
-
 ### Using the CLI Generator
 
-You can also create self-contained executables from the command line:
+You can create self-contained executables from the command line:
 
 ```powershell
 # Generate a single patch with self-contained executable
@@ -67,23 +54,18 @@ patch-gen --versions-dir "C:\versions" --new-version "1.0.3" --output patches --
 ```
 
 **Executable Type Options:**
-- **GUI Type**: Uses `patch-apply-gui.exe` (graphical windows interface)
-  - Best for non-technical end users
-  - Point-and-click interface with buttons
-  - Available from both GUI generator and CLI generator
 - **Console Host Type**: Uses `patch-apply.exe` (interactive command-line interface)
   - Best for technical users or automated scenarios
   - Interactive menu in terminal/console
   - Supports silent mode for automation
-  - Available from both GUI generator and CLI generator (CLI default)
-- Both types work identically for patching and use the same verification system
+  - Available from CLI generator
 
 **CLI Self-Contained Features:**
 - Interactive console menu with options
 - Dry-run simulation before applying
 - 1GB bypass toggle in the console
 - Manual target directory selection
-- Same patch format and verification as GUI version
+- Same patch format and verification as traditional version
 
 ### Batch Mode
 
@@ -95,7 +77,7 @@ Input:
 - versions/1.0.2/
 - Target version: 1.0.3
 
-Output (with checkbox enabled):
+Output:
 patches/
 ├── 1.0.0-to-1.0.3.patch
 ├── 1.0.0-to-1.0.3.exe ← Self-contained
@@ -113,7 +95,7 @@ A self-contained executable consists of three parts:
 
 ```
 ┌─────────────────────────────┐
-│ patch-apply-gui.exe         │  ← Base applier (~50 MB)
+│ patch-apply.exe             │  ← Base applier (~50 MB)
 ├─────────────────────────────┤
 │ Compressed Patch Data       │  ← Your patch (varies)
 ├─────────────────────────────┤
@@ -138,7 +120,7 @@ Located at the end of the file:
 
 ### Detection Process
 
-When `patch-apply-gui.exe` starts:
+When `patch-apply.exe` starts:
 1. Reads last 128 bytes of itself
 2. Parses header structure
 3. **Security validations** (fail-safe design):
@@ -152,7 +134,7 @@ When `patch-apply-gui.exe` starts:
    - Extracts patch data from validated offset
    - Verifies SHA-256 checksum
    - Decompresses if needed
-   - Loads patch into GUI automatically
+   - Loads patch into console automatically
 5. If any validation fails:
    - Runs in normal mode (browse for .patch file)
 
@@ -160,7 +142,7 @@ When `patch-apply-gui.exe` starts:
 
 ### Size Breakdown
 
-Base executable: **~50 MB** (includes GUI framework)
+Base executable: **~50 MB** (includes console interface)
 
 Example patch sizes:
 - Small update (10 MB changed): **50.01 MB** total
@@ -194,7 +176,7 @@ MyGame_Update_v1.0.3/
 ├── patch-1.0.1-to-1.0.3.exe            ← For users on 1.0.1
 ├── patch-1.0.2-to-1.0.3.exe            ← For users on 1.0.2
 └── advanced/                            ← Optional: for power users
-    ├── patch-apply-gui.exe              ← Standalone applier
+    ├── patch-apply.exe                  ← Standalone applier
     ├── patch-1.0.0-to-1.0.3.patch       ← Standard patch files
     ├── patch-1.0.1-to-1.0.3.patch
     └── patch-1.0.2-to-1.0.3.patch
@@ -224,37 +206,6 @@ Need help? Visit: https://support.mygame.com/updates
 ## User Experience
 
 ### What End Users See
-
-#### GUI Self-Contained Executable (Created by GUI)
-
-1. **Download**: One `.exe` file matching their version
-2. **Run**: Double-click the executable
-3. **GUI Opens**: Shows patch information automatically:
-   ```
-   ┌─────────────────────────────────────────────┐
-   │ Apply Patch: 1.0.0 → 1.0.1                  │
-   ├─────────────────────────────────────────────┤
-   │ [Embedded Patch Data]                       │
-   │                                             │
-   │ Target: D:\Games\MyGame\              [...]│
-   │                                             │
-   │ From: 1.0.0      Files to Add:    15       │
-   │ To:   1.0.1      Files to Modify: 8        │
-   │ Key:  game.exe   Files to Delete: 2        │
-   │                                             │
-   │ Log:                                        │
-   │ ✓ Self-contained patch loaded               │
-   │   From version: 1.0.0                       │
-   │   To version: 1.0.1                         │
-   │   Target directory: D:\Games\MyGame\        │
-   │                                             │
-   │   Click 'Apply Patch' when ready...        │
-   │                                             │
-   │ [Dry Run]  [Apply Patch]  [Close]          │
-   └─────────────────────────────────────────────┘
-   ```
-4. **Apply**: Click "Apply Patch" button
-5. **Done**: Patch applied successfully
 
 #### CLI Self-Contained Executable (Created by CLI)
 
@@ -289,11 +240,7 @@ Need help? Visit: https://support.mygame.com/updates
    ```
 4. **Choose Option**: Select 1 for dry run or 2 to apply
 5. **Apply**: Confirm with "yes" when prompted
-6. **Done**: Patch applied successfully
-
-**Choosing Between GUI and CLI:**
-- **GUI** (`patch-gen-gui.exe --create-exe`): Best for non-technical users who prefer visual interfaces
-- **CLI** (`patch-gen.exe --create-exe`): Best for automation, scripting, or users comfortable with consoles
+5. **Done**: Patch applied successfully
 
 ### User Benefits
 
@@ -408,10 +355,10 @@ See [Applier Guide - Automation Mode](applier-guide.md#automation-mode-silent-fl
 
 ### "Failed to create executable: failed to read applier executable"
 
-**Problem**: Generator can't find `patch-apply-gui.exe`
+**Problem**: Generator can't find `patch-apply.exe`
 
 **Solution**: 
-- Ensure `patch-apply-gui.exe` is in the same directory as `patch-gen-gui.exe`
+- Ensure `patch-apply.exe` is in the same directory as `patch-gen.exe`
 - Check file hasn't been renamed or deleted
 - Verify read permissions on applier file
 
@@ -431,7 +378,6 @@ See [Applier Guide - Automation Mode](applier-guide.md#automation-mode-silent-fl
 
 **Solution**:
 - Use CLI flag: Run executable with `patch-1.0.0-to-1.0.1.exe --ignore1gb`
-- Or: Enable "Ignore 1GB limit" checkbox in the GUI before applying
 - Note: Requires sufficient RAM to load large patch into memory
 - Consider: If patch is very large, traditional separate .patch file may be better
 
@@ -445,13 +391,12 @@ See [Applier Guide - Automation Mode](applier-guide.md#automation-mode-silent-fl
 - Verify download completed successfully
 - Re-generate the self-contained exe
 
-### "No patches generated in batch mode with checkbox"
+### "No patches generated in batch mode"
 
 **Problem**: Self-contained executables not created in batch mode
 
 **Solution**:
-- Verify "Create self-contained executable" checkbox is enabled
-- Check `patch-apply-gui.exe` exists in generator directory
+- Check `patch-apply.exe` exists in generator directory
 - Look for errors in log output
 - Ensure sufficient disk space (50 MB × number of patches)
 
@@ -518,7 +463,6 @@ Potential future improvements:
 ## Related Documentation
 
 - [Generator Guide](generator-guide.md) - Creating patches
-- [GUI Usage](gui-usage.md) - Using the generator GUI
 - [Applier Guide](applier-guide.md) - Applying patches
 - [How It Works](how-it-works.md) - Understanding the patch system
 - [Compression Guide](compression-guide.md) - Optimizing patch sizes

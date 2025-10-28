@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -120,7 +121,7 @@ func main() {
 	}
 
 	applier := patcher.NewApplier()
-	if err := applier.ApplyPatch(patch, *currentDir, *verify, *verify, *backup); err != nil {
+	if err := applier.ApplyPatchWithPath(patch, *currentDir, *patchFile, *verify, *verify, *backup); err != nil {
 		fmt.Printf("Error: patch application failed: %v\n", err)
 		if *backup {
 			fmt.Println("\nNote: If backup was created, automatic rollback may have been performed to restore original files.")
@@ -133,13 +134,39 @@ func main() {
 }
 
 func loadPatch(filename string) (*utils.Patch, error) {
-	// Read patch file
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read patch file: %w", err)
+	// Check if this is a multi-part patch (has .01.patch, .02.patch, etc. naming)
+	if strings.HasSuffix(filename, ".01.patch") {
+		// Load all parts of multi-part patch
+		fmt.Println("Detected multi-part patch, loading all parts...")
+		patch, err := patcher.LoadMultiPartPatch(filename)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load multi-part patch: %w", err)
+		}
+		return patch, nil
 	}
 
-	return parsePatchData(data)
+	// Check if user provided a non-.01 part number
+	// Look for pattern: .XX.patch where XX is 02-99
+	for i := 2; i <= 99; i++ {
+		partSuffix := fmt.Sprintf(".%02d.patch", i)
+		if strings.HasSuffix(filename, partSuffix) {
+			// User provided a non-first part, redirect to part 1
+			part1File := strings.Replace(filename, partSuffix, ".01.patch", 1)
+			if utils.FileExists(part1File) {
+				fmt.Printf("Note: Part %d detected, loading from part 1: %s\n", i, part1File)
+				return loadPatch(part1File)
+			}
+		}
+	}
+
+	// Single-part patch (legacy format)
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open patch file: %w", err)
+	}
+	defer file.Close()
+
+	return parsePatchDataStreaming(file)
 }
 
 // parsePatchData parses patch data, automatically detecting and decompressing if needed
@@ -163,6 +190,74 @@ func parsePatchData(data []byte) (*utils.Patch, error) {
 		if err := json.Unmarshal(data, &patch); err != nil {
 			return nil, fmt.Errorf("failed to parse patch JSON: %w", err)
 		}
+	}
+
+	return &patch, nil
+}
+
+// parsePatchDataStreaming parses patch data using streaming decompression to handle large files
+func parsePatchDataStreaming(reader io.Reader) (*utils.Patch, error) {
+	// Read first few bytes to detect format without consuming the full stream
+	limitedReader := &io.LimitedReader{R: reader, N: 10}
+	header := make([]byte, 10)
+	n, err := limitedReader.Read(header)
+	if err != nil && err != io.EOF {
+		return nil, fmt.Errorf("failed to read patch header: %w", err)
+	}
+	header = header[:n]
+
+	// Check if it starts with JSON (uncompressed)
+	if len(header) > 0 && header[0] == '{' {
+		// Uncompressed JSON - combine header with remaining reader
+		fullReader := io.MultiReader(bytes.NewReader(header), reader)
+		// Use a buffered reader with large buffer for large JSON documents
+		bufReader := bufio.NewReaderSize(fullReader, 64*1024*1024) // 64MB buffer
+		var patch utils.Patch
+		decoder := json.NewDecoder(bufReader)
+		decoder.UseNumber() // Preserve large numbers
+		if err := decoder.Decode(&patch); err != nil {
+			return nil, fmt.Errorf("failed to parse uncompressed patch JSON: %w", err)
+		}
+		return &patch, nil
+	}
+
+	// Not uncompressed JSON, try compressed formats
+	// Combine header with remaining reader for decompression
+	fullReader := io.MultiReader(bytes.NewReader(header), reader)
+
+	// Try zstd decompression
+	zstdPipeReader, zstdPipeWriter := io.Pipe()
+	go func() {
+		defer zstdPipeWriter.Close()
+		if err := utils.DecompressDataStreaming(fullReader, zstdPipeWriter, "zstd"); err != nil {
+			zstdPipeWriter.CloseWithError(err)
+		}
+	}()
+
+	// Use buffered reader for large JSON documents
+	bufReader := bufio.NewReaderSize(zstdPipeReader, 64*1024*1024) // 64MB buffer
+	var patch utils.Patch
+	decoder := json.NewDecoder(bufReader)
+	decoder.UseNumber() // Preserve large numbers as strings to avoid precision loss
+	if err := decoder.Decode(&patch); err == nil {
+		return &patch, nil
+	}
+
+	// Zstd failed, try gzip with fresh reader
+	fullReader = io.MultiReader(bytes.NewReader(header), reader)
+	gzipPipeReader, gzipPipeWriter := io.Pipe()
+	go func() {
+		defer gzipPipeWriter.Close()
+		if err := utils.DecompressDataStreaming(fullReader, gzipPipeWriter, "gzip"); err != nil {
+			gzipPipeWriter.CloseWithError(err)
+		}
+	}()
+
+	bufReader = bufio.NewReaderSize(gzipPipeReader, 64*1024*1024) // 64MB buffer
+	decoder = json.NewDecoder(bufReader)
+	decoder.UseNumber() // Preserve large numbers as strings to avoid precision loss
+	if err := decoder.Decode(&patch); err != nil {
+		return nil, fmt.Errorf("failed to parse patch: unsupported compression or invalid format: %w", err)
 	}
 
 	return &patch, nil
@@ -395,14 +490,41 @@ func checkEmbeddedPatch(ignore1GB bool) (*utils.Patch, string, bool) {
 		return nil, "", false
 	}
 
-	// The embedded patch data is the raw .patch file content
-	// We need to parse it the same way loadPatch() does
-	patch, err := parsePatchData(patchData)
-	if err != nil {
-		return nil, "", false
-	}
+	// The embedded patch data is the raw .patch file content (part 01 if multi-part)
+	// Check if there are additional parts (.02, .03, etc.) in the same directory as the exe
+	exeDir := filepath.Dir(exePath)
+	exeBaseName := strings.TrimSuffix(filepath.Base(exePath), ".exe")
 
-	// Get current directory as default target
+	// Check if part 02 exists to determine if this is multi-part
+	part02Path := filepath.Join(exeDir, exeBaseName+".02.patch")
+	isMultiPart := utils.FileExists(part02Path)
+
+	var patch *utils.Patch
+	if isMultiPart {
+		// Multi-part patch: Save embedded part 01 temporarily and load all parts
+		// Save in exe directory with the correct base name so LoadMultiPartPatch finds the parts
+		tempPart01 := filepath.Join(exeDir, exeBaseName+".01.patch")
+
+		// Write part 01 data to temporary file
+		if err := os.WriteFile(tempPart01, patchData, 0644); err != nil {
+			return nil, "", false
+		}
+		defer os.Remove(tempPart01) // Clean up temporary file
+
+		// Load all parts using multi-part loader
+		patch, err = patcher.LoadMultiPartPatch(tempPart01)
+		if err != nil {
+			return nil, "", false
+		}
+
+		fmt.Printf("✓ Loaded multi-part patch from embedded part 01 + external parts\n")
+	} else {
+		// Single-part patch: Parse embedded data directly
+		patch, err = parsePatchDataStreaming(bytes.NewReader(patchData))
+		if err != nil {
+			return nil, "", false
+		}
+	} // Get current directory as default target
 	targetDir, _ := os.Getwd()
 
 	return patch, targetDir, true
@@ -478,7 +600,7 @@ func runSilentMode(patch *utils.Patch, defaultTargetDir string, customTargetDir 
 
 	// Apply patch with default settings (verify=true, backup=true)
 	applier := patcher.NewApplier()
-	if err := applier.ApplyPatch(patch, targetDir, true, true, true); err != nil {
+	if err := applier.ApplyPatchWithPath(patch, targetDir, "", true, true, true); err != nil {
 		logOutput("\nError: Patch application failed: %v\n", err)
 		logOutput("\n========================================\n")
 		logOutput("Status: FAILED\n")
@@ -503,105 +625,206 @@ func runSilentMode(patch *utils.Patch, defaultTargetDir string, customTargetDir 
 	os.Exit(0)
 }
 
-// runSimpleMode runs a simplified interface for end users when patch creator enabled simple mode
+// runSimpleMode runs a fully automated interface for end users when patch creator enabled simple mode
+// This mode automatically:
+// - Uses current directory as target
+// - Enables backup (yes by default)
+// - Runs dry-run first to verify
+// - Applies patch if dry-run succeeds
+// - Logs everything to <patchname>_<utctime>_log.txt
 func runSimpleMode(patch *utils.Patch, defaultTargetDir string, reader *bufio.Reader) {
-	fmt.Println()
-	fmt.Println("==============================================")
-	fmt.Println("          Simple Patch Application")
-	fmt.Println("==============================================")
-	fmt.Println()
-	fmt.Printf("You are about to patch \"%s\" to \"%s\"\n", patch.FromVersion, patch.ToVersion)
-	fmt.Println()
-
-	// Ask for target directory
-	fmt.Printf("Target directory [%s]: ", defaultTargetDir)
-	input, _ := reader.ReadString('\n')
-	input = strings.TrimSpace(input)
+	// Use current directory as target
 	targetDir := defaultTargetDir
-	if input != "" {
-		targetDir = input
+
+	// Create log file with patch name and UTC timestamp
+	exePath, _ := os.Executable()
+	exeBaseName := strings.TrimSuffix(exePath, ".exe")
+	if exeBaseName == exePath {
+		exeBaseName = "patch"
+	} else {
+		// Extract just the filename without directory
+		parts := strings.Split(exeBaseName, string(os.PathSeparator))
+		if len(parts) > 0 {
+			exeBaseName = parts[len(parts)-1]
+		}
 	}
+	logFileName := fmt.Sprintf("%s_%d_log.txt", exeBaseName, time.Now().UTC().Unix())
+	logFile, err := os.Create(logFileName)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: Failed to create log file: %v\n", err)
+		logFile = nil
+	}
+	defer func() {
+		if logFile != nil {
+			logFile.Close()
+		}
+	}()
+
+	// Helper function to write to both console and log
+	logOutput := func(format string, args ...interface{}) {
+		msg := fmt.Sprintf(format, args...)
+		fmt.Print(msg)
+		if logFile != nil {
+			logFile.WriteString(msg)
+		}
+	}
+
+	// Header
+	logOutput("\n")
+	logOutput("==============================================\n")
+	logOutput("  CyberPatchMaker - Self-Contained Patch\n")
+	logOutput("==============================================\n")
+	logOutput("\n")
+	logOutput("==============================================\n")
+	logOutput("          Simple Patch Application\n")
+	logOutput("==============================================\n")
+	logOutput("\n")
+	logOutput("Automated patching from \"%s\" to \"%s\"\n", patch.FromVersion, patch.ToVersion)
+	logOutput("\n")
+
+	// Log details
+	timestamp := time.Now().UTC().Format("2006-01-02 15:04:05 UTC")
+	logOutput("Patch Information:\n")
+	logOutput("  Started:      %s\n", timestamp)
+	logOutput("  From Version: %s\n", patch.FromVersion)
+	logOutput("  To Version:   %s\n", patch.ToVersion)
+	logOutput("  Key File:     %s\n", patch.FromKeyFile.Path)
+	logOutput("  Target Dir:   %s\n", targetDir)
+	logOutput("  Backup:       Enabled\n")
+	logOutput("  Compression:  %s\n", patch.Header.Compression)
+	logOutput("\n")
 
 	// Check if directory exists
 	if !utils.FileExists(targetDir) {
-		fmt.Printf("Error: Directory not found: %s\n", targetDir)
-		fmt.Println("\nPress Enter to exit...")
-		reader.ReadString('\n')
+		logOutput("Error: Directory not found: %s\n", targetDir)
+		logOutput("\n========================================\n")
+		logOutput("Status: FAILED\n")
+		logOutput("Completed: %s\n", time.Now().UTC().Format("2006-01-02 15:04:05 UTC"))
+		logOutput("========================================\n")
+		if logFile != nil {
+			logOutput("\nLog saved to: %s\n", logFileName)
+		}
 		os.Exit(1)
 	}
 
-	// Ask about backup (default: yes)
-	fmt.Print("\nCreate backup before patching? (Y/n): ")
-	backupInput, _ := reader.ReadString('\n')
-	backupInput = strings.TrimSpace(strings.ToLower(backupInput))
-	createBackup := backupInput == "" || backupInput == "y" || backupInput == "yes"
+	// Step 1: Dry run
+	logOutput("==============================================\n")
+	logOutput("Step 1: Dry Run (Validation)\n")
+	logOutput("==============================================\n")
+	logOutput("\n")
+	logOutput("Testing patch application without making changes...\n")
+	logOutput("\n")
 
-	// Show options menu
-	for {
-		fmt.Println("\n==============================================")
-		fmt.Println("Options:")
-		fmt.Println("  1. Dry Run (test without making changes)")
-		fmt.Println("  2. Apply Patch")
-		fmt.Println("  3. Exit")
-		fmt.Println("==============================================")
-		fmt.Print("Select option [1-3]: ")
+	// Perform dry run validation
+	dryRunSuccess := true
 
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
-
-		switch input {
-		case "1":
-			// Dry run
-			fmt.Println("\n=== DRY RUN ===")
-			fmt.Println("Testing patch application...")
-			performDryRun(patch, targetDir, "")
-			fmt.Println("\nPress Enter to continue...")
-			reader.ReadString('\n')
-
-		case "2":
-			// Apply patch
-			fmt.Println("\n=== APPLYING PATCH ===")
-			fmt.Printf("Target: %s\n", targetDir)
-			fmt.Printf("Backup: %s\n", formatBoolState(createBackup))
-			fmt.Println()
-
-			fmt.Print("Proceed with patching? (yes/no): ")
-			confirm, _ := reader.ReadString('\n')
-			confirm = strings.TrimSpace(strings.ToLower(confirm))
-
-			if confirm == "yes" || confirm == "y" {
-				fmt.Println("\nApplying patch...")
-				applier := patcher.NewApplier()
-				// Use default settings: verify before and after
-				if err := applier.ApplyPatch(patch, targetDir, true, true, createBackup); err != nil {
-					fmt.Printf("\nError: Patch application failed: %v\n", err)
-					if createBackup {
-						fmt.Println("\nNote: Automatic rollback may have been performed to restore original files.")
-					}
-					fmt.Println("\nPress Enter to exit...")
-					reader.ReadString('\n')
-					os.Exit(1)
-				}
-
-				fmt.Println("\n=== SUCCESS ===")
-				fmt.Printf("Patch applied successfully!\n")
-				fmt.Printf("Version updated from %s to %s\n", patch.FromVersion, patch.ToVersion)
-				fmt.Println("\nPress Enter to exit...")
-				reader.ReadString('\n')
-				return
-			} else {
-				fmt.Println("Patch application cancelled")
-			}
-
-		case "3":
-			// Exit
-			fmt.Println("\nExiting...")
-			return
-
-		default:
-			fmt.Println("Invalid option. Please select 1-3.")
+	// Verify key file
+	logOutput("Verifying key file: %s\n", patch.FromKeyFile.Path)
+	keyFilePath := targetDir + string(os.PathSeparator) + patch.FromKeyFile.Path
+	if !utils.FileExists(keyFilePath) {
+		logOutput("✗ Key file not found: %s\n", keyFilePath)
+		dryRunSuccess = false
+	} else {
+		checksum, err := utils.CalculateFileChecksum(keyFilePath)
+		if err != nil {
+			logOutput("✗ Failed to calculate key file checksum: %v\n", err)
+			dryRunSuccess = false
+		} else if checksum != patch.FromKeyFile.Checksum {
+			logOutput("✗ Key file hash mismatch\n")
+			logOutput("  Expected: %s\n", patch.FromKeyFile.Checksum[:16]+"...")
+			logOutput("  Got:      %s\n", checksum[:16]+"...")
+			dryRunSuccess = false
+		} else {
+			logOutput("✓ Key file verified\n")
 		}
 	}
+
+	// Verify required files
+	if dryRunSuccess {
+		logOutput("\nVerifying %d required files...\n", len(patch.RequiredFiles))
+		mismatches := 0
+		for _, req := range patch.RequiredFiles {
+			filePath := targetDir + string(os.PathSeparator) + req.Path
+			if !utils.FileExists(filePath) {
+				logOutput("✗ Required file missing: %s\n", req.Path)
+				mismatches++
+				dryRunSuccess = false
+				continue
+			}
+
+			checksum, err := utils.CalculateFileChecksum(filePath)
+			if err != nil {
+				logOutput("✗ Failed to verify: %s\n", req.Path)
+				mismatches++
+				dryRunSuccess = false
+				continue
+			}
+
+			if checksum != req.Checksum {
+				logOutput("✗ Hash mismatch: %s\n", req.Path)
+				mismatches++
+				dryRunSuccess = false
+			}
+		}
+
+		if mismatches == 0 {
+			logOutput("✓ All required files verified\n")
+		}
+	}
+
+	if !dryRunSuccess {
+		logOutput("\n✗ Dry run validation failed - patch cannot be applied\n")
+		logOutput("\n========================================\n")
+		logOutput("Status: FAILED\n")
+		logOutput("Completed: %s\n", time.Now().UTC().Format("2006-01-02 15:04:05 UTC"))
+		logOutput("========================================\n")
+		if logFile != nil {
+			logOutput("\nLog saved to: %s\n", logFileName)
+		}
+		os.Exit(1)
+	}
+
+	logOutput("\n✓ Dry run completed successfully\n")
+	logOutput("\n")
+
+	// Step 2: Apply patch
+	logOutput("==============================================\n")
+	logOutput("Step 2: Applying Patch\n")
+	logOutput("==============================================\n")
+	logOutput("\n")
+	logOutput("Applying patch with backup enabled...\n")
+	logOutput("\n")
+
+	applier := patcher.NewApplier()
+	if err := applier.ApplyPatchWithPath(patch, targetDir, "", true, true, true); err != nil {
+		logOutput("\nError: Patch application failed: %v\n", err)
+		logOutput("\nNote: Automatic rollback may have been performed to restore original files.\n")
+		logOutput("\n========================================\n")
+		logOutput("Status: FAILED\n")
+		logOutput("Completed: %s\n", time.Now().UTC().Format("2006-01-02 15:04:05 UTC"))
+		logOutput("========================================\n")
+		if logFile != nil {
+			logOutput("\nLog saved to: %s\n", logFileName)
+		}
+		os.Exit(1)
+	}
+
+	// Success
+	logOutput("\n")
+	logOutput("==============================================\n")
+	logOutput("          Patch Applied Successfully\n")
+	logOutput("==============================================\n")
+	logOutput("\n")
+	logOutput("Version updated: %s → %s\n", patch.FromVersion, patch.ToVersion)
+	logOutput("\n========================================\n")
+	logOutput("Status: SUCCESS\n")
+	logOutput("Completed: %s\n", time.Now().UTC().Format("2006-01-02 15:04:05 UTC"))
+	logOutput("========================================\n")
+	if logFile != nil {
+		logOutput("\nLog saved to: %s\n", logFileName)
+	}
+
+	os.Exit(0)
 }
 
 // runInteractiveMode runs the interactive console interface for embedded patches
@@ -684,7 +907,7 @@ func runInteractiveMode(patch *utils.Patch, defaultTargetDir string, ignore1GB b
 			if confirm == "yes" || confirm == "y" {
 				fmt.Println("\nApplying patch...")
 				applier := patcher.NewApplier()
-				if err := applier.ApplyPatch(patch, targetDir, true, true, true); err != nil {
+				if err := applier.ApplyPatchWithPath(patch, targetDir, "", true, true, true); err != nil {
 					fmt.Printf("\nError: Patch application failed: %v\n", err)
 					fmt.Println("\nNote: Automatic rollback may have been performed to restore original files.")
 					fmt.Println("\nPress Enter to exit...")
