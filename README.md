@@ -30,10 +30,12 @@ Perfect for:
 - **Self-Contained Executables** - Create standalone `.exe` files for easy end-user distribution
 - **Smart File Exclusion** - Use `.cyberignore` to exclude sensitive files and reduce patch size
 - **Scan Caching** - Cache directory scans for instant patch generation (15+ min → <1 sec for large projects)
-- **Simple Mode for End Users** - Simplified interface for non-technical users with basic options **(New in v1.0.9!)**
+- **Simple Mode for End Users** - Simplified interface for non-technical users with basic options
 - **Silent Mode** - Fully automatic patching with zero user interaction, automatic log file generation (CLI only)
-- **Large File Handling** - Automatic memory-optimized processing for files >1GB, prevents memory exhaustion **(New in v1.0.6!)**
-- **Multi-Part Patches** - Automatic splitting of patches >4GB into manageable parts (prevents memory exhaustion with 18GB+ patches) **(New!)**
+- **Large File Handling** - Automatic memory-optimized processing for files >1GB, prevents memory exhaustion
+- **Multi-Part Patches** - Automatic splitting of patches >4GB into manageable parts (prevents memory exhaustion with 18GB+ patches)
+- **Parallel Processing** - Multi-threaded patch generation using multiple CPU cores for faster processing
+- **Advanced Compression** - Multiple compression algorithms (zstd, gzip) with configurable levels
 
 ## Quick Start
 
@@ -85,11 +87,75 @@ The `--verify` flag ensures everything is checked before and after patching, wit
 - [Downgrade Guide](docs/downgrade-guide.md) - Rollback to previous versions
 - [Multi-Part Patches](docs/multipart-patches.md) - Handling patches >4GB (automatic splitting)
 
-### Excluding Files with .cyberignore (New!)
+### Advanced Options
+
+CyberPatchMaker includes several advanced CLI flags for performance optimization and specialized use cases:
+
+#### Scan Caching (`--savescans`, `--scandata`, `--rescan`)
+
+Cache directory scans to dramatically speed up subsequent patch generations:
+
+```bash
+# First generation: Enable caching
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --savescans
+
+# Subsequent generations: Load from cache (instant)
+patch-gen --versions-dir ./versions --new-version 1.0.4 --output ./patches --savescans
+
+# Custom cache location
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --savescans --scandata ./shared-cache
+
+# Force rescan when files have changed
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --savescans --rescan
+```
+
+**Benefits:**
+- Large projects: 15+ minute scan → <1 second cache load
+- Validates key file hash to prevent stale data usage
+- Works with all patch generation modes
+
+#### Parallel Processing (`--jobs`)
+
+Use multiple CPU cores for faster patch generation:
+
+```bash
+# Auto-detect CPU cores (default)
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches
+
+# Use 4 cores explicitly
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --jobs 4
+
+# Single-threaded for debugging
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --jobs 1
+```
+
+**Benefits:**
+- Faster processing on multi-core systems
+- Automatic CPU detection (0 = auto-detect)
+- Significant speedup for large projects
+
+#### Multi-Part Split Size (`--splitsize`, `--bypasssplitlimit`)
+
+Control how large patches are split into manageable parts:
+
+```bash
+# Custom 2GB split size
+patch-gen --from-dir ./v1 --to-dir ./v2 --output ./patches --splitsize 2G
+
+# Small split size (requires confirmation bypass)
+patch-gen --from-dir ./v1 --to-dir ./v2 --output ./patches --splitsize 50M --bypasssplitlimit
+```
+
+**Benefits:**
+- Prevents memory exhaustion with very large patches
+- Default 4GB splits, customizable
+- Automatic part reassembly during application
+
+### Excluding Files with .cyberignore
 
 Control which files are included in patches using a `.cyberignore` file (similar to `.gitignore`):
 
-```
+```bash
 :: Place in your version directory
 :: Lines starting with :: are comments
 
@@ -153,6 +219,8 @@ CyberPatchMaker compares two versions of your software and creates a small patch
 - [Hash Verification](docs/hash-verification.md) - Security and verification
 - [Key File System](docs/key-file-system.md) - Version identification
 - [Backup Lifecycle](docs/backup-lifecycle.md) - Backup and recovery process
+- [Backup System](docs/backup-system.md) - Comprehensive backup management
+- [Version Management](docs/version-management.md) - How versions are tracked
 
 ## Complete Example
 
@@ -249,12 +317,23 @@ All documentation is in the [docs/](docs/) folder:
 - [Applier Guide](docs/applier-guide.md) - Applying patches
 - [Self-Contained Executables](docs/self-contained-executables.md) - Standalone patch distribution
 - [CLI Reference](docs/cli-reference.md) - All commands and options
+- [Simple Mode Guide](docs/simple-mode-guide.md) - Simplified interface for end users
 
 **Advanced:**
 - [How It Works](docs/how-it-works.md) - Technical deep dive
 - [Architecture](docs/architecture.md) - System design
 - [Testing Guide](docs/testing-guide.md) - Testing your patches
 - [Troubleshooting](docs/troubleshooting.md) - Common issues
+- [Advanced Test Summary](docs/ADVANCED-TEST-SUMMARY.md) - Detailed test results
+- [Large File Handling](docs/large-file-handling.md) - Memory optimization for large files
+- [Backup System](docs/backup-system.md) - Comprehensive backup management
+- [Key File System](docs/key-file-system.md) - Version identification
+- [Version Management](docs/version-management.md) - How versions are tracked
+- [Compression Guide](docs/compression-guide.md) - Compression options
+- [Hash Verification](docs/hash-verification.md) - Security and verification
+- [Backup Lifecycle](docs/backup-lifecycle.md) - Backup and recovery process
+- [Multi-Part Patches](docs/multipart-patches.md) - Handling large patches
+- [Cyberignore Guide](docs/cyberignore-guide.md) - File exclusion patterns
 
 ## Contributing
 
