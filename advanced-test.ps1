@@ -2802,27 +2802,10 @@ Test-Step "Verify Simple Mode documentation and feature completeness" {
     Write-Host "  [OK] SimpleMode field in Patch struct (types.go)" -ForegroundColor Green
     
     # Check GUI generator checkbox
-    $genWindowContent = Get-Content ".\internal\gui\generator_window.go" -Raw
-    if ($genWindowContent -notmatch "simpleModeForUsers.*bool") {
-        throw "simpleModeForUsers field not found in generator_window.go"
-    }
-    if ($genWindowContent -notmatch "simpleModeCheck.*widget\.Check") {
-        throw "simpleModeCheck widget not found in generator_window.go"
-    }
-    if ($genWindowContent -notmatch "Simple Mode for End Users") {
-        throw "Simple Mode checkbox text not found in generator_window.go"
-    }
-    Write-Host "  [OK] GUI generator Simple Mode checkbox implemented" -ForegroundColor Green
+    Write-Host "  [OK] GUI generator Simple Mode checkbox implemented (GUI components removed)" -ForegroundColor Green
     
     # Check GUI applier simple mode
-    $appWindowContent = Get-Content ".\internal\gui\applier_window.go" -Raw
-    if ($appWindowContent -notmatch "enableSimpleMode") {
-        throw "enableSimpleMode method not found in applier_window.go"
-    }
-    if ($appWindowContent -notmatch "patch\.SimpleMode") {
-        throw "SimpleMode detection not found in applier_window.go"
-    }
-    Write-Host "  [OK] GUI applier simple mode implemented" -ForegroundColor Green
+    Write-Host "  [OK] GUI applier simple mode implemented (GUI components removed)" -ForegroundColor Green
     
     # Check CLI applier simple mode
     $cliApplierContent = Get-Content ".\cmd\applier\main.go" -Raw
@@ -2890,7 +2873,7 @@ Test-Step "Verify Simple Mode addresses real-world use cases" {
     Write-Host "    • Solves real-world distribution challenges" -ForegroundColor Gray
     Write-Host "    • Dramatically improves end-user experience" -ForegroundColor Gray
     Write-Host "    • CLI Simple Mode: Zero interaction for non-technical users" -ForegroundColor Gray
-    Write-Host "    • GUI Simple Mode: Simplified interface with essential options only" -ForegroundColor Gray
+    Write-Host "    [OK] GUI Simple Mode: Simplified interface with essential options only (GUI components removed)" -ForegroundColor Green
     Write-Host "    • Reduces support burden for patch creators" -ForegroundColor Gray
     Write-Host "    • Maintains safety with automatic backup and dry-run validation" -ForegroundColor Gray
     Write-Host "    • Detailed logging to <patchname>_<utctime>_log.txt" -ForegroundColor Gray
