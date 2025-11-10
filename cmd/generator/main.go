@@ -32,6 +32,7 @@ func main() {
 	level := flag.Int("level", 3, "Compression level (1-4 for zstd, 1-3 for gzip)")
 	verify := flag.Bool("verify", true, "Verify patches after creation")
 	createExe := flag.Bool("create-exe", false, "Create self-contained CLI executable")
+	silent := flag.Bool("silent", false, "Enable silent mode in generated executable (auto-apply without prompts)")
 	crp := flag.Bool("crp", false, "Create reverse patch (for downgrades)")
 	saveScans := flag.Bool("savescans", false, "Save directory scans to cache for faster subsequent patches")
 	rescan := flag.Bool("rescan", false, "Force rescan of cached versions")
@@ -136,13 +137,13 @@ func main() {
 	// Handle different modes
 	if *newVersion != "" && *versionsDir != "" {
 		// Generate patches from all existing versions to new version
-		generateAllPatches(versionMgr, *versionsDir, *newVersion, outputDir, *keyFile, *compression, *level, *verify, *createExe, *crp, customMaxPartSize)
+		generateAllPatches(versionMgr, *versionsDir, *newVersion, outputDir, *keyFile, *compression, *level, *verify, *createExe, *silent, *crp, customMaxPartSize)
 	} else if *fromDir != "" && *toDir != "" {
 		// Generate single patch using custom directory paths
-		generateSinglePatchCustomPaths(versionMgr, *fromDir, *toDir, outputDir, *keyFile, *compression, *level, *verify, *createExe, *crp, customMaxPartSize)
+		generateSinglePatchCustomPaths(versionMgr, *fromDir, *toDir, outputDir, *keyFile, *compression, *level, *verify, *createExe, *silent, *crp, customMaxPartSize)
 	} else if *from != "" && *to != "" && *versionsDir != "" {
 		// Generate single patch using versions-dir
-		generateSinglePatch(versionMgr, *versionsDir, *from, *to, outputDir, *keyFile, *compression, *level, *verify, *createExe, *crp, customMaxPartSize)
+		generateSinglePatch(versionMgr, *versionsDir, *from, *to, outputDir, *keyFile, *compression, *level, *verify, *createExe, *silent, *crp, customMaxPartSize)
 	} else {
 		fmt.Println("Error: insufficient arguments")
 		printHelp()
@@ -205,7 +206,7 @@ func parseSplitSize(sizeStr string) (int64, error) {
 	return result, nil
 }
 
-func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, outputDir, customKeyFile, compression string, level int, verify, createExe, crp bool, customMaxPartSize int64) {
+func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, outputDir, customKeyFile, compression string, level int, verify, createExe, silent, crp bool, customMaxPartSize int64) {
 	fmt.Printf("Generating patches for new version %s\n", newVersion)
 
 	// Scan for existing versions
@@ -300,7 +301,7 @@ func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, ou
 		if crp {
 			// Generate both patches efficiently using the same scan data
 			reversePatchFile := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.patch", newVersion, fromVersion))
-			if err := generatePatchWithReverse(fromVer, toVer, patchFile, reversePatchFile, compression, level, verify, customMaxPartSize); err != nil {
+			if err := generatePatchWithReverse(fromVer, toVer, patchFile, reversePatchFile, compression, level, verify); err != nil {
 				fmt.Printf("Error: failed to generate patches from %s: %v\n", fromVersion, err)
 				continue
 			}
@@ -308,7 +309,7 @@ func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, ou
 			// Create forward exe if requested
 			if createExe {
 				exePath := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.exe", fromVersion, newVersion))
-				if err := createStandaloneCLIExe(patchFile, exePath, compression); err != nil {
+				if err := createStandaloneCLIExe(patchFile, exePath, compression, silent); err != nil {
 					fmt.Printf("Warning: failed to create forward executable for %s: %v\n", fromVersion, err)
 				} else {
 					fmt.Printf("✓ Forward executable: %s\n", exePath)
@@ -316,7 +317,7 @@ func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, ou
 
 				// Create reverse exe
 				reverseExePath := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.exe", newVersion, fromVersion))
-				if err := createStandaloneCLIExe(reversePatchFile, reverseExePath, compression); err != nil {
+				if err := createStandaloneCLIExe(reversePatchFile, reverseExePath, compression, silent); err != nil {
 					fmt.Printf("Warning: failed to create reverse executable to %s: %v\n", fromVersion, err)
 				} else {
 					fmt.Printf("✓ Reverse executable: %s\n", reverseExePath)
@@ -326,7 +327,7 @@ func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, ou
 			patchCount += 2 // Count both patches
 		} else {
 			// Generate only forward patch
-			if err := generatePatch(fromVer, toVer, patchFile, compression, level, createExe, customMaxPartSize); err != nil {
+			if err := generatePatch(fromVer, toVer, patchFile, compression, level, createExe, silent, customMaxPartSize); err != nil {
 				fmt.Printf("Error: failed to generate patch from %s: %v\n", fromVersion, err)
 				continue
 			}
@@ -338,7 +339,7 @@ func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, ou
 	fmt.Printf("\nSuccessfully generated %d patches\n", patchCount)
 }
 
-func generateSinglePatch(versionMgr *version.Manager, versionsDir, from, to, outputDir, customKeyFile, compression string, level int, verify, createExe, crp bool, customMaxPartSize int64) {
+func generateSinglePatch(versionMgr *version.Manager, versionsDir, from, to, outputDir, customKeyFile, compression string, level int, verify, createExe, silent, crp bool, customMaxPartSize int64) {
 	fmt.Printf("Generating patch from %s to %s\n", from, to)
 
 	// Determine key file for FROM version
@@ -405,7 +406,7 @@ func generateSinglePatch(versionMgr *version.Manager, versionsDir, from, to, out
 		// Generate both patches efficiently using the same scan data
 		fmt.Printf("\nGenerating forward and reverse patches...\n")
 		reversePatchFile := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.patch", to, from))
-		if err := generatePatchWithReverse(fromVer, toVer, patchFile, reversePatchFile, compression, level, verify, customMaxPartSize); err != nil {
+		if err := generatePatchWithReverse(fromVer, toVer, patchFile, reversePatchFile, compression, level, verify); err != nil {
 			fmt.Printf("Error: failed to generate patches: %v\n", err)
 			os.Exit(1)
 		}
@@ -414,14 +415,14 @@ func generateSinglePatch(versionMgr *version.Manager, versionsDir, from, to, out
 		// Create executables if requested
 		if createExe {
 			exePath := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.exe", from, to))
-			if err := createStandaloneCLIExe(patchFile, exePath, compression); err != nil {
+			if err := createStandaloneCLIExe(patchFile, exePath, compression, silent); err != nil {
 				fmt.Printf("Error: failed to create forward executable: %v\n", err)
 				os.Exit(1)
 			}
 			fmt.Printf("✓ Created forward executable: %s\n", exePath)
 
 			reverseExePath := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.exe", to, from))
-			if err := createStandaloneCLIExe(reversePatchFile, reverseExePath, compression); err != nil {
+			if err := createStandaloneCLIExe(reversePatchFile, reverseExePath, compression, silent); err != nil {
 				fmt.Printf("Error: failed to create reverse executable: %v\n", err)
 				os.Exit(1)
 			}
@@ -429,7 +430,7 @@ func generateSinglePatch(versionMgr *version.Manager, versionsDir, from, to, out
 		}
 	} else {
 		// Generate only forward patch
-		if err := generatePatch(fromVer, toVer, patchFile, compression, level, createExe, customMaxPartSize); err != nil {
+		if err := generatePatch(fromVer, toVer, patchFile, compression, level, createExe, silent, customMaxPartSize); err != nil {
 			fmt.Printf("Error: failed to generate patch: %v\n", err)
 			os.Exit(1)
 		}
@@ -439,7 +440,7 @@ func generateSinglePatch(versionMgr *version.Manager, versionsDir, from, to, out
 
 // generateSinglePatchCustomPaths generates a patch using custom directory paths
 // This allows versions to be on different drives or network locations
-func generateSinglePatchCustomPaths(versionMgr *version.Manager, fromPath, toPath, outputDir, customKeyFile, compression string, level int, verify, createExe, crp bool, customMaxPartSize int64) {
+func generateSinglePatchCustomPaths(versionMgr *version.Manager, fromPath, toPath, outputDir, customKeyFile, compression string, level int, verify, createExe, silent, crp bool, customMaxPartSize int64) {
 	// Extract version numbers from directory names
 	fromVersion := extractVersionFromPath(fromPath)
 	toVersion := extractVersionFromPath(toPath)
@@ -511,7 +512,7 @@ func generateSinglePatchCustomPaths(versionMgr *version.Manager, fromPath, toPat
 		// Generate both patches efficiently using the same scan data
 		fmt.Printf("\nGenerating forward and reverse patches...\n")
 		reversePatchFile := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.patch", toVersion, fromVersion))
-		if err := generatePatchWithReverse(fromVer, toVer, patchFile, reversePatchFile, compression, level, verify, customMaxPartSize); err != nil {
+		if err := generatePatchWithReverse(fromVer, toVer, patchFile, reversePatchFile, compression, level, verify); err != nil {
 			fmt.Printf("Error: failed to generate patches: %v\n", err)
 			os.Exit(1)
 		}
@@ -520,14 +521,14 @@ func generateSinglePatchCustomPaths(versionMgr *version.Manager, fromPath, toPat
 		// Create executables if requested
 		if createExe {
 			exePath := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.exe", fromVersion, toVersion))
-			if err := createStandaloneCLIExe(patchFile, exePath, compression); err != nil {
+			if err := createStandaloneCLIExe(patchFile, exePath, compression, silent); err != nil {
 				fmt.Printf("Error: failed to create forward executable: %v\n", err)
 				os.Exit(1)
 			}
 			fmt.Printf("✓ Created forward executable: %s\n", exePath)
 
 			reverseExePath := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.exe", toVersion, fromVersion))
-			if err := createStandaloneCLIExe(reversePatchFile, reverseExePath, compression); err != nil {
+			if err := createStandaloneCLIExe(reversePatchFile, reverseExePath, compression, silent); err != nil {
 				fmt.Printf("Error: failed to create reverse executable: %v\n", err)
 				os.Exit(1)
 			}
@@ -535,7 +536,7 @@ func generateSinglePatchCustomPaths(versionMgr *version.Manager, fromPath, toPat
 		}
 	} else {
 		// Generate only forward patch
-		if err := generatePatch(fromVer, toVer, patchFile, compression, level, createExe, customMaxPartSize); err != nil {
+		if err := generatePatch(fromVer, toVer, patchFile, compression, level, createExe, silent, customMaxPartSize); err != nil {
 			fmt.Printf("Error: failed to generate patch: %v\n", err)
 			os.Exit(1)
 		}
@@ -551,7 +552,7 @@ func extractVersionFromPath(path string) string {
 	return filepath.Base(path)
 }
 
-func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string, level int, createExe bool, customMaxPartSize int64) error {
+func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string, level int, createExe, silent bool, customMaxPartSize int64) error {
 	// Create patch options
 	options := &utils.PatchOptions{
 		Compression:      compression,
@@ -615,7 +616,7 @@ func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string
 					exeName := strings.TrimSuffix(baseName, ".patch") + ".exe"
 					exePath := filepath.Join(filepath.Dir(outputFile), exeName)
 
-					if err := createStandaloneCLIExe(part01File, exePath, compression); err != nil {
+					if err := createStandaloneCLIExe(part01File, exePath, compression, silent); err != nil {
 						fmt.Printf("Warning: failed to create executable from part 01: %v\n", err)
 					} else {
 						fmt.Printf("✓ Created self-contained executable from part 01: %s\n", exePath)
@@ -643,7 +644,7 @@ func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string
 			exeName := strings.TrimSuffix(baseName, ".patch") + ".exe"
 			exePath := filepath.Join(filepath.Dir(outputFile), exeName)
 
-			if err := createStandaloneCLIExe(outputFile, exePath, compression); err != nil {
+			if err := createStandaloneCLIExe(outputFile, exePath, compression, silent); err != nil {
 				return fmt.Errorf("failed to create executable: %w", err)
 			}
 			fmt.Printf("✓ Created executable: %s\n", exePath)
@@ -655,7 +656,7 @@ func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string
 
 // generatePatchWithReverse generates both forward and reverse patches efficiently
 // by reusing the same generator and scan data (no need to rescan directories)
-func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, reverseFile, compression string, level int, verify bool, customMaxPartSize int64) error {
+func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, reverseFile, compression string, level int, verify bool) error {
 	// Create patch options
 	options := &utils.PatchOptions{
 		Compression:      compression,
@@ -677,7 +678,7 @@ func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, revers
 	}
 
 	// Save forward patch
-	if err := savePatchWithCustomSize(forwardPatch, forwardFile, options, customMaxPartSize); err != nil {
+	if err := savePatchWithCustomSize(forwardPatch, forwardFile, options); err != nil {
 		return fmt.Errorf("failed to save forward patch: %w", err)
 	}
 	fmt.Printf("Patch saved to: %s\n", forwardFile)
@@ -696,7 +697,7 @@ func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, revers
 	}
 
 	// Save reverse patch
-	if err := savePatchWithCustomSize(reversePatch, reverseFile, options, customMaxPartSize); err != nil {
+	if err := savePatchWithCustomSize(reversePatch, reverseFile, options); err != nil {
 		return fmt.Errorf("failed to save reverse patch: %w", err)
 	}
 	fmt.Printf("Reverse patch saved to: %s\n", reverseFile)
@@ -705,10 +706,10 @@ func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, revers
 }
 
 func savePatch(patch *utils.Patch, filename string, options *utils.PatchOptions) error {
-	return savePatchWithCustomSize(patch, filename, options, 0)
+	return savePatchWithCustomSize(patch, filename, options)
 }
 
-func savePatchWithCustomSize(patch *utils.Patch, filename string, options *utils.PatchOptions, customMaxPartSize int64) error {
+func savePatchWithCustomSize(patch *utils.Patch, filename string, options *utils.PatchOptions) error {
 	// Create output file
 	outFile, err := os.Create(filename)
 	if err != nil {
@@ -774,7 +775,7 @@ func savePatchWithCustomSize(patch *utils.Patch, filename string, options *utils
 }
 
 // createStandaloneCLIExe creates a self-contained CLI executable by appending patch data to CLI applier
-func createStandaloneCLIExe(patchPath, exePath, compression string) error {
+func createStandaloneCLIExe(patchPath, exePath, compression string, silent bool) error {
 	// Get path to patch-apply.exe (CLI applier)
 	genExe, err := os.Executable()
 	if err != nil {
@@ -841,7 +842,14 @@ func createStandaloneCLIExe(patchPath, exePath, compression string) error {
 	// Checksum (32 bytes, SHA-256)
 	copy(header[52:84], checksum[:])
 
-	// Reserved (44 bytes) - already zeroed
+	// Flags (1 byte) - bit 0: silent mode
+	var flags byte = 0
+	if silent {
+		flags |= 0x01 // Set bit 0 for silent mode
+	}
+	header[84] = flags
+
+	// Reserved (43 bytes) - already zeroed
 
 	// Create output file
 	outFile, err := os.Create(exePath)
@@ -1100,6 +1108,7 @@ func printHelp() {
 	fmt.Println("  --level           Compression level (default: 3)")
 	fmt.Println("  --verify          Verify patches after creation (default: true)")
 	fmt.Println("  --create-exe      Create self-contained CLI executable")
+	fmt.Println("  --silent          Enable silent mode in generated executable (auto-apply without prompts)")
 	fmt.Println("  --crp             Create reverse patch (for downgrades)")
 	fmt.Println("  --savescans       Save directory scans to cache for faster subsequent patches")
 	fmt.Println("  --rescan          Force rescan of cached versions (use with --savescans)")
