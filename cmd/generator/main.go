@@ -301,7 +301,7 @@ func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, ou
 		if crp {
 			// Generate both patches efficiently using the same scan data
 			reversePatchFile := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.patch", newVersion, fromVersion))
-			if err := generatePatchWithReverse(fromVer, toVer, patchFile, reversePatchFile, compression, level, verify); err != nil {
+			if err := generatePatchWithReverse(fromVer, toVer, patchFile, reversePatchFile, compression, level, verify, customMaxPartSize); err != nil {
 				fmt.Printf("Error: failed to generate patches from %s: %v\n", fromVersion, err)
 				continue
 			}
@@ -406,7 +406,7 @@ func generateSinglePatch(versionMgr *version.Manager, versionsDir, from, to, out
 		// Generate both patches efficiently using the same scan data
 		fmt.Printf("\nGenerating forward and reverse patches...\n")
 		reversePatchFile := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.patch", to, from))
-		if err := generatePatchWithReverse(fromVer, toVer, patchFile, reversePatchFile, compression, level, verify); err != nil {
+		if err := generatePatchWithReverse(fromVer, toVer, patchFile, reversePatchFile, compression, level, verify, customMaxPartSize); err != nil {
 			fmt.Printf("Error: failed to generate patches: %v\n", err)
 			os.Exit(1)
 		}
@@ -512,7 +512,7 @@ func generateSinglePatchCustomPaths(versionMgr *version.Manager, fromPath, toPat
 		// Generate both patches efficiently using the same scan data
 		fmt.Printf("\nGenerating forward and reverse patches...\n")
 		reversePatchFile := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.patch", toVersion, fromVersion))
-		if err := generatePatchWithReverse(fromVer, toVer, patchFile, reversePatchFile, compression, level, verify); err != nil {
+		if err := generatePatchWithReverse(fromVer, toVer, patchFile, reversePatchFile, compression, level, verify, customMaxPartSize); err != nil {
 			fmt.Printf("Error: failed to generate patches: %v\n", err)
 			os.Exit(1)
 		}
@@ -656,7 +656,7 @@ func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string
 
 // generatePatchWithReverse generates both forward and reverse patches efficiently
 // by reusing the same generator and scan data (no need to rescan directories)
-func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, reverseFile, compression string, level int, verify bool) error {
+func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, reverseFile, compression string, level int, verify bool, customMaxPartSize int64) error {
 	// Create patch options
 	options := &utils.PatchOptions{
 		Compression:      compression,
@@ -678,7 +678,7 @@ func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, revers
 	}
 
 	// Save forward patch
-	if err := savePatchWithCustomSize(forwardPatch, forwardFile, options); err != nil {
+	if err := savePatchWithCustomSize(forwardPatch, forwardFile, options, customMaxPartSize); err != nil {
 		return fmt.Errorf("failed to save forward patch: %w", err)
 	}
 	fmt.Printf("Patch saved to: %s\n", forwardFile)
@@ -697,7 +697,7 @@ func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, revers
 	}
 
 	// Save reverse patch
-	if err := savePatchWithCustomSize(reversePatch, reverseFile, options); err != nil {
+	if err := savePatchWithCustomSize(reversePatch, reverseFile, options, customMaxPartSize); err != nil {
 		return fmt.Errorf("failed to save reverse patch: %w", err)
 	}
 	fmt.Printf("Reverse patch saved to: %s\n", reverseFile)
@@ -706,10 +706,10 @@ func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, revers
 }
 
 func savePatch(patch *utils.Patch, filename string, options *utils.PatchOptions) error {
-	return savePatchWithCustomSize(patch, filename, options)
+	return savePatchWithCustomSize(patch, filename, options, 0)
 }
 
-func savePatchWithCustomSize(patch *utils.Patch, filename string, options *utils.PatchOptions) error {
+func savePatchWithCustomSize(patch *utils.Patch, filename string, options *utils.PatchOptions, customMaxPartSize int64) error {
 	// Create output file
 	outFile, err := os.Create(filename)
 	if err != nil {

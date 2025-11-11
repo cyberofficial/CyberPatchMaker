@@ -32,6 +32,7 @@ Perfect for:
 - **Scan Caching** - Cache directory scans for instant patch generation (15+ min → <1 sec for large projects)
 - **Simple Mode for End Users** - Simplified interface for non-technical users with basic options
 - **Silent Mode** - Fully automatic patching with zero user interaction, automatic log file generation (CLI only)
+- **Embedded Silent Mode** - Generator `--silent` flag embeds auto-apply behavior into executables (no user flags needed)
 - **Large File Handling** - Automatic memory-optimized processing for files >1GB, prevents memory exhaustion
 - **Multi-Part Patches** - Automatic splitting of patches >4GB into manageable parts (prevents memory exhaustion with 18GB+ patches)
 - **Parallel Processing** - Multi-threaded patch generation using multiple CPU cores for faster processing

@@ -147,6 +147,17 @@ This requires both versions to already be registered in the system.
 - See [Self-Contained Executables Guide](self-contained-executables.md) for details
 - Works with all generation modes (single, batch, custom paths)
 
+**`--silent`**
+- Embed silent mode flag into generated self-contained executables
+- Only works with `--create-exe` flag (no effect without it)
+- When embedded, executable automatically applies patch without user prompts
+- Overrides interactive console menu - patch applies immediately on launch
+- Creates log file `log_<epochtime>.txt` with execution details
+- Perfect for distributing automated patches to end users
+- Example: `patch-gen --create-exe --silent --from-dir v1 --to-dir v2 --output patches`
+- Users run: `1.0.0-to-1.0.1.exe` (no flags needed, applies automatically)
+- See [Self-Contained Executables Guide](self-contained-executables.md) for details
+
 **`--crp`** (Create Reverse Patch)
 - Automatically create reverse patch for downgrades
 - Generates both forward patch (A→B) and reverse patch (B→A)
@@ -189,6 +200,26 @@ This requires both versions to already be registered in the system.
 - **Example**: 4-core system can process 4 files simultaneously
 - Scales based on available CPU cores and I/O bandwidth
 - Works with all generation modes and compression options
+
+**`--splitsize <size>`** (Multi-Part Split Size)
+- Custom size for splitting large patches into multiple parts
+- Format: Number followed by unit (M/MB for megabytes, G/GB for gigabytes)
+- Examples: `2G`, `2GB`, `500M`, `500MB`
+- Default: `4GB` (4 gigabytes)
+- Minimum recommended: `100MB` (requires confirmation if below)
+- Use cases:
+  - Hosting platforms with file size limits
+  - Email attachments or transfer services with restrictions
+  - Memory-constrained systems during patch application
+- See [Multi-Part Patches Guide](multipart-patches.md) for details
+
+**`--bypasssplitlimit`**
+- Bypass the 100MB minimum split size confirmation prompt
+- Only meaningful when used with `--splitsize` below 100MB
+- Without this flag: Generator prompts for confirmation if split size < 100MB
+- With this flag: Generator proceeds without asking
+- Warning: Very small split sizes create many parts (not recommended)
+- Use case: Automated scripts where confirmation prompts would block execution
 
 **`--help`**
 - Display usage information
@@ -567,6 +598,98 @@ patch-gen --versions-dir ./releases \
 - Advanced deployment scenarios
 
 **Remember:** Simple Mode (SimpleMode field) = Simplified UI | Silent Mode (--silent flag) = Automation
+
+---
+
+### Example 9: Embedded Silent Mode for Automated Patches
+
+**NEW**: Create self-contained executables that automatically apply patches without user interaction.
+
+The `--silent` flag embeds silent mode into generated executables, making them perfect for automated deployments where you want users to simply run the file and have it patch automatically.
+
+**Create Silent Mode Executable:**
+
+```bash
+# Single patch with embedded silent mode
+patch-gen --from-dir "C:\releases\1.0.0" --to-dir "C:\releases\1.0.1" --output ./patches --create-exe --silent
+
+# Batch mode with silent executables for all versions
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --create-exe --silent --verify
+```
+
+**Result:**
+```
+patches/
+├── 1.0.0-to-1.0.3.patch     ← Standard patch file
+├── 1.0.0-to-1.0.3.exe       ← Silent mode embedded executable
+├── 1.0.1-to-1.0.3.patch
+├── 1.0.1-to-1.0.3.exe       ← Silent mode embedded executable
+├── 1.0.2-to-1.0.3.patch
+└── 1.0.2-to-1.0.3.exe       ← Silent mode embedded executable
+```
+
+**User Experience:**
+- User downloads `1.0.0-to-1.0.3.exe`
+- User double-clicks the executable
+- Patch applies automatically (no prompts, no menus)
+- Creates log file `log_<epochtime>.txt` with complete execution details
+- Returns exit code 0 on success, 1 on failure
+
+**Difference from Applier --silent Flag:**
+- **Generator --silent**: Embeds silent mode INTO the executable itself
+  - User runs: `1.0.0-to-1.0.1.exe` (applies automatically)
+  - No command-line flags needed by end user
+  - Silent behavior is built into the file
+  
+- **Applier --silent**: Command-line flag for interactive executables
+  - User runs: `1.0.0-to-1.0.1.exe --silent` (requires flag)
+  - Works with any self-contained executable
+  - Silent behavior activated by user
+
+**Combined with --crp for Bidirectional Silent Patches:**
+
+```bash
+# Create both upgrade and downgrade silent executables
+patch-gen --from-dir "C:\releases\1.0.0" --to-dir "C:\releases\1.0.1" --output ./patches --create-exe --silent --crp
+```
+
+**Result:**
+```
+patches/
+├── 1.0.0-to-1.0.1.patch     ← Forward patch
+├── 1.0.0-to-1.0.1.exe       ← Forward silent executable (auto-upgrade)
+├── 1.0.1-to-1.0.0.patch     ← Reverse patch
+└── 1.0.1-to-1.0.0.exe       ← Reverse silent executable (auto-downgrade)
+```
+
+**When to Use Embedded Silent Mode:**
+- Distributing to end users for one-click automated updates
+- Enterprise deployments with minimal user interaction
+- Kiosk or unattended systems that need automatic patching
+- Game patches where users just want updates to "work"
+- Any scenario where you want simplest possible user experience
+
+**When NOT to Use Embedded Silent Mode:**
+- Users need to review patch details before applying
+- Testing environments where control is needed
+- Situations where backup/dry-run decisions should be user-controlled
+- When users need to specify custom target directories
+
+**Log File Details:**
+When a silent mode executable runs, it creates a timestamped log file:
+- Filename: `log_<unix_timestamp>.txt`
+- Location: Same directory as executable
+- Contents: Patch info, target directory, success/failure status, error messages
+- Enables audit trails for automated deployments
+
+**Security Note:**
+Silent mode executables apply patches immediately without confirmation. Ensure:
+- Patches are from trusted sources
+- Users understand what the executable does
+- Files are distributed through secure channels
+- Digital signatures verify authenticity
+
+See [Self-Contained Executables Guide](self-contained-executables.md) for complete documentation on silent mode behavior and log file formats.
 
 ---
 

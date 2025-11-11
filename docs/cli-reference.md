@@ -26,11 +26,14 @@ patch-gen [options]
 | `--level <n>` | No | Compression level: zstd (1-4), gzip (1-3), default: 3 |
 | `--verify` | No | Verify patches after creation (default: true) |
 | `--create-exe` | No | Create self-contained CLI executable |
+| `--silent` | No | Embed silent mode into generated executables (requires --create-exe) |
 | `--crp` | No | Create reverse patch for downgrades |
 | `--savescans` | No | Enable scan caching to `.data/` directory |
 | `--scandata <dir>` | No | Custom cache directory (default: `.data`) |
 | `--rescan` | No | Force rescan, ignoring cached data |
 | `--jobs <n>` | No | Number of parallel workers (0 = auto-detect CPU cores, 1 = single-threaded) |
+| `--splitsize <size>` | No | Custom multi-part split size (e.g., '2G', '500M'). Default: 4GB |
+| `--bypasssplitlimit` | No | Bypass 100MB minimum split size confirmation |
 | `--version` | No | Show version information |
 | `--help` | No | Display help information |
 
@@ -66,6 +69,14 @@ patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --com
 **With Verification**:
 ```bash
 patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --verify
+```
+
+**With Self-Contained Executables (Silent Mode Embedded)**:
+```bash
+# Create executables with embedded silent mode (auto-apply)
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --create-exe --silent --verify
+
+# Result: Users just run 1.0.0-to-1.0.3.exe and patch applies automatically
 ```
 
 ---
