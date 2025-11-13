@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -590,8 +591,8 @@ func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string
 			return fmt.Errorf("failed to split patch: %w", err)
 		}
 
-		// Save multi-part patch
-		if err := generator.SaveMultiPartPatch(parts, outputFile, compression); err != nil {
+		// Save multi-part patch (pass chunk size for additional per-part chunking)
+		if err := generator.SaveMultiPartPatch(parts, outputFile, compression, customMaxPartSize); err != nil {
 			return fmt.Errorf("failed to save multi-part patch: %w", err)
 		}
 
@@ -800,6 +801,47 @@ func createStandaloneCLIExe(patchPath, exePath, compression string, silent bool)
 		return fmt.Errorf("failed to read patch file: %w", err)
 	}
 
+	// Look for any chunk sidecar JSON files in the same directory and build a sidecar blob.
+	// Sidecar filename pattern: <base>.part<N>.chunks.json
+	sidecarBlob := []byte{}
+	sidecarFiles := []string{}
+	base := filepath.Base(patchPath)
+	if strings.HasSuffix(base, ".01.patch") {
+		base = strings.TrimSuffix(base, ".01.patch")
+	} else {
+		base = strings.TrimSuffix(base, ".patch")
+	}
+	// Glob for sidecars
+	globPattern := filepath.Join(filepath.Dir(patchPath), base+".part*.chunks.json")
+	matches, _ := filepath.Glob(globPattern)
+	if len(matches) > 0 {
+		// We'll encode an index followed by pairs of (nameLen, name, size, data)
+		var idxBuf []byte
+		// Use a bytes buffer-like composition without extra import
+		for _, f := range matches {
+			data, err := os.ReadFile(f)
+			if err != nil {
+				return fmt.Errorf("failed to read sidecar %s: %w", f, err)
+			}
+			relName := filepath.Base(f)
+			nameBytes := []byte(relName)
+			// name length (uint16) + name + size (uint64) + data
+			nb := make([]byte, 2)
+			binary.LittleEndian.PutUint16(nb, uint16(len(nameBytes)))
+			idxBuf = append(idxBuf, nb...)
+			idxBuf = append(idxBuf, nameBytes...)
+			sb := make([]byte, 8)
+			binary.LittleEndian.PutUint64(sb, uint64(len(data)))
+			idxBuf = append(idxBuf, sb...)
+			idxBuf = append(idxBuf, data...)
+			sidecarFiles = append(sidecarFiles, relName)
+		}
+		// Prepend total count (uint32)
+		cnt := make([]byte, 4)
+		binary.LittleEndian.PutUint32(cnt, uint32(len(matches)))
+		sidecarBlob = append(cnt, idxBuf...)
+	}
+
 	// Calculate checksum of patch data (as bytes, not hex string)
 	checksum := sha256.Sum256(patchData)
 
@@ -858,13 +900,20 @@ func createStandaloneCLIExe(patchPath, exePath, compression string, silent bool)
 	}
 	defer outFile.Close()
 
-	// Write: applier.exe + patch data + header
+	// Write: applier.exe + patch data + optional sidecar blob + header
 	if _, err := outFile.Write(applierData); err != nil {
 		return fmt.Errorf("failed to write applier data: %w", err)
 	}
 
 	if _, err := outFile.Write(patchData); err != nil {
 		return fmt.Errorf("failed to write patch data: %w", err)
+	}
+
+	// Write sidecar blob (may be empty)
+	if len(sidecarBlob) > 0 {
+		if _, err := outFile.Write(sidecarBlob); err != nil {
+			return fmt.Errorf("failed to write sidecar blob: %w", err)
+		}
 	}
 
 	if _, err := outFile.Write(header); err != nil {

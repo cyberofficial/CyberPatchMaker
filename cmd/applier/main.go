@@ -459,13 +459,14 @@ func checkEmbeddedPatch(ignore1GB bool) (*utils.Patch, string, bool, bool) {
 		return nil, "", false, false
 	}
 
-	// Validate structure
+	// Validate structure: data must start immediately after stub
 	if header.DataOffset != header.StubSize {
 		return nil, "", false, false
 	}
 
-	expectedSize := header.StubSize + header.DataSize + HEADER_SIZE
-	if expectedSize != uint64(fileSize) {
+	// Allow optional sidecar blob between patch data and header (we may embed chunk JSONs)
+	minExpectedSize := header.StubSize + header.DataSize + HEADER_SIZE
+	if uint64(fileSize) < minExpectedSize {
 		return nil, "", false, false
 	}
 
@@ -480,6 +481,7 @@ func checkEmbeddedPatch(ignore1GB bool) (*utils.Patch, string, bool, bool) {
 		return nil, "", false, false
 	}
 
+
 	// Read patch data
 	if _, err := file.Seek(int64(header.DataOffset), io.SeekStart); err != nil {
 		return nil, "", false, false
@@ -488,6 +490,48 @@ func checkEmbeddedPatch(ignore1GB bool) (*utils.Patch, string, bool, bool) {
 	patchData := make([]byte, header.DataSize)
 	if _, err := io.ReadFull(file, patchData); err != nil {
 		return nil, "", false, false
+	}
+
+	// If there are extra bytes between patch data and header, treat them as sidecar blob
+	extraBytes := int64(fileSize) - int64(minExpectedSize)
+	var writtenSidecars []string
+	if extraBytes > 0 {
+		// Read sidecar blob
+		sidecarOffset := int64(header.DataOffset + header.DataSize)
+		if _, err := file.Seek(sidecarOffset, io.SeekStart); err == nil {
+			sidecarData := make([]byte, extraBytes)
+			if _, err := io.ReadFull(file, sidecarData); err == nil {
+				// Parse sidecar format: uint32 count, then for each: uint16 nameLen, name bytes, uint64 dataLen, data bytes
+				r := bytes.NewReader(sidecarData)
+				var count uint32
+				if err := binary.Read(r, binary.LittleEndian, &count); err == nil {
+					for i := uint32(0); i < count; i++ {
+						var nameLen uint16
+						if err := binary.Read(r, binary.LittleEndian, &nameLen); err != nil {
+							break
+						}
+						nameBytes := make([]byte, nameLen)
+						if _, err := io.ReadFull(r, nameBytes); err != nil {
+							break
+						}
+						var dataLen uint64
+						if err := binary.Read(r, binary.LittleEndian, &dataLen); err != nil {
+							break
+						}
+						dataBytes := make([]byte, dataLen)
+						if _, err := io.ReadFull(r, dataBytes); err != nil {
+							break
+						}
+						// Write sidecar file into exe directory
+						exeDir := filepath.Dir(exePath)
+						sidePath := filepath.Join(exeDir, string(nameBytes))
+						if err := os.WriteFile(sidePath, dataBytes, 0644); err == nil {
+							writtenSidecars = append(writtenSidecars, sidePath)
+						}
+					}
+				}
+			}
+		}
 	}
 
 	// Verify checksum
@@ -511,11 +555,58 @@ func checkEmbeddedPatch(ignore1GB bool) (*utils.Patch, string, bool, bool) {
 		// Save in exe directory with the correct base name so LoadMultiPartPatch finds the parts
 		tempPart01 := filepath.Join(exeDir, exeBaseName+".01.patch")
 
+		// Before writing part 01 temp, verify that any extracted sidecars reference existing chunk files.
+		// If any listed chunk file is missing, fail early to avoid silently falling back to a full part.
+		exeDir := filepath.Dir(exePath)
+		for _, sc := range writtenSidecars {
+			// Read sidecar JSON
+			sb, err := os.ReadFile(sc)
+			if err != nil {
+				// cleanup and fail
+				for _, p := range writtenSidecars {
+					_ = os.Remove(p)
+				}
+				return nil, "", false, false
+			}
+			var parsed struct {
+				PartNumber int                 `json:"part_number"`
+				Chunks     []utils.PartChunk   `json:"chunks"`
+			}
+			if err := json.Unmarshal(sb, &parsed); err != nil {
+				for _, p := range writtenSidecars {
+					_ = os.Remove(p)
+				}
+				return nil, "", false, false
+			}
+			// Verify each chunk file exists
+			for _, ch := range parsed.Chunks {
+				chunkPath := filepath.Join(exeDir, ch.FileName)
+				if !utils.FileExists(chunkPath) {
+					// cleanup and fail with clear message
+					for _, p := range writtenSidecars {
+						_ = os.Remove(p)
+					}
+					fmt.Fprintf(os.Stderr, "Error: missing chunk file required by embedded sidecar: %s\n", chunkPath)
+					return nil, "", false, false
+				}
+			}
+		}
+
 		// Write part 01 data to temporary file
 		if err := os.WriteFile(tempPart01, patchData, 0644); err != nil {
+			// cleanup any written sidecars
+			for _, p := range writtenSidecars {
+				_ = os.Remove(p)
+			}
 			return nil, "", false, false
 		}
-		defer os.Remove(tempPart01) // Clean up temporary file
+		// Clean up temporary file and any written sidecars after loading
+		defer func() {
+			_ = os.Remove(tempPart01)
+			for _, p := range writtenSidecars {
+				_ = os.Remove(p)
+			}
+		}()
 
 		// Load all parts using multi-part loader
 		patch, err = patcher.LoadMultiPartPatch(tempPart01)
@@ -528,6 +619,10 @@ func checkEmbeddedPatch(ignore1GB bool) (*utils.Patch, string, bool, bool) {
 		// Single-part patch: Parse embedded data directly
 		patch, err = parsePatchDataStreaming(bytes.NewReader(patchData))
 		if err != nil {
+			// cleanup any written sidecars
+			for _, p := range writtenSidecars {
+				_ = os.Remove(p)
+			}
 			return nil, "", false, false
 		}
 	} // Get current directory as default target

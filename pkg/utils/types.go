@@ -71,6 +71,15 @@ type PartHash struct {
 	Size       int64  // Part file size in bytes
 }
 
+// PartChunk describes a chunk of a larger part file when a part is further split
+type PartChunk struct {
+	PartNumber  int    // Parent part number (1-indexed)
+	ChunkNumber int    // Chunk order within the part (1-indexed)
+	FileName    string // Filename of the chunk (relative to patch directory)
+	Checksum    string // SHA-256 checksum of this chunk
+	Size        int64  // Size in bytes of this chunk
+}
+
 // FileRequirement specifies a file that must exist with exact hash
 type FileRequirement struct {
 	Path       string // Relative file path
