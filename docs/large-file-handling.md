@@ -17,7 +17,7 @@ When generating or applying patches, CyberPatchMaker automatically detects large
 
 #### Patch Generation
 - **Large file additions**: Files are copied in 128MB chunks
-- **Large file modifications**: Binary diffs are computed chunk-by-chunk
+- **Large file modifications**: Full file replacement (not chunked binary diffs)
 - **Progress tracking**: Shows percentage and MB processed/total
 
 #### Patch Application
@@ -44,12 +44,13 @@ LargeFileThreshold = 1024 * 1024 * 1024  // 1 GB threshold
 
 #### For Modified Files (>1GB)
 1. Detect either old or new file exceeds threshold
-2. Open both files for streaming access
-3. Compare files chunk-by-chunk (128MB chunks)
-4. Generate binary diff for each changed chunk using bsdiff
-5. Write chunks incrementally to temp file
-6. Release memory after each chunk
-7. Return complete diff data
+2. Use full file replacement strategy instead of binary diff
+3. Copy new file in 128MB chunks to avoid loading entire file into memory
+4. Store file data directly in patch (no bsdiff for very large files)
+5. Release memory after each chunk
+6. Return file reference for patch operation
+
+**Note:** For files exceeding 1GB, CyberPatchMaker uses full file replacement rather than binary diff generation. This prevents memory exhaustion while maintaining patch integrity. The large file size means the binary diff would be similar in size to the full file, so replacement is more efficient.
 
 #### For Applying Patches
 1. Check if target file exceeds threshold
@@ -79,9 +80,9 @@ Processing 1 added files...
   Add (large): assets/game.pak (23456 MB)
 
 Processing 1 modified files (generating diffs)...
-  Large file detected (old: 12000 MB, new: 13500 MB), using chunked diff: data/world.bin
+  Large file detected (old: 12000 MB, new: 13500 MB), using full replacement: data/world.bin
   Progress: 100.0% (13500/13500 MB)
-  Modify (chunked diff): data/world.bin (diff: 1200 MB, orig: 12000 MB, new: 13500 MB)
+  Modify (full replacement): data/world.bin (size: 13500 MB)
 ```
 
 ### Applying Patch with Large File

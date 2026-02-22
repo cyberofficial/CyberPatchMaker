@@ -449,7 +449,7 @@ If any check fails:
 
 ### Overview
 
-**NEW in v1.0.9**: Patch creators can enable **Simple Mode** when generating self-contained executables. This provides end users with a fully automated patching experience.
+**Available since v1.0.9**: Patch creators can enable **Simple Mode** when generating self-contained executables. This provides end users with a fully automated patching experience.
 
 This is distinct from the `--silent` automation flag - instead, this feature is **configured by the patch creator** during patch generation using the `SimpleMode` field in the patch structure.
 

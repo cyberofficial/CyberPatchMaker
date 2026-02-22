@@ -1,6 +1,6 @@
 # Simple Mode for End Users Guide
 
-**NEW in v1.0.9**
+**Available since v1.0.9**
 
 A comprehensive guide to using Simple Mode to create user-friendly patches for non-technical end users.
 
@@ -393,7 +393,6 @@ A: No performance impact. Only UI changes, internal processing identical.
 
 - [Generator Guide](generator-guide.md) - Creating patches with Silent Mode
 - [Applier Guide](applier-guide.md) - How simplified interface works
-- [GUI Usage Guide](gui-usage.md) - Using GUI to enable Silent Mode
 - [Self-Contained Executables](self-contained-executables.md) - Creating standalone patches
 
 ## Summary

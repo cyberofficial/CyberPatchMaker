@@ -10,10 +10,10 @@ Welcome to the CyberPatchMaker documentation wiki. This comprehensive guide cove
 ### User Guides
 - [Generator Tool Guide](generator-guide.md) - Complete guide to patch generation (CLI)
 - [Applier Tool Guide](applier-guide.md) - Complete guide to patch application (CLI)
-- [GUI Usage Guide](gui-usage.md) - Using the graphical interface **(Experimental)**
 - [Self-Contained Executables](self-contained-executables.md) - Create standalone patch executables **(New!)**
 - [Downgrade Guide](downgrade-guide.md) - Rollback to previous versions
-- [Large File Handling](large-file-handling.md) - Memory-efficient processing for 20GB+ files **(New in v1.0.6!)**
+- [Scan Caching](scan-caching.md) - Instant patch generation with cached scans **(Available since v1.0.10)**
+- [Large File Handling](large-file-handling.md) - Memory-efficient processing for 20GB+ files **(Available since v1.0.6)**
 - [Multi-Part Patches](multipart-patches.md) - Automatic splitting of patches >4GB into manageable parts **(New!)**
 - [CLI Reference](cli-reference.md) - Quick command-line reference
 - [CLI Examples](CLI-EXAMPLES.md) - Real-world command examples
@@ -25,7 +25,7 @@ Welcome to the CyberPatchMaker documentation wiki. This comprehensive guide cove
 - [System Architecture](architecture.md) - Overall system design
 - [Backup System](backup-system.md) - Selective backup and rollback mechanisms
 - [Backup Lifecycle](backup-lifecycle.md) - Detailed backup timing and lifecycle
-- [Backup Directory Exclusion](backup-exclusion.md) - Automatic exclusion safeguard
+- [Backup Exclusion](backup-exclusion.md) - Automatic exclusion safeguard
 - [.cyberignore File Guide](cyberignore-guide.md) - Exclude files from patches **(New!)**
 
 ### Technical Deep-Dives
@@ -53,4 +53,4 @@ Welcome to the CyberPatchMaker documentation wiki. This comprehensive guide cove
 
 ## Documentation Version
 
-This documentation corresponds to CyberPatchMaker
+This documentation corresponds to CyberPatchMaker v1.0.16 (current version)

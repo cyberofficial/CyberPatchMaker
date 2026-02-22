@@ -192,6 +192,87 @@ Multi-part patches solve the memory exhaustion problem:
 - **Single 18GB patch:** Tries to allocate 64GB+ for JSON parsing → OOM crash
 - **Multi-part (5x 3-4GB):** Loads parts sequentially, max ~4GB per part → Success
 
+## Chunk Sidecar System (Very Large Patches)
+
+For patches where individual parts exceed 3.75GB (after compression overhead), CyberPatchMaker uses a **chunk sidecar system** to further break down parts into smaller chunk files.
+
+### When Chunking Occurs
+
+- Default part size limit: 4GB
+- When a compressed part approaches this limit (~3.75GB), the system:
+  1. Chunks the part data into smaller files (~500MB-1GB each)
+  2. Creates a `.chunks.json` sidecar file with chunk metadata
+  3. Reconstructs the part on-the-fly when loading
+
+### Chunk File Structure
+
+```
+patch-name.01.patch                    ← Part 1 (small, contains metadata)
+patch-name.02.patch                    ← Part 2 (regular, not chunked)
+patch-name.03.patch.chunks.json        ← Sidecar for chunked Part 3
+patch-name.part3.1.patch               ← Chunk 1 of Part 3
+patch-name.part3.2.patch               ← Chunk 2 of Part 3
+patch-name.part3.3.patch               ← Chunk 3 of Part 3
+```
+
+### Sidecar JSON Format
+
+```json
+{
+  "part_number": 3,
+  "chunks": [
+    {
+      "FileName": "patch-name.part3.1.patch",
+      "PartNumber": 3,
+      "ChunkNumber": 1,
+      "Size": 536870912,
+      "Checksum": "abc123def456..."
+    },
+    {
+      "FileName": "patch-name.part3.2.patch",
+      "PartNumber": 3,
+      "ChunkNumber": 2,
+      "Size": 536870912,
+      "Checksum": "789ghi012jkl..."
+    }
+  ]
+}
+```
+
+### Chunk Reconstruction Process
+
+When applying a patch with chunked parts:
+
+1. **Detect sidecar:** If `<part>.chunks.json` exists, part is chunked
+2. **Load sidecar:** Read chunk metadata (file names, offsets, checksums)
+3. **Read chunks:** Load each chunk file and verify SHA-256 checksum
+4. **Reassemble:** Combine chunks in order into temporary file
+5. **Verify reconstructed hash:** Ensure full part matches expected hash
+6. **Load part:** Parse reconstructed part as normal patch data
+
+### Benefits of Chunking
+
+- **Handles any patch size:** Even 50GB+ patches can be processed
+- **Memory-safe:** Never loads more than one chunk at a time
+- **Parallel download ready:** Chunks can be downloaded independently
+- **Checksum verification:** Each chunk verified individually
+
+### Self-Contained Executables with Chunks
+
+When creating self-contained executables with very large patches:
+
+- **Chunk sidecar embedded** in the executable
+- **Chunk files distributed separately** alongside the .exe
+- **Executable auto-detects** chunks and reassembles during application
+
+Example distribution:
+```
+MyApp-Patch-1.0.3.exe                  ← ~50MB (contains applier + patch metadata)
+MyApp-Patch-1.0.3.exe.chunks.json     ← Chunk manifest
+MyApp-Patch-1.0.3.exe.part1.1.patch    ← First chunk file
+MyApp-Patch-1.0.3.exe.part1.2.patch    ← Second chunk file
+```
+
 ## Compatibility
 
 ### Backward Compatibility

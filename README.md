@@ -326,6 +326,7 @@ All documentation is in the [docs/](docs/) folder:
 - [Testing Guide](docs/testing-guide.md) - Testing your patches
 - [Troubleshooting](docs/troubleshooting.md) - Common issues
 - [Advanced Test Summary](docs/ADVANCED-TEST-SUMMARY.md) - Detailed test results
+- [Scan Caching](docs/scan-caching.md) - Instant patch generation with cached scans
 - [Large File Handling](docs/large-file-handling.md) - Memory optimization for large files
 - [Backup System](docs/backup-system.md) - Comprehensive backup management
 - [Key File System](docs/key-file-system.md) - Version identification

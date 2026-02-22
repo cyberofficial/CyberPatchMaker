@@ -6,18 +6,6 @@ Complete guide to using the CyberPatchMaker generator tool for creating delta pa
 
 The generator tool creates efficient binary patches between software versions. It compares two complete directory trees and generates a small patch file containing only the changes.
 
-> **NOTE: GUI Alternative Available**
-> 
-> For a visual interface with additional features like self-contained executables, see the [GUI Usage Guide](gui-usage.md).
-> 
-> The GUI includes:
-> - User-friendly interface for all options
-> - Real-time validation and progress monitoring
-> - **Self-contained executable creation** (generates standalone `.exe` files with embedded patches)
-> - Batch mode for generating multiple patches at once
-> 
-> This guide focuses on the command-line tool.
-
 ## Basic Usage
 
 ### Generate Patches from All Versions to New Version
@@ -530,7 +518,7 @@ See [Downgrade Guide](downgrade-guide.md) for complete documentation.
 
 ### Example 8: Simple Mode for End Users
 
-**NEW in v1.0.9**: Enable simplified interface for end users when creating self-contained executables.
+**Available since v1.0.9**: Enable simplified interface for end users when creating self-contained executables.
 
 When you distribute patches to clients who will give the executables to their users, you can enable **Simple Mode** to provide a streamlined, user-friendly experience. This hides advanced options and shows only what end users need.
 
@@ -603,7 +591,7 @@ patch-gen --versions-dir ./releases \
 
 ### Example 9: Embedded Silent Mode for Automated Patches
 
-**NEW**: Create self-contained executables that automatically apply patches without user interaction.
+**Available since v1.0.11**: Create self-contained executables that automatically apply patches without user interaction.
 
 The `--silent` flag embeds silent mode into generated executables, making them perfect for automated deployments where you want users to simply run the file and have it patch automatically.
 

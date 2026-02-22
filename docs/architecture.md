@@ -20,6 +20,7 @@ CyberPatchMaker is designed as a modular, maintainable system with clear separat
 │  ├─ scanner/      Directory scanning & hashing               │
 │  ├─ manifest/     Manifest creation & comparison             │
 │  ├─ version/      Version management & registry              │
+│  ├─ cache/        Scan caching for fast reload               │
 │  ├─ config/       Configuration management                   │
 │  ├─ differ/       Binary diff generation (bsdiff)            │
 │  └─ patcher/      Patch generation & application             │
@@ -62,7 +63,7 @@ CyberPatchMaker is designed as a modular, maintainable system with clear separat
 - Error presentation
 - Progress reporting
 
-**Lines of Code**: ~300 lines
+**Lines of Code**: 1,192 lines (main.go: 1,192)
 
 #### Applier (`cmd/applier/main.go`)
 - Parses command-line flags
@@ -77,7 +78,7 @@ CyberPatchMaker is designed as a modular, maintainable system with clear separat
 - Backup restoration (fallback)
 - User feedback
 
-**Lines of Code**: ~300 lines
+**Lines of Code**: 1,123 lines (main.go: 1,123)
 
 ---
 
@@ -102,7 +103,7 @@ CyberPatchMaker is designed as a modular, maintainable system with clear separat
 - Build complete file manifests
 - Handle symbolic links and special files
 
-**Lines of Code**: ~200 lines
+**Lines of Code**: 728 lines (scanner.go: 267, ignore.go: 208, parallel.go: 253)
 
 ---
 
@@ -122,8 +123,10 @@ type Manifest struct {
     Version     string        // "1.0.0"
     KeyFile     KeyFileInfo   // Main program identifier
     Files       []FileEntry   // All files in tree
+    Directories []string      // All directories (for empty dir handling)
     Timestamp   time.Time     // Creation time
     TotalSize   int64         // Total bytes
+    TotalFiles  int           // Total number of files
     Checksum    string        // Overall version hash
 }
 ```
@@ -135,7 +138,7 @@ type Manifest struct {
 - Compare two manifests
 - Identify added/modified/deleted files
 
-**Lines of Code**: ~250 lines
+**Lines of Code**: 230 lines (manager.go: 230)
 
 ---
 
@@ -151,11 +154,13 @@ type Manifest struct {
 
 **Data Structure:**
 ```go
-type VersionEntry struct {
-    Version   string       // "1.0.0"
-    Location  string       // Absolute path
-    Manifest  *Manifest    // Cached manifest
-    ScannedAt time.Time    // Last scan time
+type Version struct {  // From pkg/utils/types.go
+    Number       string       // "1.0.0"
+    Location     string       // Absolute path
+    KeyFile      KeyFileInfo  // Key file identification
+    Manifest     *Manifest    // Complete file manifest
+    RegisteredAt time.Time    // When version was registered
+    LastScanned  time.Time    // When manifest was last updated
 }
 ```
 
@@ -166,7 +171,7 @@ type VersionEntry struct {
 - Validate version directories
 - Manage version registry
 
-**Lines of Code**: ~200 lines
+**Lines of Code**: 569 lines (manager.go: 481, version.go: 88)
 
 ---
 
@@ -190,7 +195,25 @@ type Config struct {
 }
 ```
 
-**Lines of Code**: ~150 lines
+**Lines of Code**: 204 lines (config.go: 204)
+
+---
+
+#### Cache (`internal/core/cache/`)
+
+**Purpose**: Cache directory scans for instant reload on subsequent patch generations
+
+**Key Components:**
+- `scan_cache.go`: Scan caching operations
+
+**Responsibilities:**
+- Save scanned version data to cache
+- Load cached scans with validation
+- List and manage cached scans
+- Generate unique cache filenames
+- Hash location paths for validation
+
+**Lines of Code**: 259 lines (scan_cache.go: 259)
 
 ---
 
@@ -211,7 +234,7 @@ type Config struct {
 
 **External Dependency**: `github.com/gabstv/go-bsdiff`
 
-**Lines of Code**: ~100 lines
+**Lines of Code**: 266 lines (differ.go: 266)
 
 ---
 
@@ -246,7 +269,7 @@ type Config struct {
 - Cleanup backup on success
 - Restore backup on failure
 
-**Lines of Code**: ~400 lines (most complex component)
+**Lines of Code**: 1,429 lines (applier.go: 634, generator.go: 315, multipart.go: 480)
 
 ---
 
@@ -256,25 +279,40 @@ type Config struct {
 
 #### types.go
 **Defines core data structures:**
+- `Version`: Registered software version
 - `Patch`: Complete patch structure
 - `PatchOperation`: Single operation (add/modify/delete)
 - `FileEntry`: File metadata
 - `KeyFileInfo`: Key file identification
 - `Manifest`: Version manifest
-- Enums: `OperationType`, `CompressionType`
+- `MultiPartInfo`: Multi-part patch metadata
+- `PartHash`: Part hash information
+- `PartChunk`: Part chunk information
+- `FileRequirement`: File requirement for verification
+- `PatchHeader`: Patch metadata
+- `PatchOptions`: Generation options
+- `Config`: Application configuration
+- `VersionRegistry`: Version storage
+- `OperationType`: Operation enum (OpAdd, OpModify, OpDelete, OpAddDir, OpDeleteDir)
 
-**Lines of Code**: ~200 lines
+**Constants:**
+- `ChunkSize`: 128 MB chunk size for large files
+- `LargeFileThreshold`: 1 GB threshold
+- `DefaultMaxPartSize`: 4 GB default part size
+
+**Lines of Code**: 165 lines
 
 ---
 
 #### checksum.go
 **Hash calculation utilities:**
 - `CalculateFileChecksum(path string) (string, error)`
-- `CalculateDirectoryChecksum(dir string) (string, error)`
+- `CalculateDataChecksum(data []byte) string`
+- `CalculateStringChecksum(text string) string`
+- `VerifyFileChecksum(path, expected string) (bool, error)`
 - SHA-256 implementation
-- Efficient file streaming
 
-**Lines of Code**: ~100 lines
+**Lines of Code**: 46 lines
 
 ---
 
@@ -282,26 +320,43 @@ type Config struct {
 **File operation utilities:**
 - `CopyFile(src, dst string) error`
 - `EnsureDir(path string) error`
+- `RemoveDir(path string) error`
 - `FileExists(path string) bool`
-- `RemoveAll(path string) error`
+- `GetFileSize(path string) (int64, error)`
+- `IsExecutable(path string) bool`
+- `CopyDir(src, dst string) error`
+- `CountFilesInDir(path string) (int, error)`
 - Cross-platform path handling
 
-**Lines of Code**: ~150 lines
+**Lines of Code**: 142 lines
 
 ---
 
 #### compress.go
 **Compression/decompression:**
-- `Compress(data []byte, method string, level int) ([]byte, error)`
-- `Decompress(data []byte, method string) ([]byte, error)`
-- zstd support
-- gzip support
+- `CompressData(data []byte, algorithm string, level int) ([]byte, error)`
+- `DecompressData(data []byte, algorithm string) ([]byte, error)`
+- `CompressDataStreaming(src, dst, algorithm, level) error`
+- `DecompressDataStreaming(src, dst, algorithm) error`
+- zstd support (levels 1-4)
+- gzip support (levels 1-3)
 
-**External Dependencies**: 
+**External Dependencies**:
 - `github.com/klauspost/compress/zstd`
 - Standard library `compress/gzip`
 
-**Lines of Code**: ~150 lines
+**Lines of Code**: 238 lines
+
+---
+
+#### patch_io.go
+**Patch serialization/deserialization:**
+- `SavePatch(patch, filename, compression) error`
+- `LoadPatch(filename) (*Patch, error)`
+- Streaming JSON encoding for large patches
+- Compression integration
+
+**Lines of Code**: 338 lines
 
 ---
 
@@ -449,7 +504,7 @@ Output: Success/Error Message
 - **Memory**: O(1) - streaming I/O for large files
 
 ### Optimizations
-- Streaming for large files (no full load into memory)
+- Chunked processing for large files (128MB chunks, no full load into memory)
 - Skip binary-identical files
 - Efficient selective backup (only changed files)
 
