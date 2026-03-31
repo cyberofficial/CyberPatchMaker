@@ -145,9 +145,8 @@ type PatchOperation struct {
 - `OpDeleteDir` (4): Delete directory
 
 **Data Storage Strategy:**
-- Small files (< 1GB): Use `BinaryDiff` with bsdiff
-- Large files (≥ 1GB): Use `NewFile` with full replacement
-- Both fields can coexist for flexibility
+- All modified files: Use `NewFile` with full replacement
+- `BinaryDiff` is only used during patch application for backward compatibility with old-format patches
 
 ---
 

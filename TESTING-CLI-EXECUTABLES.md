@@ -13,7 +13,7 @@ This guide explains how to test the new CLI self-contained executable feature.
 ### CLI Applier (`patch-apply.exe`)
 - Detects embedded patch data on startup
 - Interactive console menu interface
-- Options: Dry Run, Apply Patch, Toggle 1GB Bypass, Change Target Directory
+- Options: Dry Run, Apply Patch, Toggle 1GB Bypass, Change Target Directory, Specify Custom Key File
 - User-friendly console interface for non-technical users
 
 ## Testing Steps
@@ -79,9 +79,10 @@ Options:
   2. Apply Patch
   3. Toggle 1GB Bypass Mode (currently: Disabled)
   4. Change Target Directory
-  5. Exit
+  5. Specify Custom Key File
+  6. Exit
 ==============================================
-Select option [1-5]:
+Select option [1-6]:
 ```
 
 #### Test Each Menu Option:
@@ -108,7 +109,13 @@ Select option [1-5]:
 - Validates directory exists
 - Updates target for subsequent operations
 
-**Option 5: Exit**
+**Option 5: Specify Custom Key File**
+- Allows specifying a custom key file path (if renamed or moved)
+- Shows current key file (default or custom)
+- Validates the custom key file exists
+- Press Enter to revert to default key file
+
+**Option 6: Exit**
 - Cleanly exits the program
 
 ### 4. Verify Patch Application
@@ -190,12 +197,13 @@ Select option 2, then type "no" when prompted - should cancel gracefully.
 | Apply | Menu option 2 |
 | 1GB Bypass | Menu option 3 |
 | Target Dir | Menu option 4 |
+| Custom Key File | Menu option 5 |
 | Best For | Scripters, CLI users, automation |
 
 ## Known Limitations
 
 1. **Windows Only:** Currently only generates `.exe` files
-2. **Interactive Only:** CLI executable requires user interaction (not for automation)
+2. **Interactive by default:** CLI executable requires user interaction, but supports `--silent` flag for automation
 3. **Memory Usage:** Large patches (>1GB) require significant RAM
 4. **Single Use:** Each executable is for one specific version transition
 

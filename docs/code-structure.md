@@ -125,7 +125,7 @@ CyberPatchMaker/
 - `GenerateDiff(oldPath, newPath)` - Generate binary diff
 - `GenerateDiffFromData(oldData, newData)` - Diff from byte arrays
 - `GenerateDiffStreaming(oldPath, newPath, output)` - Stream diff generation
-- `IsLargeFile(path)` - Check if file > 1GB
+- `IsLargeFile(path)` - Check if file > 1GB, returns (isLarge, size, error)
 - `GenerateDiffChunked(oldPath, newPath, chunkSize, callback)` - Chunked diff for large files
 - `CopyFileChunked(srcPath, dstPath, chunkSize, callback)` - Copy large file in chunks
 - `ApplyPatch(oldPath, patchData)` - Apply patch to data

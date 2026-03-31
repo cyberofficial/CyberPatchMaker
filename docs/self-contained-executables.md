@@ -128,7 +128,7 @@ When `patch-apply.exe` starts:
    - Validates format version (only v1 supported)
    - Checks for magic bytes "CPMPATCH"
    - Verifies `DataOffset == StubSize` (no gaps)
-   - Validates `StubSize + DataSize + HEADER_SIZE == fileSize` (exact match)
+   - Validates `StubSize + DataSize + HEADER_SIZE <= fileSize` (minimum check; extra bytes allowed for sidecar data)
    - Ensures offsets are within file bounds
    - Limits patch size to max 1 GB (prevents memory exhaustion)
 4. If all validations pass:
@@ -238,9 +238,10 @@ Need help? Visit: https://support.mygame.com/updates
      2. Apply Patch
      3. Toggle 1GB Bypass Mode (currently: Disabled)
      4. Change Target Directory
-     5. Exit
+     5. Specify Custom Key File
+     6. Exit
    ==============================================
-   Select option [1-5]:
+   Select option [1-6]:
    ```
 4. **Choose Option**: Select 1 for dry run or 2 to apply
 5. **Apply**: Confirm with "yes" when prompted

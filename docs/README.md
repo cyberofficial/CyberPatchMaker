@@ -23,10 +23,13 @@ Welcome to the CyberPatchMaker documentation wiki. This comprehensive guide cove
 ### Core Concepts
 - [How It Works](how-it-works.md) - Understanding the patch system
 - [System Architecture](architecture.md) - Overall system design
+- [Code Structure](code-structure.md) - Source code organization and module breakdown
+- [Data Structures](data-structures.md) - Key types and data flow
 - [Backup System](backup-system.md) - Selective backup and rollback mechanisms
 - [Backup Lifecycle](backup-lifecycle.md) - Detailed backup timing and lifecycle
 - [Backup Exclusion](backup-exclusion.md) - Automatic exclusion safeguard
 - [.cyberignore File Guide](cyberignore-guide.md) - Exclude files from patches **(New!)**
+- [Simple Mode Guide](simple-mode-guide.md) - Simplified interface for end users **(New!)**
 
 ### Technical Deep-Dives
 - [Key File System](key-file-system.md) - Automatic key file detection and version identification
@@ -34,6 +37,7 @@ Welcome to the CyberPatchMaker documentation wiki. This comprehensive guide cove
 
 ### Problem Solving
 - [Troubleshooting](troubleshooting.md) - Common issues and solutions
+- [Performance](performance.md) - Optimization techniques and benchmarks
 
 ### Development
 - [Development Setup](development-setup.md) - Setting up dev environment and contributing

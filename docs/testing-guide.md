@@ -183,7 +183,7 @@ The advanced test suite includes 61 comprehensive tests organized into several c
 37. **Verify CLI executable structure and header** - Magic bytes verification
 38. **Test batch mode with CLI executable creation** - Batch exe creation
 39. **Test 1GB bypass with large patch creation** *(optional: -run1gbtest)* - Large patches
-40. **Verify CLI executables use CLI applier (not GUI)** - CLI applier verification
+40. **Verify CLI executables use CLI applier** - CLI applier verification
 
 ### File Exclusion & Silent Mode Tests (Tests 41-46)
 41. **Verify backup.cyberpatcher directories are excluded** - Backup exclusion

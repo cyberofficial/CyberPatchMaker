@@ -29,29 +29,14 @@ Simple Mode is designed for:
 
 When generating a patch, enable "Simple Mode for End Users":
 
-**GUI Method:**
-1. Open Patch Generator GUI
-2. Configure your patch (versions, compression, etc.)
-3. Check **"Enable Simple Mode for End Users"** checkbox
-4. Generate patch or create self-contained executable
-5. Distribute to end users
-
 **CLI Method:**
-Currently, Simple Mode can only be enabled via the GUI. The CLI generator does not have a `--simple-mode` flag yet. Simple Mode is controlled by the `SimpleMode` field in the Patch struct, which the GUI sets when the checkbox is checked.
+Simple Mode is controlled by the `SimpleMode` field in the Patch struct. When generating self-contained executables, the generator sets SimpleMode automatically for simplified end-user interaction.
 
 **Note:** Do not confuse this with `--silent` flag, which is for automation (fully automatic, no user interaction).
 
 ### For End Users
 
 When end users run a patch created with Simple Mode enabled, they experience:
-
-**GUI Mode:**
-- Simple message showing version change
-- Essential options only:
-  - Create backup (checked by default)
-  - Dry Run button
-  - Apply Patch button
-- Advanced options hidden
 
 **CLI Mode:**
 - Clean console interface
@@ -162,7 +147,7 @@ A software company distributes patches to business clients who then deploy to th
 **Solution:**
 ```bash
 # Generate patches for all versions
-# Note: Simple Mode must be enabled via GUI checkbox
+# Note: Simple Mode must be enabled in the patch before distribution
 patch-gen --versions-dir ./releases \
           --new-version 2.0.0 \
           --output ./dist \
@@ -186,8 +171,8 @@ IT department needs to deploy updates to 500 workstations with minimal user inte
 
 **Solution:**
 ```bash
-# Create GUI executable
-# Note: Enable Simple Mode via GUI checkbox before generating
+# Create self-contained executable
+# Note: Simple Mode is set automatically for self-contained executables
 patch-gen --from-dir ./prod/v1.5 \
           --to-dir ./prod/v1.6 \
           --output ./deploy \
@@ -214,7 +199,7 @@ Game developer needs to push updates to players worldwide with varying technical
 **Solution:**
 ```bash
 # Create patches for all versions
-# Note: Enable Simple Mode via GUI checkbox before generating
+# Note: Simple Mode is set automatically for self-contained executables
 patch-gen --versions-dir ./builds \
           --new-version 3.2.0 \
           --output ./updates \
@@ -234,9 +219,9 @@ patch-gen --versions-dir ./builds \
 
 ## Best Practices
 
-### When to Enable Silent Mode
+### When to Enable Simple Mode
 
-✅ **DO use Silent Mode when:**
+✅ **DO use Simple Mode when:**
 - Distributing to non-technical users
 - Client or customer distributions
 - End-user facing patches
@@ -244,7 +229,7 @@ patch-gen --versions-dir ./builds \
 - Professional appearance matters
 - Users should focus on essentials only
 
-❌ **DON'T use Silent Mode when:**
+❌ **DON'T use Simple Mode when:**
 - Internal development/testing
 - Technical users need full control
 - Advanced configuration required
@@ -253,13 +238,13 @@ patch-gen --versions-dir ./builds \
 
 ### Patch Creator Checklist
 
-Before distributing Silent Mode patches:
+Before distributing Simple Mode patches:
 
-- [ ] Test the patch with Silent Mode enabled
+- [ ] Test the patch with Simple Mode enabled
 - [ ] Verify the simplified interface works correctly
 - [ ] Test both Dry Run and Apply Patch options
 - [ ] Ensure backup option functions properly
-- [ ] Test with both GUI and CLI executables
+- [ ] Test with CLI executables
 - [ ] Prepare simple user instructions
 - [ ] Document the expected user experience
 - [ ] Test on clean installation
@@ -268,7 +253,7 @@ Before distributing Silent Mode patches:
 
 ### User Instructions Template
 
-When distributing Silent Mode patches, provide clear instructions:
+When distributing Simple Mode patches, provide clear instructions:
 
 ```
 How to Update [Your App Name]
@@ -297,16 +282,16 @@ Note: A backup will be created automatically for safety.
 
 ### Issue: Users Ask for Advanced Options
 
-**Cause:** Silent Mode hides advanced options by design
+**Cause:** Simple Mode hides advanced options by design
 
 **Solution:**
-- Create two versions: one with Silent Mode, one without
-- Distribute Silent Mode version to regular users
+- Create two versions: one with Simple Mode, one without
+- Distribute Simple Mode version to regular users
 - Provide standard version on request for power users
 
 ### Issue: Users Can't Find Custom Key File Option
 
-**Cause:** Custom key file is disabled in Silent Mode
+**Cause:** Custom key file is disabled in Simple Mode
 
 **Solution:**
 - For standard deployments, key file should be in standard location
@@ -315,11 +300,11 @@ Note: A backup will be created automatically for safety.
 
 ### Issue: Users Want to See Technical Details
 
-**Cause:** Silent Mode simplifies output for clarity
+**Cause:** Simple Mode simplifies output for clarity
 
 **Solution:**
 - Provide standard mode patch for technical users
-- Silent Mode targets non-technical users specifically
+- Simple Mode targets non-technical users specifically
 - Include version/build info in separate documentation
 
 ## Advanced Configuration
@@ -347,10 +332,10 @@ patch-gen --from-dir ./v1 --to-dir ./v2 \
 
 ### With Reverse Patches
 
-Silent Mode works with reverse patches:
+Simple Mode works with reverse patches:
 
 ```bash
-# Note: Enable Simple Mode via GUI checkbox
+# Note: Simple Mode is set automatically for self-contained executables
 patch-gen --from-dir ./v2.0 --to-dir ./v2.1 \
           --output ./patches \
           --create-exe \
@@ -361,24 +346,24 @@ patch-gen --from-dir ./v2.0 --to-dir ./v2.1 \
 # - 2.1-to-2.0.exe (downgrade, silent mode)
 ```
 
-Both upgrade and downgrade use Silent Mode interface.
+Both upgrade and downgrade use Simple Mode interface.
 
 ## FAQ
 
-**Q: Does Silent Mode make patches less safe?**  
+**Q: Does Simple Mode make patches less safe?**  
 A: No. All safety features (verification, backup, etc.) still operate. Only the UI is simplified.
 
 **Q: Can users still see what's changing?**  
 A: Users see high-level info (from version X to Y). Technical details are hidden for clarity.
 
 **Q: What if users need the advanced options?**  
-A: Provide standard mode patches for power users. Silent Mode targets non-technical users.
+A: Provide standard mode patches for power users. Simple Mode targets non-technical users.
 
 **Q: Can Simple Mode be disabled after patch creation?**  
 A: No, it's embedded in the patch file (SimpleMode field). Create new patch without Simple Mode enabled if needed.
 
 **Q: Does Simple Mode work with all patch types?**  
-A: Yes - works with standard patches, self-contained exes, CLI and GUI modes.
+A: Yes - works with standard patches, self-contained exes, and CLI modes.
 
 **Q: Can users still do dry runs in Simple Mode?**  
 A: Yes! Dry Run button is available and recommended before applying.
@@ -391,7 +376,7 @@ A: No performance impact. Only UI changes, internal processing identical.
 
 ## Related Documentation
 
-- [Generator Guide](generator-guide.md) - Creating patches with Silent Mode
+- [Generator Guide](generator-guide.md) - Creating patches with Simple Mode
 - [Applier Guide](applier-guide.md) - How simplified interface works
 - [Self-Contained Executables](self-contained-executables.md) - Creating standalone patches
 

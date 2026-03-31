@@ -1793,15 +1793,14 @@ Testing: 1GB bypass test
 ```
 Testing: Verify all executables use CLI applier
   Testing executable applier selection...
-  ✓ Executable uses CLI applier (not GUI)
-  ✓ No GUI dependencies in executable
+  ✓ Executable uses CLI applier
+  ✓ CLI interface available in executable
   ✓ Command-line interface available
 ✓ PASSED: Verify all executables use CLI applier
 ```
 
 **What This Tests:**
 - Executables embed CLI applier code
-- No GUI dependencies in self-contained executables
 - CLI interface is available when running executable
 - Consistent behavior across all executable patches
 
@@ -1964,41 +1963,38 @@ Testing: Simple mode - patch generation with SimpleMode flag
   Testing SimpleMode field in patch structure...
   ✓ Patch generated with SimpleMode=true
   ✓ SimpleMode field found in patch header
-  ✓ GUI generator enables SimpleMode via checkbox
-  ✓ CLI generator enables SimpleMode via --simple-mode flag
+  ✓ CLI generator enables SimpleMode when generating self-contained exe
 ✓ PASSED: Simple mode - patch generation with SimpleMode flag
 ```
 
 **What This Tests:**
 - SimpleMode boolean field in Patch struct (types.go)
-- GUI generator checkbox sets SimpleMode=true
-- CLI --simple-mode flag sets SimpleMode=true
+- CLI generator sets SimpleMode=true for self-contained executables
 - Patch header contains SimpleMode metadata
 
 **Technical Details:**
 - SimpleMode field added to Patch structure
-- GUI generator has "Enable Simple Mode for End Users" checkbox
-- CLI generator has --simple-mode flag
+- CLI generator sets SimpleMode when creating self-contained executables
 - Field is embedded in patch header for applier detection
 
 ---
 
-#### Test 52: Simple Mode - GUI Applier Simplified Interface
-**Purpose:** Verify GUI applier shows simplified interface when SimpleMode=true
+#### Test 52: Simple Mode - CLI Applier Simplified Interface
+**Purpose:** Verify CLI applier shows simplified interface when SimpleMode=true
 
 **Expected Output:**
 ```
-Testing: Simple mode - GUI applier simplified interface
-  Testing simplified GUI interface...
-  ✓ GUI detects SimpleMode field in patch
-  ✓ Simplified interface shown (3 options only)
-  ✓ Advanced options hidden (compression, verification checkboxes)
-  ✓ User sees: Simple message + basic backup option + 3-choice menu
-✓ PASSED: Simple mode - GUI applier simplified interface
+Testing: Simple mode - CLI applier simplified interface
+  Testing simplified CLI interface...
+  ✓ CLI detects SimpleMode field in patch
+  ✓ Simplified interface shown
+  ✓ Advanced options hidden
+  ✓ User sees: Simple message + basic backup option + simplified menu
+✓ PASSED: Simple mode - CLI applier simplified interface
 ```
 
 **What This Tests:**
-- GUI applier enableSimpleMode() method
+- CLI applier runSimpleMode() method
 - Patch.SimpleMode field detection
 - Interface simplification when SimpleMode=true
 - Hidden advanced options (compression, verification)
@@ -2025,7 +2021,6 @@ Testing: Simple mode - end-to-end workflow
   Testing complete Simple Mode workflow...
   ✓ Self-contained exe created with SimpleMode=true
   ✓ End user runs exe and sees simplified interface
-  ✓ GUI version: Simple message + basic options only
   ✓ CLI version: FULLY AUTOMATED - no prompts, runs dry-run then applies
   ✓ CLI: Uses current directory as target automatically
   ✓ CLI: Backup always enabled (no prompt)
@@ -2035,19 +2030,18 @@ Testing: Simple mode - end-to-end workflow
 ```
 
 **What This Tests:**
-- Complete workflow: GUI generator → self-contained exe → end user
+- Complete workflow: CLI generator → self-contained exe → end user
 - **CLI Simple Mode**: Fully automated - double-click in target folder and it patches automatically
-- **GUI Simple Mode**: Simplified interface with essential options only
-- Patch creator enables Simple Mode checkbox
+- Patch creator generates self-contained exe with SimpleMode
 - End user receives exe with embedded SimpleMode=true
-- End user sees simplified interface (GUI or CLI)
+- End user sees simplified interface
 - No advanced settings exposed to end user
 
 **Workflow Steps:**
-1. **Patch Creator:** Uses GUI generator, enables "Enable Simple Mode for End Users"
+1. **Patch Creator:** Uses CLI generator to create self-contained exe
 2. **Patch Creator:** Creates self-contained exe with SimpleMode=true
-3. **GUI End User:** Runs exe, sees simplified interface with essential options
-4. **GUI End User:** Can test with Dry Run, then Apply Patch with simple choices
+3. **End User:** Runs exe, sees simplified interface with essential options
+4. **End User:** Can test with Dry Run, then Apply Patch with simple choices
 5. **CLI End User:** Double-clicks exe in target folder, patching happens automatically
 6. **CLI:** Runs dry-run validation, then auto-applies if successful
 7. **CLI:** Creates detailed log file: `<patchname>_<utctime>_log.txt`
@@ -2064,8 +2058,6 @@ Testing: Simple mode - feature documentation validation
   Validating Simple Mode implementation...
   ✓ Documentation files exist (simple-mode-guide.md, generator-guide.md, etc.)
   ✓ SimpleMode field in types.go Patch struct
-  ✓ GUI generator simpleModeForUsers checkbox
-  ✓ GUI applier enableSimpleMode method
   ✓ CLI applier runSimpleMode function
   ✓ Feature mentioned in README.md
 ✓ PASSED: Simple mode - feature documentation validation
@@ -2078,10 +2070,8 @@ Testing: Simple mode - feature documentation validation
 - Implementation follows design specifications
 
 **Validated Components:**
-- **Documentation:** simple-mode-guide.md, generator-guide.md, applier-guide.md, gui-usage.md
+- **Documentation:** simple-mode-guide.md, generator-guide.md, applier-guide.md
 - **Types:** SimpleMode bool field in Patch struct
-- **GUI Generator:** simpleModeCheck widget.Check with "Simple Mode for End Users" text
-- **GUI Applier:** enableSimpleMode() method detects patch.SimpleMode
 - **CLI Applier:** runSimpleMode() function for simplified CLI interface
 - **README:** Feature prominently mentioned
 

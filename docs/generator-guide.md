@@ -62,7 +62,7 @@ Successfully generated 3 patches
 To create one patch between two specific versions:
 
 ```bash
-patch-gen --from 1.0.0 --to 1.0.3 --output ./patches/custom-patch.patch
+patch-gen --versions-dir ./versions --from 1.0.0 --to 1.0.3 --output ./patches/custom-patch.patch
 ```
 
 This requires both versions to already be registered in the system.
@@ -91,14 +91,19 @@ This requires both versions to already be registered in the system.
 
 ### Required Options (Single Patch Mode)
 
+**`--versions-dir <path>`**
+- Directory containing version folders
+- Required to locate source and target version directories
+- Example: `./versions`
+
 **`--from <version>`**
 - Source version number
-- Must be a registered version
+- Must match a folder name in `--versions-dir`
 - Example: `1.0.0`
 
 **`--to <version>`**
 - Target version number
-- Must be a registered version
+- Must match a folder name in `--versions-dir`
 - Example: `1.0.3`
 
 **`--output <path>`**
@@ -138,7 +143,7 @@ This requires both versions to already be registered in the system.
 - Create self-contained CLI executable
 - Embeds patch data into a standalone `.exe` file
 - Creates both `.patch` file and `.exe` file
-- Uses CLI applier (console interface) instead of GUI
+- Uses CLI applier (console interface)
 - See [Self-Contained Executables Guide](self-contained-executables.md) for details
 - Works with all generation modes (single, batch, custom paths)
 
@@ -232,14 +237,14 @@ This requires both versions to already be registered in the system.
 - Overrides `--versions-dir` and `--from`
 - Use when source version is not in versions directory
 - Example: `D:\builds\old-version`
-- Cannot be used with `--versions-dir`
+- Takes priority over `--versions-dir`/`--from`/`--to` (provides custom source path directly)
 
 **`--to-dir <path>`**
 - Full path to target version directory
 - Overrides `--versions-dir` and `--to`
 - Use when target version is not in versions directory
 - Example: `C:\projects\new-release`
-- Cannot be used with `--versions-dir`
+- Takes priority over `--versions-dir`/`--from`/`--to` (provides custom target path directly)
 
 **Custom Path Example:**
 ```bash
@@ -534,25 +539,11 @@ See [Downgrade Guide](downgrade-guide.md) for complete documentation.
 
 When you distribute patches to clients who will give the executables to their users, you can enable **Simple Mode** to provide a streamlined, user-friendly experience. This hides advanced options and shows only what end users need.
 
-**Using GUI Generator:**
-
-1. Open the Patch Generator GUI
-2. Configure your patch settings (from/to versions, compression, etc.)
-3. Check **"Enable Simple Mode for End Users"** checkbox
-4. Click "Generate Patch" or "Generate + Create EXE"
-
 **Using CLI Generator:**
 
-Currently, Simple Mode can only be enabled via the GUI. The CLI generator does not have a `--simple-mode` flag. The `SimpleMode` field in the patch structure is set by the GUI when the checkbox is checked.
+Simple Mode is set automatically when generating self-contained executables. The `SimpleMode` field in the patch structure is enabled to provide a streamlined experience for end users.
 
 **Note:** Simple Mode is different from the `--silent` flag (which is for fully automatic patching with no user interaction).
-
-**What Users See (GUI exe):**
-- Simple message: "You are about to patch from [version] to [version]"
-- Create backup checkbox (checked by default)
-- Dry Run button (to test without changes)
-- Apply Patch button
-- Advanced options are hidden/disabled
 
 **What Users See (CLI exe):**
 - Clean console interface showing patch info
@@ -573,7 +564,7 @@ Currently, Simple Mode can only be enabled via the GUI. The CLI generator does n
 **Example Workflow:**
 
 ```bash
-# Software vendor creates patches (enable Simple Mode via GUI checkbox)
+# Software vendor creates patches with Simple Mode
 patch-gen --versions-dir ./releases \
           --new-version 2.0.0 \
           --output ./dist \

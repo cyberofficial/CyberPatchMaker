@@ -183,13 +183,14 @@ CyberPatchMaker performs verification at three critical stages:
 1. Read operation metadata:
    - File: "libs/oldfile.dll"
    - Expected hash: "ghi789..."
-   
+
 2. Verify file before deletion:
    currentHash = SHA256(file)
    if currentHash != expectedHash {
-       WARNING: "File modified - deleting anyway"
+       ERROR: "file checksum mismatch before delete"
+       STOP: Operation fails, no further operations applied
    }
-   
+
 3. Delete file:
    deleteFile(file)
 ```
@@ -234,17 +235,10 @@ CyberPatchMaker performs verification at three critical stages:
            ABORT + ROLLBACK: "Added file incorrect"
        }
    }
-   
-5. Verify ALL deleted files:
-   for each deletedFile {
-       if fileExists(deletedFile) {
-           ABORT + ROLLBACK: "File should be deleted but still exists"
-       }
-   }
-   
-6. If ALL verifications pass:
+
+5. If ALL verifications pass:
    → Patch application SUCCESSFUL
-   → Delete backup
+   → Backup preserved for manual rollback
    → Report success to user
 ```
 
@@ -252,8 +246,9 @@ CyberPatchMaker performs verification at three critical stages:
 - Key file matches target version exactly
 - ALL modified files have correct target hashes
 - ALL added files exist and have correct hashes
-- ALL deleted files are gone
 - Complete version integrity
+
+**Note**: Delete and delete-directory operations are not explicitly re-verified during post-patch verification. Only files that should exist (modified and added files) are checked.
 
 **Failure Scenarios Detected**:
 - Incomplete patch application (some operations failed silently)
@@ -351,7 +346,7 @@ CyberPatchMaker performs verification at three critical stages:
 #### During-Patch Verification
 
 ```
-[System] Create backup: C:\MyApp\.backup\
+[System] Create backup: C:\MyApp\backup.cyberpatcher\
 
 [Operation 1] MODIFY program.exe
 → Old hash expected: abc123...
@@ -398,11 +393,8 @@ CyberPatchMaker performs verification at three critical stages:
 → data/newasset.png exists: ✓
 → data/newasset.png hash: new111... ✓ MATCH
 
-[Deleted Files Verification]
-→ libs/oldfile.dll deleted: ✓
-
 [System] Post-patch verification PASSED ✓
-→ Delete backup: C:\MyApp\.backup\
+→ Backup preserved at: C:\MyApp\backup.cyberpatcher\
 → PATCH APPLICATION SUCCESSFUL
 → C:\MyApp\ is now version 1.0.3
 ```

@@ -4,11 +4,11 @@ This document provides an overview of the comprehensive test suite for CyberPatc
 
 ## Overview
 
-CyberPatchMaker includes a comprehensive test suite with 20 tests to ensure reliability and correctness:
+CyberPatchMaker includes a comprehensive test suite with 61 tests (58 standard + 3 optional) to ensure reliability and correctness:
 
 | Tests | Coverage | Complexity | Purpose |
 |-------|----------|------------|---------|
-| **20** | All aspects + edge cases | Complex (17 items, 3 levels deep) | Comprehensive verification |
+| **61** | All aspects + edge cases | Complex (17 items, 3 levels deep) | Comprehensive verification |
 
 **Key Feature**: Test data is auto-generated on first run - no bloat files committed to repository!
 
@@ -16,7 +16,7 @@ CyberPatchMaker includes a comprehensive test suite with 20 tests to ensure reli
 
 **File**: `advanced-test.ps1` (Windows only, ~500 lines)
 
-### Test Coverage (20 tests)
+### Test Coverage (61 tests: 58 standard + 3 optional)
 
 #### Basic Verification (3 tests)
 1. Verify executables exist
@@ -47,6 +47,15 @@ CyberPatchMaker includes a comprehensive test suite with 20 tests to ensure reli
 18. Verify detection of corrupted files
 19. Verify backup system works correctly
 20. Verify patch generation performance (0.03s)
+21. Test bidirectional patching (upgrade then downgrade)
+22-27. Backup system tests (creation, selective backup, preservation, rollback, complex paths)
+28. Custom paths mode
+29-35. Custom paths, self-contained executables, CLI applier verification
+36-40. Backup exclusion, .cyberignore, silent mode, reverse patches
+41-46. Scan cache tests, silent mode log files, embedded silent flag
+47-53. Scan cache testing (caching, custom dir, force rescan, performance, validation, invalidation)
+54-58. Simple Mode feature validation
+59-61. .cyberignore advanced patterns, streaming, large file handling (3 optional)
 
 ### Test Data
 
@@ -87,7 +96,7 @@ testdata/versions/1.0.2/
 
 **Expected Output**: 
 ```
-Passed: 20
+Passed: 61
 Failed: 0
 
 ✓ All advanced tests passed!
@@ -96,9 +105,18 @@ Advanced Features Verified:
   • Complex nested directory structures
   • Multiple compression formats (zstd, gzip, none)
   • Multi-hop patching (1.0.0 → 1.0.1 → 1.0.2)
+  • Bidirectional patching (upgrade and downgrade)
   • Wrong version detection
   • File corruption detection
   • Backup system functionality
+  • Backup exclusion (backup.cyberpatcher ignored)
+  • .cyberignore file support (wildcard, directory, exact path, absolute path patterns)
+  • Silent mode (--silent flag for automation)
+  • Reverse patches (--crp flag for downgrades)
+  • Scan cache testing (--savescans, --scandata, --rescan)
+  • Simple Mode for end users
+  • Custom paths mode (--from-dir, --to-dir)
+  • Self-contained executables (--create-exe)
   • Performance benchmarks
   • Deep file path operations
 ```
@@ -120,7 +138,7 @@ Advanced Features Verified:
 ### Core Functionality
 - [x] Patch generation from any version to any version
 - [x] Patch application with complete verification
-- [x] Binary diffing using bsdiff algorithm
+- [x] Full file replacement for all modifications
 - [x] SHA-256 hash verification of all files
 - [x] Key file verification system
 - [x] Required files verification
@@ -129,9 +147,18 @@ Advanced Features Verified:
 - [x] Complex nested directory structures (3+ levels)
 - [x] Multiple compression formats (zstd, gzip, none)
 - [x] Multi-hop patching (1.0.0 → 1.0.1 → 1.0.2)
+- [x] Bidirectional patching (upgrade and downgrade)
 - [x] Compression efficiency comparison
 - [x] Deep file path operations
 - [x] All compression formats produce identical results
+- [x] Backup exclusion (backup.cyberpatcher directories ignored)
+- [x] .cyberignore file support (wildcard, directory, and absolute path patterns)
+- [x] Silent mode (--silent flag for non-interactive automation)
+- [x] Reverse patches (--crp flag for downgrade support)
+- [x] Scan cache testing (caching, custom directory, force rescan, performance, validation, invalidation)
+- [x] Simple Mode (simplified interface for end users)
+- [x] Custom paths mode (--from-dir, --to-dir)
+- [x] Self-contained executables (--create-exe)
 
 ### Error Handling & Safety
 - [x] Wrong version detection and rejection
@@ -151,7 +178,7 @@ Advanced Features Verified:
 
 ### Test Suite
 - **Status**: ALL TESTS PASSED
-- **Tests**: 20/20 passed (100%)
+- **Tests**: 61/61 passed (100%)
 - **Coverage**: All aspects + edge cases
 - **Complexity**: Complex (17 items, 3 levels deep)
 - **Purpose**: Comprehensive verification of production readiness
@@ -161,7 +188,7 @@ Advanced Features Verified:
 
 | Capability | Description |
 |-----------|-------------|
-| **Test Count** | 20 comprehensive tests |
+| **Test Count** | 61 comprehensive tests (58 standard + 3 optional) |
 | **Test Data Items** | 17 items across 3 versions |
 | **Nesting Depth** | 3 levels deep with complex structures |
 | **Compression Formats** | 3 formats tested (zstd, gzip, none) |
@@ -185,7 +212,7 @@ Based on comprehensive testing, CyberPatchMaker is **production ready**:
 
 - **Test Suite**: See `advanced-test.ps1`
 - **Test Results**: See `ADVANCED-TEST-SUMMARY.md`
-- **Project Plan**: See `PLAN.MD`
+- **Test Results**: See `ADVANCED-TEST-SUMMARY.md`
 - **Main README**: See `README.md`
 
 ## Future Test Enhancements
@@ -215,13 +242,13 @@ Potential additions for even more comprehensive testing:
 ## Conclusion
 
 CyberPatchMaker has been thoroughly tested with:
-- **20 comprehensive tests** with 100% pass rate
+- **61 comprehensive tests** with 100% pass rate
 - **Complex scenarios** verified (3 levels deep, 17 items)
 - **All compression formats** tested and working (zstd, gzip, none)
 - **Auto-generated test data** (no bloat files in repository)
 - **Production readiness** confirmed
 
-Both CLI tools (generator.exe and applier.exe) work correctly with:
+Both CLI tools (patch-gen.exe and patch-apply.exe) work correctly with:
 - Complex nested directory structures (3 levels deep)
 - All compression formats (zstd, gzip, none)
 - Edge cases (wrong versions, corruption, multi-hop patching)

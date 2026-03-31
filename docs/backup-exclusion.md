@@ -114,15 +114,16 @@ If backup exclusion is working, the patch size will only reflect actual changes 
 
 ### Nested Backup Directories
 
-If you manually create nested backup directories:
+The exclusion only matches `backup.cyberpatcher` at the **root level** of the scanned directory. Nested directories with the same name are **not** automatically excluded:
 
 ```
 app/
-├── backup.cyberpatcher/
-│   └── backup.cyberpatcher/  ← Still excluded
+├── backup.cyberpatcher/         ← Excluded (root-level)
+├── subfolder/
+│   └── backup.cyberpatcher/     ← NOT excluded (nested)
 ```
 
-The exclusion pattern matches at any level, so all `backup.cyberpatcher` directories are excluded.
+This is because the scanner checks `relPath == "backup.cyberpatcher" || strings.HasPrefix(relPath, "backup.cyberpatcher/")`, which only matches paths at the root of the scan. If you need to exclude nested directories with this name, add them to a `.cyberignore` file.
 
 ### Case Sensitivity
 

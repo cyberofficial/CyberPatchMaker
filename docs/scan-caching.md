@@ -187,6 +187,7 @@ type ScanCache struct {
 | `DeleteScan(versionNumber, location string)` | Remove cached scan |
 | `ClearCache()` | Remove all cached scans |
 | `ListCachedScans()` | Get info about all cached scans |
+| `GetCacheDir()` | Returns the cache directory path as a string |
 
 ## Best Practices
 

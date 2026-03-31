@@ -275,10 +275,10 @@ The `version.Manager` (in `internal/core/version/manager.go`) provides the follo
 | `EnableScanCache(cacheDir string, forceRescan bool)` | Enable scan caching with specified cache directory |
 | `RegisterVersion(versionNumber, location, keyFilePath string)` | Register and scan a new version |
 | `UnregisterVersion(versionNumber string)` | Remove a version from the registry |
-| `GetVersion(versionNumber string)` | Retrieve a registered version |
+| `GetVersion(versionNumber string)` | Retrieve a registered version (returns `*utils.Version, error`) |
 | `ListVersions()` | Return all registered versions |
 | `RescanVersion(versionNumber string)` | Rescan a version's directory and update its manifest |
-| `VerifyVersion(versionNumber string)` | Verify all files in a version match their checksums |
+| `VerifyVersion(versionNumber string)` | Verify all files in a version match their checksums (returns `[]string, error`) |
 
 ### Automatic Registration
 

@@ -468,15 +468,6 @@ This is distinct from the `--silent` automation flag - instead, this feature is 
 
 When a patch is created with Simple Mode enabled:
 
-**For GUI Executables:**
-- Shows simplified message: "You are about to patch from [version] to [version]"
-- Only displays essential options:
-  - **Create backup** checkbox (checked by default)
-  - **Dry Run** button (to test without changes)
-  - **Apply Patch** button
-- Advanced options are hidden/disabled automatically
-- Provides clear, simple instructions
-
 **For CLI Executables (Fully Automated):**
 - **No user prompts** - completely automated patching
 - Automatically uses **current directory** as target
@@ -488,17 +479,6 @@ When a patch is created with Simple Mode enabled:
 - Exit code 0 on success, 1 on failure
 
 ### User Experience Example
-
-**GUI Mode:**
-```
-=== Simple Mode Enabled ===
-You are about to patch from 1.0.0 to 1.0.3
-
-Please review the options below:
-• Create backup is enabled by default (recommended)
-• Use Dry Run to simulate the patch without making changes
-• Click Apply Patch when ready
-```
 
 **CLI Mode (Fully Automated):**
 ```
@@ -568,7 +548,6 @@ Log saved to: 1.0.0-to-1.0.3_1728756645_log.txt
 
 **For End Users:**
 - **CLI: Zero interaction** - just double-click and it patches
-- **GUI: Simple, clear interface** with only essential options
 - No confusing technical jargon
 - Essential safety features always enabled
 - Automatic dry-run validation before applying
@@ -590,14 +569,6 @@ See [Generator Guide - Simple Mode](generator-guide.md#example-8-simple-mode-for
 ### Technical Details
 
 When Simple Mode is enabled:
-
-**GUI Mode:**
-- **Verification**: Always enabled (before and after)
-- **Auto-detect version**: Always enabled
-- **Backup**: User can choose, default is YES
-- **Dry Run**: Available to users
-- **Custom key file**: Disabled in GUI
-- **1GB bypass**: Hidden in simplified interface
 
 **CLI Mode (Fully Automated):**
 - **Target Directory**: Automatically uses current directory
@@ -873,16 +844,6 @@ patch-apply --patch ./patches/1.0.0-to-1.0.1.patch \
             --key-file MyApp.exe \
             --dry-run
 ```
-
-### GUI Support
-
-The GUI applier also supports custom key files:
-
-1. Select your patch file
-2. Select current directory
-3. Enter custom key file path in the "Custom Key:" field (optional)
-4. Browse or type the path manually
-5. Apply patch as normal
 
 ### Self-Contained Executable Support
 

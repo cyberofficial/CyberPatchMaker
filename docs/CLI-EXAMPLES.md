@@ -392,7 +392,7 @@ none: 7.8 MB (no compression overhead)
 
 **Valid Ranges:**
 - **zstd:** 1-4 (1=fastest, 4=smallest)
-- **gzip:** 1-9 (1=fastest, 9=smallest)
+- **gzip:** 1-3 (1=fastest, 3=smallest)
 - **none:** Ignored
 
 #### Example 1: Default Level
@@ -560,7 +560,7 @@ All patches verified successfully
 - Creates both `.patch` file and `.exe` file
 - Embeds patch data into CLI applier executable
 - Results in standalone executable that users can run directly
-- Uses console interface (not GUI)
+- Uses console interface
 - See [Self-Contained Executables Guide](self-contained-executables.md) for details
 
 #### Example 1: Single Patch with Executable

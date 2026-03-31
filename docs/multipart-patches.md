@@ -194,12 +194,12 @@ Multi-part patches solve the memory exhaustion problem:
 
 ## Chunk Sidecar System (Very Large Patches)
 
-For patches where individual parts exceed 3.75GB (after compression overhead), CyberPatchMaker uses a **chunk sidecar system** to further break down parts into smaller chunk files.
+For patches where individual parts exceed the configured split size, CyberPatchMaker uses a **chunk sidecar system** to further break down parts into smaller chunk files.
 
 ### When Chunking Occurs
 
-- Default part size limit: 4GB
-- When a compressed part approaches this limit (~3.75GB), the system:
+- Default part size limit: 4GB (configurable via `--splitsize`)
+- When a saved part file exceeds the split size (`chunkSize`, which equals the `--splitsize` value), the system:
   1. Chunks the part data into smaller files (~500MB-1GB each)
   2. Creates a `.chunks.json` sidecar file with chunk metadata
   3. Reconstructs the part on-the-fly when loading
@@ -327,8 +327,7 @@ At runtime, the applier reads the 128-byte header from the end of the executable
 ### Forward Compatibility
 
 - **MaxPartSize is configurable** in metadata (adjustable via `--splitsize` flag)
-- **Version field** allows format evolution
-- **Reserved fields** for future enhancements
+- **PartHashes array** allows adding new part entries without format changes
 
 ## Best Practices
 

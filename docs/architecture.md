@@ -104,7 +104,7 @@ CyberPatchMaker is designed as a modular, maintainable system with clear separat
 - Build complete file manifests
 - Handle symbolic links and special files
 
-**Lines of Code**: 728 lines (scanner.go: 267, ignore.go: 208, parallel.go: 253)
+**Lines of Code**: 725 lines (scanner.go: 266, ignore.go: 207, parallel.go: 252)
 
 ---
 
@@ -172,7 +172,7 @@ type Version struct {  // From pkg/utils/types.go
 - Validate version directories
 - Manage version registry
 
-**Lines of Code**: 569 lines (manager.go: 481, version.go: 88)
+**Lines of Code**: 567 lines (manager.go: 480, version.go: 87)
 
 ---
 
@@ -188,15 +188,19 @@ type Version struct {  // From pkg/utils/types.go
 **Data Structure:**
 ```go
 type Config struct {
+    VersionRegistry    map[string]*Version
     DefaultPatchOutput string
     TempDirectory      string
     WorkerThreads      int
     EnableParallel     bool
-    // ... compression settings, etc.
+    SkipIdentical      bool
+    PreservePerms      bool
+    VerifySignatures   bool
+    SigningKeyPath     string
 }
 ```
 
-**Lines of Code**: 204 lines (config.go: 204)
+**Lines of Code**: 203 lines (config.go: 203)
 
 ---
 
@@ -214,7 +218,7 @@ type Config struct {
 - Generate unique cache filenames
 - Hash location paths for validation
 
-**Lines of Code**: 259 lines (scan_cache.go: 259)
+**Lines of Code**: 258 lines (scan_cache.go: 258)
 
 ---
 
@@ -235,7 +239,7 @@ type Config struct {
 
 **External Dependency**: `github.com/gabstv/go-bsdiff`
 
-**Lines of Code**: 266 lines (differ.go: 266)
+**Lines of Code**: 265 lines (differ.go: 265)
 
 ---
 
@@ -255,9 +259,9 @@ type Config struct {
 - `Generator.GeneratePatch(fromVersion, toVersion *Version, options *PatchOptions) (*Patch, error)` (generator.go)
 - `Applier.ApplyPatch(patch *Patch, targetDir string, verifyBefore, verifyAfter, createBackup bool) error` (applier.go)
 - `Applier.ApplyPatchWithPath(patch *Patch, targetDir, patchFilePath string, verifyBefore, verifyAfter, createBackup bool) error` (applier.go)
-- `verifyKeyFile(dir string, keyFile KeyFileInfo) error`
-- `verifyRequiredFiles(dir string, files []FileRequirement) error`
-- `verifyPatchedFiles(dir string, ops []PatchOperation) error`
+- `verifyKeyFile(targetDir string, keyFile KeyFileInfo) error`
+- `verifyRequiredFiles(targetDir string, required []FileRequirement) error`
+- `verifyPatchedFiles(targetDir string, operations []PatchOperation) error`
 - `createMirrorBackup(targetDir, backupDir string, ops []PatchOperation) error`
 - `restoreMirrorBackup(backupDir, targetDir string, ops []PatchOperation) error`
 
@@ -421,7 +425,7 @@ Patcher.ApplyPatch (internal/core/patcher/applier.go)
     ↓
 2. BACKUP CREATION (if enabled)
     ├─ Create Backup Directory
-    └─ Recursively Copy All Files
+    └─ Selectively Copy Files Being Modified or Deleted
     ↓
 3. APPLY OPERATIONS
     ├─ For Each Operation:
@@ -594,7 +598,7 @@ The header is always located at the **last 128 bytes** of the file:
 
 **Binary Layout:**
 ```go
-type Header struct {
+type EmbeddedPatchHeader struct {
     Magic       [8]byte   // "CPMPATCH"
     Version     uint32    // Format version = 1
     StubSize    uint64    // Size of applier.exe
@@ -621,7 +625,7 @@ When the generator creates a self-contained executable:
    ```
    The sidecar blob is optional and only present for multi-part patches that were chunked. It contains chunk JSON files that the applier extracts to disk at runtime.
 
-**Generator Code Location:** `cmd/generator/main.go` (createStandaloneExe function)
+**Generator Code Location:** `cmd/generator/main.go` (createStandaloneCLIExe function)
 
 ### Detection Process
 
@@ -646,6 +650,7 @@ When a self-contained executable runs:
 13. **Parse JSON**: Decodes patch manifest
 14. **Load console**: Populates console interface with patch information automatically
     - If `SimpleMode` field is true: runs `runSimpleMode()` (automated two-step flow: dry-run then apply)
+      - Note: SimpleMode is currently reserved for future use. The field exists in the Patch struct and the applier respects it, but no generator code path currently sets it to true.
     - If embedded silent flag is set or `--silent` CLI flag: runs `runSilentMode()` (fully automated, no prompts)
     - Otherwise: runs interactive console with menu options
 
@@ -686,7 +691,7 @@ When a self-contained executable runs:
 ### Related Code
 
 **Generator:**
-- `cmd/generator/main.go` - `createStandaloneExe()` function
+- `cmd/generator/main.go` - `createStandaloneCLIExe()` function
 - Flag: `--create-exe` (create self-contained executable)
 - Flag: `--silent` (embed silent mode in generated executable)
 - Flag: `--crp` (create reverse patch for downgrades)

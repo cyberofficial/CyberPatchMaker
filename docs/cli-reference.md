@@ -20,7 +20,7 @@ patch-gen [options]
 | `--to <version>` | Mode 2 | Target version number (with --versions-dir) |
 | `--from-dir <path>` | Mode 3 | Full path to source version directory |
 | `--to-dir <path>` | Mode 3 | Full path to target version directory |
-| `--output <path>` | Yes | Output directory for patches (default: patches) |
+| `--output <path>` | No (default: patches) | Output directory for patches (default: patches) |
 | `--key-file <name>` | No | Specific key file to use (e.g., app_name.exe) |
 | `--compression <type>` | No | Compression: `zstd` (default), `gzip`, `none` |
 | `--level <n>` | No | Compression level: zstd (1-4), gzip (1-3), default: 3 |
@@ -327,7 +327,7 @@ Currently, no environment variables are used. All configuration is via command-l
 
 ## Configuration Files
 
-Currently, no configuration files are used. All configuration is via command-line flags.
+Configuration can be set via command-line flags. A configuration file is also supported (see development-setup.md for details).
 
 ---
 
@@ -431,8 +431,8 @@ patch-apply.exe --patch .\patches\1.0.0-to-1.0.3.patch --current-dir .\myapp --v
 
 **Bash:**
 ```bash
-./generator --versions-dir ./versions --new-version 1.0.3 --output ./patches
-./applier --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --verify
+./patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches
+./patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./myapp --verify
 ```
 
 **Paths:** Use forward slashes `/`

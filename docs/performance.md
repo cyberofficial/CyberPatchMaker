@@ -168,26 +168,21 @@ DecompressDataStreaming(src, dst, "zstd")
 - CPU time for compression/decompression
 - Higher levels have diminishing returns
 
-### 6. Full File Replacement for Large Files
+### 6. Full File Replacement
 
-**Problem**: Binary diff generation on large files is slow and memory-intensive
+**Problem**: Binary diff generation is slow and memory-intensive for any file size
 
-**Solution**: Use full file replacement for files >1GB
+**Solution**: Use full file replacement for all modified files regardless of size
 
 ```go
-if fileSize > LargeFileThreshold {
-    // Use full file instead of binary diff
-    operation.NewFile = readFile(newFilePath)
-} else {
-    // Use binary diff
-    operation.BinaryDiff = generateDiff(old, new)
-}
+// All modified files: store entire new file content
+operation.NewFile = readFile(newFilePath)
 ```
 
 **Benefits:**
-- Avoids bsdiff memory requirements
-- Often similar or better than diff for large files
-- Simpler code path
+- Avoids bsdiff memory requirements entirely
+- Simpler code path, faster generation
+- Predictable memory usage proportional to changed file sizes
 
 **Trade-offs:**
 - Larger patch size for small changes in large files
@@ -200,7 +195,6 @@ if fileSize > LargeFileThreshold {
 | Directory Scan | O(n) | n = number of files |
 | File Hashing | O(m) | m = total file size |
 | Manifest Comparison | O(n) | n = number of files |
-| Binary Diff Generation | O(m) | m = file size (bsdiff) |
 | Patch Generation | O(k) | k = size of changed files |
 | Patch Application | O(k) | k = number of operations |
 
