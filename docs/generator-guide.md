@@ -114,11 +114,18 @@ This requires both versions to already be registered in the system.
 - gzip is more universally compatible
 - none is fastest but largest patches
 
+**`--key-file <filename>`**
+- Specify a custom key file to use for version identification
+- Overrides auto-detection of key file (program.exe, game.exe, app.exe, main.exe)
+- Example: `--key-file my_app.exe` or `--key-file custom_executable.exe`
+- Useful when the main executable has a non-standard name
+- Default: Auto-detects from standard key file names
+
 **`--level <1-4>`**
-- Compression level (zstd only)
-- 1 = Fastest, largest files
-- 3 = Default, balanced (recommended)
-- 4 = Slowest, smallest files
+- Compression level (applies to zstd and gzip)
+- **zstd**: Levels 1-4 (1 = fastest/largest, 4 = slowest/smallest)
+- **gzip**: Levels 1-3 (1 = fastest/largest, 3 = slowest/smallest)
+- Default: 3 (balanced, recommended)
 - Higher levels take longer but save bandwidth
 
 **`--verify`**
@@ -208,6 +215,11 @@ This requires both versions to already be registered in the system.
 - With this flag: Generator proceeds without asking
 - Warning: Very small split sizes create many parts (not recommended)
 - Use case: Automated scripts where confirmation prompts would block execution
+
+**`--version`**
+- Display version information for the generator tool
+- Prints version string and exits
+- Example: `patch-gen --version`
 
 **`--help`**
 - Display usage information

@@ -272,12 +272,20 @@ go build -gcflags="all=-N -l" ./cmd/generator
 
 ### Full Test Suite
 
+The test suite is implemented as a PowerShell script (`advanced-test.ps1`) that performs comprehensive integration testing by building the tools and running end-to-end scenarios.
+
 **Windows (PowerShell):**
 ```powershell
+# Run the standard test suite (58 tests)
 .\advanced-test.ps1
+
+# Optional: Run with large file tests
+.\advanced-test.ps1 -run1gbtest       # Test large patches >1GB
+.\advanced-test.ps1 -runlargefile     # Test chunked processing for 1.5GB file
+.\advanced-test.ps1 -runstreamtest    # Test .data directory streaming
 ```
 
-Test data is automatically generated on first run.
+Test data is automatically generated on first run. See [Testing Guide](testing-guide.md) for details.
 
 **Expected output (first run):**
 ```
@@ -291,74 +299,32 @@ Version 1.0.2 created (11 files, 6 directories, 3 levels deep)
 Created 3 test version(s)
 
 === Test Results ===
-All 59 tests passed!
+All 61 tests passed!
 ```
 
 ---
 
-### Unit Tests
+### Building with build.ps1
 
-**Run all tests:**
-```bash
-go test ./...
+The project includes a build script that outputs versioned builds to `dist/<version>/`.
+
+**Basic build:**
+```powershell
+.\build.ps1
+# Outputs to dist/<version>/patch-gen.exe and dist/<version>/patch-apply.exe
 ```
 
-**Run specific package:**
-```bash
-go test ./internal/core/patcher
-go test ./internal/core/manifest
-go test ./internal/core/scanner
+**Version auto-increment flags:**
+```powershell
+.\build.ps1 -i      # Increment patch version (e.g., 1.0.15 -> 1.0.16)
+.\build.ps1 -ii     # Increment minor version (e.g., 1.0.16 -> 1.1.0)
+.\build.ps1 -iii    # Increment major version (e.g., 1.0.16 -> 2.0.0)
 ```
 
-**Verbose output:**
-```bash
-go test -v ./...
-```
-
-**Run specific test:**
-```bash
-go test -run TestApplyPatch ./internal/core/patcher
-go test -run TestGenerateManifest ./internal/core/manifest
-```
-
----
-
-### Coverage
-
-**Generate coverage:**
-```bash
-go test -cover ./...
-```
-
-**Coverage report:**
-```bash
-go test -coverprofile=coverage.out ./...
-go tool cover -html=coverage.out
-```
-
-**Coverage by package:**
-```bash
-go test -coverprofile=coverage.out ./...
-go tool cover -func=coverage.out
-```
-
----
-
-### Benchmarks
-
-**Run benchmarks:**
-```bash
-go test -bench=. ./...
-```
-
-**Benchmark specific function:**
-```bash
-go test -bench=BenchmarkDiff ./internal/core/differ
-```
-
-**Benchmark with memory stats:**
-```bash
-go test -bench=. -benchmem ./...
+**Other options:**
+```powershell
+.\build.ps1 -Clean    # Clean dist directory before building
+.\build.ps1 -Verbose  # Verbose build output
 ```
 
 ---
@@ -372,18 +338,15 @@ CyberPatchMaker/
 ├── cmd/
 │   ├── generator/        # Generator CLI tool
 │   │   └── main.go       # Entry point
-│   ├── applier/          # Applier CLI tool
-│   │   └── main.go       # Entry point
-│   ├── patch-bundler/    # Patch bundling tool
-│   │   └── main.go       # Entry point
-│   └── patch-gui/        # GUI patch tool
+│   └── applier/          # Applier CLI tool
 │       └── main.go       # Entry point
 │
 ├── internal/
 │   └── core/             # Core business logic
 │       ├── patcher/      # Core patching logic
 │       │   ├── applier.go    # Apply patches
-│       │   └── generator.go  # Generate patches
+│       │   ├── generator.go  # Generate patches
+│       │   └── multipart.go  # Multi-part patch chunking
 │       │
 │       ├── manifest/     # Manifest handling
 │       │   └── manager.go    # Manifest operations
@@ -396,6 +359,9 @@ CyberPatchMaker/
 │       │   ├── parallel.go   # Parallel scanning
 │       │   └── scanner.go    # Recursive scanning & hashing
 │       │
+│       ├── cache/        # Scan cache management
+│       │   └── scan_cache.go # Scan caching for performance
+│       │
 │       ├── version/      # Version management
 │       │   ├── manager.go    # Version operations
 │       │   └── version.go    # Version utilities
@@ -403,19 +369,13 @@ CyberPatchMaker/
 │       └── config/       # Configuration management
 │           └── config.go     # App configuration
 │
-├── internal/gui/         # GUI components
-│   ├── applier_window.go # GUI applier interface
-│   ├── generator_window.go # GUI generator interface
-│   ├── components.go     # Shared GUI components
-│   └── styles.go         # GUI styling
-│
 ├── pkg/
 │   └── utils/            # Shared utilities
 │       ├── types.go      # Core data structures
 │       ├── checksum.go   # SHA-256 calculation
 │       ├── fileops.go    # File operations
 │       ├── compress.go   # Compression utilities
-│       └── types.go      # Additional types
+│       └── patch_io.go   # Patch file I/O helpers
 │
 ├── docs/                 # Documentation
 │   ├── README.md         # Documentation hub
@@ -424,7 +384,8 @@ CyberPatchMaker/
 │
 ├── go.mod                # Go module definition
 ├── go.sum                # Dependency checksums
-├── advanced-test.ps1     # Comprehensive test suite (59 tests)
+├── build.ps1             # Build script (versioned output to dist/)
+├── advanced-test.ps1     # Comprehensive test suite (61 tests)
 ├── LICENSE               # Apache 2.0 license
 └── README.md             # Project README
 ```
@@ -507,7 +468,7 @@ CyberPatchMaker/
 - Add to `internal/core/scanner/scanner.go`
 - Implement verification logic
 - Call from `internal/core/patcher/applier.go`
-- Write tests in `internal/core/scanner/scanner_test.go`
+- Add test cases to `advanced-test.ps1`
 
 **Adding new command-line flag:**
 - Add to `cmd/generator/main.go` or `cmd/applier/main.go`
@@ -519,7 +480,7 @@ CyberPatchMaker/
 - Add to `internal/core/patcher/generator.go`
 - Implement operation logic
 - Handle in `internal/core/patcher/applier.go`
-- Write tests in `internal/core/patcher/` test files
+- Add test cases to `advanced-test.ps1`
 
 ---
 
@@ -527,28 +488,17 @@ CyberPatchMaker/
 
 **All new features must have:**
 
-1. **Unit tests** - Test individual functions
-2. **Integration tests** - Test end-to-end workflows
-3. **Edge case tests** - Test boundary conditions
-4. **Error tests** - Test error handling
+1. **Integration tests** - Test end-to-end workflows
+2. **Edge case tests** - Test boundary conditions
+3. **Error tests** - Test error handling
 
-**Example:**
-```go
-func TestNewFeature(t *testing.T) {
-    // Setup
-    input := "test input"
-    expected := "expected output"
-    
-    // Execute
-    result, err := NewFeature(input)
-    
-    // Verify
-    if err != nil {
-        t.Fatalf("unexpected error: %v", err)
-    }
-    if result != expected {
-        t.Errorf("expected %q, got %q", expected, result)
-    }
+**Tests are added to `advanced-test.ps1`** following the existing `Test-Step` pattern:
+```powershell
+Test-Step "Description of new feature test" {
+    # Setup test environment
+    # Run commands using patch-gen.exe or patch-apply.exe
+    # Verify results
+    # Throw on failure
 }
 ```
 
@@ -607,7 +557,7 @@ git checkout -b feature/add-brotli-compression
 vim pkg/compress/brotli.go
 
 # Run tests
-go test ./...
+.\advanced-test.ps1
 
 # Format code
 go fmt ./...
@@ -859,7 +809,9 @@ dlv debug ./cmd/generator -- --versions-dir ./versions --new-version 1.0.1
 
 **Debug tests:**
 ```bash
-dlv test ./internal/core/patcher
+# Debug the test suite by running advanced-test.ps1 with breakpoints
+# Or debug individual tools:
+dlv debug ./cmd/generator -- --versions-dir ./versions --new-version 1.0.1
 ```
 
 **Set breakpoints:**
@@ -905,20 +857,28 @@ dlv test ./internal/core/patcher
 
 ### Profiling
 
-**CPU profiling:**
-```bash
-go test -cpuprofile=cpu.prof ./internal/core/patcher
-go tool pprof cpu.prof
+**CPU profiling (add to cmd/generator/main.go temporarily):**
+```go
+import "runtime/pprof"
+
+f, _ := os.Create("cpu.prof")
+pprof.StartCPUProfile(f)
+defer pprof.StopCPUProfile()
 ```
 
 **Memory profiling:**
-```bash
-go test -memprofile=mem.prof ./internal/core/patcher
-go tool pprof mem.prof
+```go
+import "runtime"
+
+f, _ := os.Create("mem.prof")
+runtime.GC()
+pprof.WriteHeapProfile(f)
+f.Close()
 ```
 
 **Analyze profile:**
 ```bash
+go tool pprof cpu.prof
 (pprof) top        # Show top functions
 (pprof) list func  # Show source for function
 (pprof) web        # Open web visualization
@@ -948,9 +908,10 @@ func DecompressBrotli(data []byte) ([]byte, error) {
 ```
 
 3. **Add tests:**
-```go
-func TestBrotliCompress(t *testing.T) {
-    // Test implementation
+```powershell
+# Add test case to advanced-test.ps1
+Test-Step "Verify brotli compression" {
+    # Test implementation
 }
 ```
 
@@ -1043,12 +1004,11 @@ for i := 0; i < n; i++ {
 5. **Benchmark again:**
 ```bash
 go test -bench=. -benchmem ./internal/core/patcher > after.txt
-benchcmp before.txt after.txt
+# Compare before.txt and after.txt manually
 ```
 
 6. **Verify correctness:**
 ```powershell
-go test ./...
 .\advanced-test.ps1
 ```
 

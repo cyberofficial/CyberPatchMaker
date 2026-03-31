@@ -31,16 +31,16 @@ When generating or applying patches, CyberPatchMaker automatically detects large
 ```go
 ChunkSize = 128 * 1024 * 1024  // 128 MB per chunk
 LargeFileThreshold = 1024 * 1024 * 1024  // 1 GB threshold
+DefaultMaxPartSize = 4 * 1024 * 1024 * 1024  // 4 GB max part size (for multi-part patches)
 ```
 
 ### Processing Strategy
 
 #### For Added Files (>1GB)
 1. Detect file size exceeds threshold
-2. Copy source file in 128MB chunks to temporary location
-3. Read complete file data from temp location
-4. Include in patch operation
-5. Show progress during copy
+2. Use full file replacement strategy -- return source file path directly (no binary diff)
+3. Caller streams the file directly to the patch output
+4. Show progress during copy
 
 #### For Modified Files (>1GB)
 1. Detect either old or new file exceeds threshold

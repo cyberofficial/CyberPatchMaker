@@ -64,11 +64,13 @@ cache.LoadScan(versionNumber, location)  // Instant load
 **Solution**: Parallel checksum calculation with worker pool
 
 ```go
-// Auto-detect CPU cores
-scanner.ScanDirectoryParallel(0)  // 0 = auto-detect
+// The CLI layer handles auto-detection:
+// --jobs 0  →  runtime.NumCPU() cores (set in cmd/generator/main.go)
+// The version manager then calls:
+scan.ScanDirectoryParallelWithProgress(workerCount, progressCallback)
 
-// Or specify workers
-scanner.ScanDirectoryParallel(8)  // Use 8 workers
+// Or specify workers explicitly
+scan.ScanDirectoryParallelWithProgress(8, progressCallback)  // Use 8 workers
 ```
 
 **Benefits:**
@@ -144,6 +146,23 @@ CompressData(data, "zstd", 3)  // Balanced
 - ~60% size reduction on average
 - Faster transfer outweighs compression time
 - Multiple algorithm options (zstd, gzip, none)
+
+### Streaming Compression
+
+For large data that should not be buffered entirely in memory, `CompressDataStreaming` and `DecompressDataStreaming` operate on `io.Reader`/`io.Writer` interfaces:
+
+```go
+// Streaming compression - constant memory regardless of input size
+CompressDataStreaming(src, dst, "zstd", 3)
+
+// Streaming decompression
+DecompressDataStreaming(src, dst, "zstd")
+```
+
+**Performance characteristics:**
+- Memory usage is constant (bounded by internal encoder buffers), not proportional to data size
+- Used internally by `SavePatch` for patch file output with optional compression
+- Algorithm and level options are identical to the in-memory `CompressData`/`DecompressData` functions
 
 **Trade-offs:**
 - CPU time for compression/decompression
@@ -261,7 +280,7 @@ if fileSize > LargeFileThreshold {
 ### For Patch Creators
 
 1. **Enable scan caching**: Use `--savescans` for repeated builds
-2. **Use parallel workers**: `--jobs 0` for auto-detect
+2. **Use parallel workers**: `--jobs 0` for auto-detect (uses `runtime.NumCPU()`)
 3. **Choose compression level**: `--level 3` for balance
 4. **SSD for versions**: Store versions on fast storage
 5. **Exclude unnecessary files**: Use `.cyberignore`

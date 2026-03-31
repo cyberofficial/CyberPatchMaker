@@ -387,6 +387,20 @@ If directory has 10 files but only 4 are registered, 6 files were ignored (inclu
 5. **Absolute path match**: Full absolute paths are compared case-insensitively on Windows
 6. **Absolute wildcard match**: Absolute paths with wildcards use enhanced pattern matching
 
+### Dual-Path Matching: `ShouldIgnoreWithAbsPath`
+
+The scanner provides both a relative path and an absolute path for every file encountered during directory traversal. The `ShouldIgnoreWithAbsPath(relPath, absPath string)` method checks patterns against both paths:
+
+1. **Relative path check**: Each pattern is tested against the normalized relative path (same as `ShouldIgnore`)
+2. **Absolute path check**: Each pattern is also tested against the normalized absolute path, enabling patterns like `E:\projects\myapp\*.key` to match files by their full filesystem location
+
+This dual-path approach ensures that:
+- Relative patterns (e.g., `*.log`, `logs/`) match regardless of where the source directory is located
+- Absolute patterns (e.g., `C:\temp\build\*.log`) can target specific filesystem locations
+- The `.cyberignore` file itself is always excluded when detected via either path
+
+The simpler `ShouldIgnore(relPath string)` method checks only the relative path and is available for use cases where absolute path information is not needed.
+
 ### Performance Impact
 
 - `.cyberignore` is loaded once at scan start

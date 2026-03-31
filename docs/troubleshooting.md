@@ -18,7 +18,7 @@ go build ./cmd/applier
 .\advanced-test.ps1  # Windows only
 ```
 
-If all 58 tests pass, your setup is correct! Test data is auto-generated on first run.
+If all 61 tests pass, your setup is correct! Test data is auto-generated on first run.
 
 ---
 
@@ -635,6 +635,36 @@ syntax error: unexpected newline, expecting comma or }
    ```bash
    go fmt ./...
    ```
+
+---
+
+### Error: "build.ps1 failed to increment version"
+
+**Symptom:**
+```
+Failed to parse patch version from internal\core\version\version.go
+```
+
+**Cause:** Version file has unexpected format
+
+**Solutions:**
+1. Check `internal/core/version/version.go` contains lines like `Patch = 16`
+2. Ensure the version constants (Major, Minor, Patch) are integer literals
+3. Do not manually edit the version file with non-numeric values
+
+---
+
+### Error: "build.ps1 outputs to wrong directory"
+
+**Symptom:** Build output not found where expected
+
+**Cause:** Version directory mismatch or missing dist folder
+
+**Solutions:**
+1. Check `dist/<version>/` for output files (e.g., `dist/1.0.16/`)
+2. Use `-Clean` flag to reset: `.\build.ps1 -Clean`
+3. Verify `internal/core/version/version.go` has correct version numbers
+4. Built filenames are `patch-gen.exe` and `patch-apply.exe`
 
 ---
 

@@ -454,6 +454,42 @@ video.mp4: 100 MB → 98 MB (1.02x) - not worth compressing
 
 ---
 
+## Streaming Compression API
+
+For large data that should not be loaded entirely into memory, CyberPatchMaker provides streaming compression and decompression functions that operate on `io.Reader` / `io.Writer` interfaces.
+
+### CompressDataStreaming
+
+```go
+func CompressDataStreaming(src io.Reader, dst io.Writer, algorithm string, level int) error
+```
+
+Reads from `src`, compresses using the specified algorithm and level, and writes to `dst`. This avoids buffering the entire input or output in memory.
+
+- **algorithm**: `"zstd"`, `"gzip"`, or `"none"` (passes data through with `io.Copy`)
+- **level**: Same scale as `CompressData` (1-4 for zstd, 1-3 for gzip)
+
+### DecompressDataStreaming
+
+```go
+func DecompressDataStreaming(src io.Reader, dst io.Writer, algorithm string) error
+```
+
+Reads compressed data from `src`, decompresses using the specified algorithm, and writes to `dst`.
+
+- **algorithm**: `"zstd"`, `"gzip"`, or `"none"` (passes data through)
+
+### When to Use Streaming vs In-Memory
+
+| Scenario | Use | Function |
+|----------|-----|----------|
+| Small data (<100 MB) | In-memory | `CompressData` / `DecompressData` |
+| Large data (>100 MB) | Streaming | `CompressDataStreaming` / `DecompressDataStreaming` |
+| Patch file I/O | Streaming | `CompressDataStreaming` / `DecompressDataStreaming` |
+| In-memory diff | In-memory | `CompressData` / `DecompressData` |
+
+---
+
 ## Compression Internals
 
 ### How Compression Works

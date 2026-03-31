@@ -98,7 +98,7 @@ patch-gen.exe --from-dir "C:\Version1" --to-dir "C:\Version2" --output patches
 # ✓ Multi-part patch saved: 5 parts
 ```
 
-### CLI Generator
+### Custom Split Sizes
 
 The CLI automatically detects and splits large patches. Use `--splitsize` to customize the part size:
 
@@ -209,7 +209,7 @@ For patches where individual parts exceed 3.75GB (after compression overhead), C
 ```
 patch-name.01.patch                    ← Part 1 (small, contains metadata)
 patch-name.02.patch                    ← Part 2 (regular, not chunked)
-patch-name.03.patch.chunks.json        ← Sidecar for chunked Part 3
+patch-name.part3.chunks.json           ← Sidecar for chunked Part 3
 patch-name.part3.1.patch               ← Chunk 1 of Part 3
 patch-name.part3.2.patch               ← Chunk 2 of Part 3
 patch-name.part3.3.patch               ← Chunk 3 of Part 3
@@ -273,6 +273,49 @@ MyApp-Patch-1.0.3.exe.part1.1.patch    ← First chunk file
 MyApp-Patch-1.0.3.exe.part1.2.patch    ← Second chunk file
 ```
 
+### Binary Sidecar Embedding Format
+
+When creating a self-contained executable with `--create-exe`, the generator embeds chunk sidecar JSON files directly into the executable binary. The layout on disk is:
+
+```
++---------------------------+
+| Applier EXE (stub)       |  ← patch-apply.exe binary
++---------------------------+
+| Patch Data (part 01)      |  ← Compressed .patch content
++---------------------------+
+| Sidecar Blob (optional)   |  ← Embedded chunk sidecar data
++---------------------------+
+| 128-byte Header           |  ← Metadata trailer
++---------------------------+
+```
+
+**Sidecar Blob Format** (binary, little-endian):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| Count | uint32 | Number of embedded sidecar files |
+| For each sidecar: | | |
+| &nbsp;&nbsp;Name Length | uint16 | Length of sidecar filename in bytes |
+| &nbsp;&nbsp;Name | []byte | Sidecar filename (e.g., `mypass.part2.chunks.json`) |
+| &nbsp;&nbsp;Data Length | uint64 | Length of sidecar data in bytes |
+| &nbsp;&nbsp;Data | []byte | Raw sidecar JSON content |
+
+**128-byte Header Layout:**
+
+| Offset | Size | Field |
+|--------|------|-------|
+| 0 | 8 bytes | Magic: `CPMPATCH` |
+| 8 | 4 bytes | Version (uint32, currently 1) |
+| 12 | 8 bytes | Stub size (uint64, size of applier EXE) |
+| 20 | 8 bytes | Data offset (uint64, same as stub size) |
+| 28 | 8 bytes | Data size (uint64, size of patch data) |
+| 36 | 16 bytes | Compression type string (e.g., "zstd") |
+| 52 | 32 bytes | SHA-256 checksum of patch data |
+| 84 | 1 byte | Flags (bit 0: silent mode) |
+| 85 | 43 bytes | Reserved |
+
+At runtime, the applier reads the 128-byte header from the end of the executable, locates and extracts any embedded sidecar files, writes them to the same directory as the executable, and uses them to reconstruct chunked parts before applying the patch. Temporary files (extracted sidecars and part 01 data) are cleaned up after loading.
+
 ## Compatibility
 
 ### Backward Compatibility
@@ -283,7 +326,7 @@ MyApp-Patch-1.0.3.exe.part1.2.patch    ← Second chunk file
 
 ### Forward Compatibility
 
-- **MaxPartSize is configurable** in metadata (future: adjustable limit)
+- **MaxPartSize is configurable** in metadata (adjustable via `--splitsize` flag)
 - **Version field** allows format evolution
 - **Reserved fields** for future enhancements
 
@@ -351,7 +394,7 @@ MyApp-Patch-1.0.3.exe.part1.2.patch    ← Second chunk file
 
 ### Current Limitations
 
-1. **4GB fixed limit** - not user-configurable (planned for future)
+1. **Configurable part size** - default 4GB, adjustable via `--splitsize` flag
 2. **Sequential loading** - parts loaded one at a time (could be parallelized)
 3. **No compression across parts** - each part compressed independently
 4. **Metadata only in Part 1** - other parts don't have standalone info
@@ -367,18 +410,17 @@ MyApp-Patch-1.0.3.exe.part1.2.patch    ← Second chunk file
 
 ### Planned Features
 
-1. **Configurable part size** - let users choose limit
-2. **Parallel part loading** - speed up multi-part application
-3. **Delta compression** - cross-part deduplication
-4. **Smart part sizing** - better balance for many small files
-5. **Integrity validation** - verify parts before generation completes
-6. **Resume support** - restart failed multi-part downloads
-7. **Part compression** - optimize individual part sizes further
+1. **Parallel part loading** - speed up multi-part application
+2. **Delta compression** - cross-part deduplication
+3. **Smart part sizing** - better balance for many small files
+4. **Integrity validation** - verify parts before generation completes
+5. **Resume support** - restart failed multi-part downloads
+6. **Part compression** - optimize individual part sizes further
 
 ## FAQ
 
-**Q: Why 4GB limit?**
-A: Balances between manageable part sizes and avoiding too many parts. Prevents 32-bit integer overflow issues.
+**Q: Why 4GB default limit?**
+A: Balances between manageable part sizes and avoiding too many parts. Prevents 32-bit integer overflow issues. The limit is configurable via `--splitsize` (e.g., `--splitsize 2G`).
 
 **Q: Can I combine parts manually?**
 A: No - the format requires proper metadata merging. Use the applier to load all parts.
@@ -387,7 +429,7 @@ A: No - the format requires proper metadata merging. Use the applier to load all
 A: Yes - Part 1 contains metadata but operations span all parts.
 
 **Q: Can I create executables from multi-part patches?**
-A: Not currently supported - self-contained executables work with single-part only.
+A: Yes - use `--create-exe` with multi-part patches. The generator embeds part 01 data inside the executable. External parts (.02.patch, etc.) and chunk sidecar files must be distributed alongside the .exe. The embedded executable auto-detects and loads external parts at runtime.
 
 **Q: What if I lose Part 2 but have others?**
 A: Application will fail - all parts required for complete patch.

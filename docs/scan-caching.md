@@ -49,23 +49,25 @@ The location hash ensures that cached scans from one directory cannot be mistake
 
 ```json
 {
-  "Version": "1.0.0",
-  "Location": "/path/to/versions/1.0.0",
-  "LocationHash": "a1b2c3d4e5f6g7h8",
-  "KeyFile": {
-    "RelativePath": "game.exe",
-    "Checksum": "abc123..."
+  "version": "1.0.0",
+  "location": "/path/to/versions/1.0.0",
+  "location_hash": "a1b2c3d4e5f6g7h8",
+  "key_file": {
+    "Path": "game.exe",
+    "Checksum": "abc123...",
+    "Size": 15728640
   },
-  "Manifest": {
+  "manifest": {
     "Version": "1.0.0",
     "KeyFile": {...},
     "Files": [...],
     "Directories": [...],
     "Timestamp": "2024-01-15T10:30:00Z",
     "TotalSize": 56987654321,
+    "TotalFiles": 34650,
     "Checksum": "def456..."
   },
-  "CachedAt": "2024-01-15T10:30:05Z"
+  "cached_at": "2024-01-15T10:30:05Z"
 }
 ```
 

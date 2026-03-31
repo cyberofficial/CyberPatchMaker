@@ -84,6 +84,38 @@ patches/downgrade/
 
 ---
 
+### Automatic Reverse Patch Generation (--crp)
+
+Instead of manually running separate commands for forward and reverse patches, use the `--crp` flag to generate both automatically in a single invocation:
+
+```bash
+# Generate forward AND reverse patches in one command
+patch-gen --versions-dir ./versions \
+          --new-version 1.0.3 \
+          --output ./patches \
+          --crp
+```
+
+This produces both:
+- `patches/1.0.0-to-1.0.3.patch` (forward)
+- `patches/1.0.3-to-1.0.0.patch` (reverse/downgrade)
+
+The `--crp` flag works with all generation modes:
+```bash
+# With --from / --to
+patch-gen --versions-dir ./versions --from 1.0.0 --to 1.0.3 --output ./patches --crp
+
+# With --from-dir / --to-dir
+patch-gen --from-dir ./versions/1.0.0 --to-dir ./versions/1.0.3 --output ./patches --crp
+
+# Combined with --create-exe (generates executables for both directions)
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --crp --create-exe
+```
+
+When `--crp` is combined with `--create-exe`, executables are generated for both the forward and reverse patches.
+
+---
+
 ### Batch Script for Downgrade Patches
 
 **PowerShell Script:**

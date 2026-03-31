@@ -260,6 +260,26 @@ D:\dev-builds\           # Development builds
 
 ## Registering Versions
 
+### Manager Methods
+
+The `version.Manager` (in `internal/core/version/manager.go`) provides the following public methods:
+
+| Method | Description |
+|--------|-------------|
+| `NewManager()` | Create a new version manager with default settings (single-threaded) |
+| `SetWorkerThreads(threads int)` | Set number of parallel workers for scanning (minimum 1) |
+| `GetScanCache()` | Returns the `*cache.ScanCache` instance (nil if caching not enabled) |
+| `GetRegistry()` | Returns the `*Registry` containing all registered versions |
+| `SaveRegistry(filePath string)` | Persist all version manifests to disk (each version gets its own JSON file in a `manifests/` subdirectory) |
+| `LoadRegistry(filePath string)` | Load version manifests from disk (reads all `.json` files from the `manifests/` subdirectory) |
+| `EnableScanCache(cacheDir string, forceRescan bool)` | Enable scan caching with specified cache directory |
+| `RegisterVersion(versionNumber, location, keyFilePath string)` | Register and scan a new version |
+| `UnregisterVersion(versionNumber string)` | Remove a version from the registry |
+| `GetVersion(versionNumber string)` | Retrieve a registered version |
+| `ListVersions()` | Return all registered versions |
+| `RescanVersion(versionNumber string)` | Rescan a version's directory and update its manifest |
+| `VerifyVersion(versionNumber string)` | Verify all files in a version match their checksums |
+
 ### Automatic Registration
 
 When generating patches, versions are automatically registered:

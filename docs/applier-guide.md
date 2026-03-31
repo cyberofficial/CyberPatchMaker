@@ -143,7 +143,7 @@ No changes were made to your installation
 **`--backup`** (Enabled by Default)
 - Create backup of changed files before patching
 - Selective backup (only files being modified/deleted)
-- Backup saved to `{current-dir}.backup.cyberpatcher`
+- Backup saved to `<current-dir>\backup.cyberpatcher\`
 - Default: `true` (enabled)
 - Disable with `--backup=false` (not recommended)
 - Manual rollback: Delete patched files, restore from backup
@@ -162,6 +162,17 @@ No changes were made to your installation
 - Returns exit code 0 on success, 1 on failure
 - Example: `1.2.4-to-1.2.5.exe --silent`
 - Useful for automated deployments and CI/CD pipelines
+
+**`--ignore1gb`**
+- Bypass the 1GB patch size limit for embedded patches
+- Use with caution - large patches may consume significant memory
+- Only relevant for self-contained executables with embedded patches
+- Example: `1.0.0-to-1.0.1.exe --ignore1gb`
+
+**`--version`**
+- Display version information for the applier tool
+- Prints version string and exits
+- Example: `patch-apply --version`
 
 **`--help`**
 - Display usage information
@@ -674,10 +685,8 @@ After all operations are applied, the applier verifies:
 
 **"Key file checksum mismatch"**
 ```
-Error: patch application failed: key file verification failed: 
-  key file checksum mismatch: 
-  expected 63573ff071ea5fa2...
-  got      8f3c9d2e1a4b7c5e...
+Error: patch application failed: key file verification failed:
+  key file checksum mismatch: expected 63573ff071ea5fa2, got 8f3c9d2e1a4b7c5e
 ```
 
 **Meaning:** Your key file (program.exe) doesn't match expected version
@@ -696,10 +705,9 @@ Error: patch application failed: key file verification failed:
 
 **"Required file missing or modified"**
 ```
-Error: patch application failed: required file verification failed: 
-  file "data/config.json" checksum mismatch:
-  expected a1b2c3d4e5f6...
-  got      z9y8x7w6v5u4...
+Error: patch application failed: required files verification failed:
+  found 1 mismatches:
+  [data/config.json: checksum mismatch (expected a1b2c3d4e5f67890, got z9y8x7w6v5u43210)]
 ```
 
 **Meaning:** A file in your installation was modified or corrupted
@@ -878,13 +886,24 @@ The GUI applier also supports custom key files:
 
 ### Self-Contained Executable Support
 
-Self-contained `.exe` patches also support custom key files:
+Self-contained `.exe` patches provide an interactive console menu:
 
 1. Run the self-contained executable
-2. Accept or change the target directory
-3. Select option **5: Specify Custom Key File**
-4. Enter the custom key file path
-5. Choose **1: Dry Run** to test or **2: Apply Patch**
+2. Accept or change the default target directory (current working directory)
+
+The interactive menu provides the following options:
+
+**Option 1: Dry Run** - Simulate the patch without making changes
+
+**Option 2: Apply Patch** - Apply the patch with verification and backup
+
+**Option 3: Toggle 1GB Bypass Mode** - Enable or disable the 1GB size limit bypass for large embedded patches (default: Disabled). Shows warning about memory usage when enabled.
+
+**Option 4: Change Target Directory** - Change the target installation directory. Validates that the new directory exists.
+
+**Option 5: Specify Custom Key File** - Enter a custom key file path if the original key file was renamed or moved. Shows current key file (default from patch or previously set custom path). Can be reset to default by pressing Enter without input.
+
+**Option 6: Exit** - Quit the application without patching
 
 ---
 
@@ -901,10 +920,10 @@ patch-apply --patch ./patches/1.0.2-to-1.0.3.patch --current-dir C:\Production\M
 
 **What Happens:**
 1. Verifies you're running 1.0.2
-2. Creates backup at `C:\Production\MyApp.backup\`
+2. Creates backup at `C:\Production\MyApp\backup.cyberpatcher\`
 3. Applies changes
 4. Verifies result is 1.0.3
-5. Removes backup on success
+5. Preserves backup for manual rollback
 
 ---
 
@@ -943,7 +962,7 @@ Applying patch to network-installed application:
 patch-apply --patch ./patches/1.0.1-to-1.0.2.patch --current-dir \\server\share\MyApp --verify
 ```
 
-**Note:** Backup will be at `\\server\share\MyApp.backup\`
+**Note:** Backup will be at `\\server\share\MyApp\backup.cyberpatcher\`
 
 ---
 
@@ -999,7 +1018,7 @@ patch-apply --patch ./patches/1.0.1-to-1.0.2.patch --current-dir \\server\share\
 
 1. **Test Application**: Verify application works correctly
 2. **Check Version**: Confirm version was updated
-3. **Remove Backup**: If successful, remove .backup folder
+3. **Remove Backup**: If successful, remove `backup.cyberpatcher` folder
 4. **Keep Patch**: Keep patch file for future re-installations
 
 ---
@@ -1023,7 +1042,7 @@ patch-apply --patch ./patches/1.0.1-to-1.0.2.patch --current-dir \\server\share\
 
 **Solution:**
 1. Check disk space
-2. Manually copy files from `.backup` to installation
+2. Manually copy files from `backup.cyberpatcher` to installation
 3. Check permissions
 4. Contact support if manual restoration fails
 
@@ -1048,7 +1067,7 @@ patch-apply --patch ./patches/1.0.1-to-1.0.2.patch --current-dir \\server\share\
 **Solution:**
 1. Check post-verification passed (all hashes correct)
 2. Re-apply patch
-3. Restore from .backup if it still exists
+3. Restore from `backup.cyberpatcher` if it still exists
 4. Re-install clean version and try again
 5. Report bug with error logs
 

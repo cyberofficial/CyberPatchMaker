@@ -9,19 +9,35 @@ This document provides comprehensive examples for every command-line argument av
   - [--versions-dir](#--versions-dir)
   - [--new-version](#--new-version)
   - [--from and --to](#--from-and---to)
+  - [--from-dir and --to-dir](#--from-dir-and---to-dir)
   - [--output](#--output)
+  - [--key-file (Generator)](#--key-file-generator)
   - [--compression](#--compression)
   - [--level](#--level)
-  - [--verify](#--verify)
-  - [--help](#--help-generator)
+  - [--verify (Generator)](#--verify-generator)
+  - [--create-exe](#--create-exe)
+  - [--silent (Generator)](#--silent-generator)
+  - [--crp](#--crp)
+  - [--savescans](#--savescans)
+  - [--scandata](#--scandata)
+  - [--rescan](#--rescan)
+  - [--jobs](#--jobs)
+  - [--splitsize](#--splitsize)
+  - [--bypasssplitlimit](#--bypasssplitlimit)
+  - [--version (Generator)](#--version-generator)
+  - [--help (Generator)](#--help-generator)
 - [Applier Tool (`patch-apply.exe`)](#applier-tool-applierexe)
   - [Basic Usage](#basic-usage-1)
   - [--patch](#--patch)
   - [--current-dir](#--current-dir)
+  - [--key-file (Applier)](#--key-file-applier)
   - [--dry-run](#--dry-run)
-  - [--verify](#--verify-1)
+  - [--verify (Applier)](#--verify-applier)
   - [--backup](#--backup)
-  - [--help](#--help-applier)
+  - [--ignore1gb](#--ignore1gb)
+  - [--silent (Applier)](#--silent-applier)
+  - [--version (Applier)](#--version-applier)
+  - [--help (Applier)](#--help-applier)
 - [Common Workflows](#common-workflows)
 - [Troubleshooting](#troubleshooting)
 
@@ -192,6 +208,35 @@ patch-gen.exe --versions-dir .\versions --from 2.1.3 --to 2.1.4 --output .\patch
 
 ---
 
+### `--from-dir` and `--to-dir`
+
+**Purpose:** Specify full paths to source and target version directories directly, bypassing `--versions-dir`/`--from`/`--to`.
+
+**Type:** String (optional, overrides `--versions-dir`/`--from`/`--to`)
+
+**Behavior:**
+- Use when versions are on different drives, network locations, or not in a shared parent directory
+- `--from-dir` sets the full path to the source version directory
+- `--to-dir` sets the full path to the target version directory
+- Both must be specified together
+
+#### Example 1: Versions on Different Drives
+```powershell
+patch-gen.exe --from-dir "C:\releases\1.0.0" --to-dir "D:\builds\1.0.1" --output .\patches
+```
+
+#### Example 2: Network Locations
+```powershell
+patch-gen.exe --from-dir "\\server1\app\v1" --to-dir "\\server2\app\v2" --output .\patches
+```
+
+#### Example 3: Combined with Other Flags
+```powershell
+patch-gen.exe --from-dir C:\v1 --to-dir C:\v2 --output .\patches --create-exe --compression zstd --level 4
+```
+
+---
+
 ### `--output`
 
 **Purpose:** Specifies where to save the generated patch files.
@@ -233,6 +278,29 @@ patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\relea
 #### Example 5: Different Drive
 ```powershell
 patch-gen.exe --versions-dir C:\builds\versions --from 1.0.0 --to 1.0.1 --output E:\distribution\patches
+```
+
+---
+
+### `--key-file` (Generator)
+
+**Purpose:** Specify which file to use as the key file for version identification.
+
+**Type:** String (optional)
+
+**Behavior:**
+- By default, the generator auto-detects the key file (e.g., the main executable)
+- Use this flag to explicitly specify which file should be used as the key file
+- The key file's checksum is used to verify the correct version when applying patches
+
+#### Example 1: Specify Custom Key File
+```powershell
+patch-gen.exe --from-dir C:\v1 --to-dir C:\v2 --output .\patches --key-file app.exe
+```
+
+#### Example 2: Game with Custom Launcher
+```powershell
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --key-file game_launcher.exe
 ```
 
 ---
@@ -571,9 +639,11 @@ Options:
   2. Apply Patch
   3. Toggle 1GB Bypass Mode (currently: Disabled)
   4. Change Target Directory
-  5. Exit
+  5. Specify Custom Key File
+     (Currently: program.exe - default)
+  6. Exit
 ==============================================
-Select option [1-5]:
+Select option [1-6]:
 ```
 
 **Benefits:**
@@ -591,6 +661,260 @@ Select option [1-5]:
 
 ---
 
+### `--silent` (Generator)
+
+**Purpose:** Enable silent mode in the generated executable so it auto-applies without prompts.
+
+**Type:** Boolean (optional, default: `false`)
+
+**Behavior:**
+- Only applies when used with `--create-exe`
+- Embeds a silent flag into the self-contained executable header
+- When end users run the executable, it applies the patch automatically without showing a menu
+- No user interaction required -- perfect for automation and non-technical users
+
+#### Example 1: Create Silent Self-Contained Executable
+```powershell
+patch-gen.exe --from-dir C:\v1 --to-dir C:\v2 --output .\patches --create-exe --silent
+```
+
+**Output:**
+```
+Generating patch from 1.0.0 to 1.0.1...
+Patch saved to: .\patches\1.0.0-to-1.0.1.patch
+✓ Created executable (silent mode): .\patches\1.0.0-to-1.0.1.exe
+```
+
+#### Example 2: Batch with Silent Mode
+```powershell
+patch-gen.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches --create-exe --silent
+```
+
+**When end user runs the executable:**
+```
+========================================
+CyberPatchMaker Silent Mode Log
+Started: 2026-03-30 12:00:00
+========================================
+
+Patch Information:
+  From Version: 1.0.0
+  To Version:   1.0.1
+  ...
+
+Patch applied successfully: 1.0.0 → 1.0.1
+
+========================================
+Status: SUCCESS
+========================================
+```
+
+---
+
+### `--crp`
+
+**Purpose:** Create a reverse patch (for downgrades) alongside the forward patch.
+
+**Type:** Boolean (optional, default: `false`)
+
+**Behavior:**
+- Generates a second patch that allows downgrading from the target version back to the source version
+- The reverse patch filename follows the pattern `<to>-to-<from>.patch`
+- Useful for allowing users to roll back if an update causes issues
+
+#### Example 1: Forward and Reverse Patches
+```powershell
+patch-gen.exe --from-dir C:\v1.0.0 --to-dir C:\v1.0.1 --output .\patches --crp
+```
+
+**Output:**
+```
+patches/
+├── 1.0.0-to-1.0.1.patch     (forward patch)
+└── 1.0.1-to-1.0.0.patch     (reverse patch)
+```
+
+#### Example 2: Reverse Patches with Self-Contained Executables
+```powershell
+patch-gen.exe --from-dir C:\v1.0.0 --to-dir C:\v1.0.1 --output .\patches --crp --create-exe
+```
+
+**Output:**
+```
+patches/
+├── 1.0.0-to-1.0.1.patch
+├── 1.0.0-to-1.0.1.exe       (upgrade executable)
+├── 1.0.1-to-1.0.0.patch
+└── 1.0.1-to-1.0.0.exe       (downgrade executable)
+```
+
+---
+
+### `--savescans`
+
+**Purpose:** Save directory scans to cache for faster subsequent patch generation.
+
+**Type:** Boolean (optional, default: `false`)
+
+**Behavior:**
+- Scans directory contents and saves metadata to a cache directory
+- On subsequent runs with the same versions, loads from cache instead of rescanning
+- Dramatically speeds up repeated patch generation for large projects
+- Default cache directory is `.data/` (can be changed with `--scandata`)
+
+#### Example 1: Enable Scan Caching
+```powershell
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --savescans
+```
+
+**Output:**
+```
+✓ Scan caching enabled (cache dir: .data)
+Scanning source version 1.0.0...
+Scanning target version 1.0.1...
+...
+```
+
+#### Example 2: Subsequent Run Uses Cache
+```powershell
+patch-gen.exe --versions-dir .\versions --from 1.0.1 --to 1.0.2 --output .\patches --savescans
+```
+
+**Note:** Version 1.0.1 is loaded from cache (no rescan needed), only 1.0.2 is scanned fresh.
+
+---
+
+### `--scandata`
+
+**Purpose:** Specify a custom directory for the scan cache.
+
+**Type:** String (optional, default: `.data`)
+
+**Behavior:**
+- Only applies when used with `--savescans`
+- Overrides the default `.data/` cache directory
+- Useful for shared cache locations or CI/CD environments
+
+#### Example 1: Custom Cache Directory
+```powershell
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --savescans --scandata ./shared-cache
+```
+
+---
+
+### `--rescan`
+
+**Purpose:** Force rescan of cached versions, ignoring existing cache data.
+
+**Type:** Boolean (optional, default: `false`)
+
+**Behavior:**
+- Only applies when used with `--savescans`
+- Forces a fresh scan even if cache exists for the version
+- Useful when files have changed on disk since the last scan
+
+#### Example 1: Force Rescan
+```powershell
+patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --savescans --rescan
+```
+
+---
+
+### `--jobs`
+
+**Purpose:** Set the number of parallel worker threads for patch generation.
+
+**Type:** Integer (optional, default: `0`)
+
+**Behavior:**
+- `0` = Auto-detect (uses number of CPU cores)
+- `1` = Single-threaded (no parallelism)
+- `2+` = Use that many worker threads
+- Improves performance for large projects with many files
+
+#### Example 1: Auto-Detect Workers
+```powershell
+patch-gen.exe --from-dir C:\v1 --to-dir C:\v2 --output .\patches --jobs 0
+```
+
+**Output:**
+```
+✓ Using 8 worker threads for parallel operations
+...
+```
+
+#### Example 2: Single-Threaded
+```powershell
+patch-gen.exe --from-dir C:\v1 --to-dir C:\v2 --output .\patches --jobs 1
+```
+
+#### Example 3: Custom Worker Count
+```powershell
+patch-gen.exe --from-dir C:\v1 --to-dir C:\v2 --output .\patches --jobs 16
+```
+
+---
+
+### `--splitsize`
+
+**Purpose:** Set a custom split size for multi-part patch files.
+
+**Type:** String (optional, default: `4GB`)
+
+**Behavior:**
+- Accepts sizes like `2G`, `2GB`, `500M`, `500MB`
+- Patches larger than this size are split into multiple parts
+- Default split size is 4GB
+- Minimum recommended size is 100MB (see `--bypasssplitlimit`)
+
+#### Example 1: Split at 2GB
+```powershell
+patch-gen.exe --from-dir C:\v1 --to-dir C:\v2 --output .\patches --splitsize 2G
+```
+
+#### Example 2: Split at 500MB
+```powershell
+patch-gen.exe --from-dir C:\v1 --to-dir C:\v2 --output .\patches --splitsize 500MB
+```
+
+---
+
+### `--bypasssplitlimit`
+
+**Purpose:** Bypass the 100MB minimum split size safety check.
+
+**Type:** Boolean (optional, default: `false`)
+
+**Behavior:**
+- When `--splitsize` is set below 100MB, the generator prompts for confirmation
+- Use this flag to skip the confirmation prompt
+- Warning: Very small split sizes may create many small parts, which is not recommended
+
+#### Example 1: Small Split Size with Bypass
+```powershell
+patch-gen.exe --from-dir C:\v1 --to-dir C:\v2 --output .\patches --splitsize 50M --bypasssplitlimit
+```
+
+---
+
+### `--version` (Generator)
+
+**Purpose:** Display the generator version information.
+
+**Type:** Boolean (optional)
+
+#### Example 1: Show Version
+```powershell
+patch-gen.exe --version
+```
+
+**Output:**
+```
+CyberPatchMaker Patch Generator v1.0.16
+```
+
+---
+
 ### `--help` (Generator)
 
 **Purpose:** Display usage information and available options.
@@ -604,41 +928,72 @@ patch-gen.exe --help
 
 **Output:**
 ```
-CyberPatchMaker - Generator Tool
-Version: 0.1.0
+CyberPatchMaker - Patch Generator v1.0.16
 
 Usage:
-  patch-gen.exe [options]
+  Generate patches from all versions to new version:
+    patch-gen --versions-dir <dir> --new-version <version>
 
-Required Arguments (Mode 1 - Single Patch):
-  --versions-dir string    Directory containing version folders
-  --from string           Source version number
-  --to string             Target version number
-  --output string         Output directory for patch file
+  Generate single patch (versions in same directory):
+    patch-gen --versions-dir <dir> --from <version> --to <version>
 
-Required Arguments (Mode 2 - Batch Generation):
-  --versions-dir string    Directory containing version folders
-  --new-version string    New version to generate patches for
-  --output string         Output directory for patch files
+  Generate single patch (custom paths, different drives/locations):
+    patch-gen --from-dir <path> --to-dir <path>
 
-Optional Arguments:
-  --compression string    Compression algorithm: zstd, gzip, none (default: zstd)
-  --level int            Compression level (1-4 for zstd, 1-9 for gzip) (default: 3)
-  --verify               Verify patches after creation (default: true)
-  --help                 Show this help message
+Options:
+  --versions-dir    Directory containing version folders
+  --new-version     New version number to generate patches for
+  --from            Source version number (with --versions-dir)
+  --to              Target version number (with --versions-dir)
+  --from-dir        Full path to source version directory
+  --to-dir          Full path to target version directory
+  --output          Output directory for patches (default: patches)
+  --key-file        Specific key file to use (e.g., app_name.exe)
+  --compression     Compression algorithm: zstd, gzip, none (default: zstd)
+  --level           Compression level (default: 3)
+  --verify          Verify patches after creation (default: true)
+  --create-exe      Create self-contained CLI executable
+  --silent          Enable silent mode in generated executable (auto-apply without prompts)
+  --crp             Create reverse patch (for downgrades)
+  --savescans       Save directory scans to cache for faster subsequent patches
+  --rescan          Force rescan of cached versions (use with --savescans)
+  --scandata        Custom directory for scan cache (default: .data)
+  --jobs            Number of parallel workers (0=auto-detect CPU cores, 1=single-threaded, default: 0)
+  --splitsize       Custom multi-part split size (e.g., '2G', '2GB', '500M', '500MB', default: 4GB)
+  --bypasssplitlimit Bypass 100MB minimum split size confirmation
+  --version         Show version information
+  --help            Show this help message
 
 Examples:
-  # Generate single patch
-  patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches
+  # Versions on different drives
+  patch-gen --from-dir C:\releases\1.0.0 --to-dir D:\builds\1.0.1 --output patches
 
-  # Generate patches for new version
-  patch-gen.exe --versions-dir .\versions --new-version 1.0.3 --output .\patches
+  # Create self-contained executable
+  patch-gen --from-dir C:\\v1 --to-dir C:\\v2 --output patches --create-exe
 
-  # Use gzip compression
-  patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression gzip
+  # Create forward and reverse patches with executables
+  patch-gen --from-dir C:\\v1.0.0 --to-dir C:\\v1.0.1 --output patches --crp --create-exe
 
-  # Maximum compression
-  patch-gen.exe --versions-dir .\versions --from 1.0.0 --to 1.0.1 --output .\patches --compression zstd --level 4
+  # Use scan caching for faster subsequent patches
+  patch-gen --versions-dir C:\\versions --from 1.0.0 --to 1.0.1 --output patches --savescans
+  patch-gen --versions-dir C:\\versions --from 1.0.1 --to 1.0.2 --output patches --savescans
+
+  # Use parallel workers for faster processing (large projects)
+  patch-gen --from-dir C:\\v1 --to-dir C:\\v2 --output patches --jobs 0
+  patch-gen --from-dir C:\\v1 --to-dir C:\\v2 --output patches --jobs 8
+
+  # Force rescan of cached versions
+  patch-gen --versions-dir C:\\versions --from 1.0.0 --to 1.0.1 --output patches --savescans --rescan
+
+  # Custom split size for multi-part patches
+  patch-gen --from-dir C:\\v1 --to-dir C:\\v2 --output patches --splitsize 2G
+  patch-gen --from-dir C:\\v1 --to-dir C:\\v2 --output patches --splitsize 500MB
+
+  # Small split size (below 100MB) with bypass
+  patch-gen --from-dir C:\\v1 --to-dir C:\\v2 --output patches --splitsize 50M --bypasssplitlimit
+
+  # Versions on different network locations
+  patch-gen --from-dir \\server1\app\v1 --to-dir \\server2\app\v2 --output .
 ```
 
 #### Example 2: Help Shortcut
@@ -767,6 +1122,35 @@ patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir "C:\Program
 ```
 
 **Note:** Requires administrator privileges for Program Files
+
+---
+
+### `--key-file` (Applier)
+
+**Purpose:** Specify a custom key file path if the original key file was renamed or moved.
+
+**Type:** String (optional)
+
+**Behavior:**
+- Overrides the key file path stored in the patch
+- Can be a relative path (resolved against `--current-dir`) or an absolute path
+- Useful when the key file has been renamed or is in a non-standard location
+
+#### Example 1: Renamed Key File
+```powershell
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --key-file app.exe
+```
+
+**Output:**
+```
+Using custom key file: app.exe
+...
+```
+
+#### Example 2: Absolute Path
+```powershell
+patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --key-file C:\MyApp\renamed_program.exe
+```
 
 ---
 
@@ -1017,9 +1401,11 @@ Options:
   2. Apply Patch
   3. Toggle 1GB Bypass Mode (currently: Enabled)
   4. Change Target Directory
-  5. Exit
+  5. Specify Custom Key File
+     (Currently: program.exe - default)
+  6. Exit
 ==============================================
-Select option [1-5]:
+Select option [1-6]:
 ```
 
 #### Example 2: Without Bypass (Default)
@@ -1037,7 +1423,7 @@ Press any key to exit...
 #### Example 3: Toggle in Interactive Menu
 Users can also toggle the 1GB bypass from within the interactive console:
 ```
-Select option [1-5]: 3
+Select option [1-6]: 3
 
 1GB Bypass Mode: Enabled
 Warning: Large patches may consume significant memory!
@@ -1209,6 +1595,76 @@ Backup preserved in: C:\MyApp\backup.cyberpatcher for investigation.
 
 ---
 
+### `--silent` (Applier)
+
+**Purpose:** Run the applier in silent mode, applying the patch automatically without prompts.
+
+**Type:** Boolean (optional, default: `false`)
+
+**Behavior:**
+- Applies patch immediately without showing menus or prompts
+- Uses default settings: verify=true, backup=true
+- Creates a log file named `log_<timestamp>.txt` in the current directory
+- Returns exit code 0 on success, 1 on failure
+- Ideal for automation, CI/CD pipelines, and scripting
+
+#### Example 1: Silent Mode with Self-Contained Executable
+```powershell
+1.0.0-to-1.0.1.exe --silent
+```
+
+**Output:**
+```
+========================================
+CyberPatchMaker Silent Mode Log
+Started: 2026-03-30 12:00:00
+========================================
+
+Patch Information:
+  From Version: 1.0.0
+  To Version:   1.0.1
+  ...
+
+Patch applied successfully: 1.0.0 → 1.0.1
+
+========================================
+Status: SUCCESS
+Completed: 2026-03-30 12:00:05
+========================================
+
+Log saved to: log_1743331200.txt
+```
+
+#### Example 2: Silent Mode with Custom Target Directory
+```powershell
+1.0.0-to-1.0.1.exe --silent --current-dir C:\MyApp
+```
+
+#### Example 3: Silent Mode with Custom Key File
+```powershell
+1.0.0-to-1.0.1.exe --silent --current-dir C:\MyApp --key-file renamed.exe
+```
+
+---
+
+### `--version` (Applier)
+
+**Purpose:** Display the applier version information.
+
+**Type:** Boolean (optional)
+
+#### Example 1: Show Version
+```powershell
+patch-apply.exe --version
+```
+
+**Output:**
+```
+CyberPatchMaker Patch Applier v1.0.16
+```
+
+---
+
 ### `--help` (Applier)
 
 **Purpose:** Display usage information and available options.
@@ -1222,34 +1678,43 @@ patch-apply.exe --help
 
 **Output:**
 ```
-CyberPatchMaker - Applier Tool
-Version: 0.1.0
+CyberPatchMaker - Patch Applier v1.0.16
 
 Usage:
-  patch-apply.exe [options]
+  patch-apply --patch <file> --current-dir <directory>
 
-Required Arguments:
-  --patch string          Path to patch file
-  --current-dir string    Directory containing current version
+Options:
+  --patch         Path to patch file (required)
+  --current-dir   Directory containing current version (required)
+  --key-file      Custom key file path (if renamed or moved)
+  --dry-run       Simulate patch without making changes
+  --verify        Verify file hashes before and after patching (default: true)
+  --backup        Create backup before patching (default: true)
+  --ignore1gb     Bypass 1GB patch size limit (use with caution)
+  --silent        Silent mode: apply patch automatically without prompts
+  --version       Show version information
+  --help          Show this help message
 
-Optional Arguments:
-  --dry-run              Simulate patch without making changes (default: false)
-  --verify               Verify file hashes before and after patching (default: true)
-  --backup               Create backup before patching (default: true)
-  --help                 Show this help message
+Self-Contained Executable Mode:
+  When run as a self-contained executable, an interactive console
+  interface will guide you through the patch application process.
+  Use --silent flag for automated patching without user interaction.
 
 Examples:
-  # Apply patch with full verification and backup (recommended)
-  patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp
+  # Apply patch
+  patch-apply --patch 1.0.0-to-1.0.3.patch --current-dir C:\MyApp
 
-  # Dry run to preview changes
-  patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --dry-run
+  # Dry run (simulate only)
+  patch-apply --patch 1.0.0-to-1.0.3.patch --current-dir C:\MyApp --dry-run
 
-  # Apply without backup (not recommended)
-  patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --backup=false
+  # Run self-contained executable with 1GB bypass
+  1.0.0-to-1.0.1.exe --ignore1gb
 
-  # Quick apply (skip verification, not recommended for production)
-  patch-apply.exe --patch .\patches\1.0.0-to-1.0.1.patch --current-dir C:\MyApp --verify=false
+  # Run self-contained executable in silent mode (automation)
+  1.2.4-to-1.2.5.exe --silent
+
+  # Silent mode with custom target directory
+  1.2.4-to-1.2.5.exe --silent --current-dir C:\MyApp
 ```
 
 #### Example 2: Help Shortcut

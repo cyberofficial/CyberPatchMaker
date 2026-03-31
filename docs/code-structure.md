@@ -43,7 +43,12 @@ CyberPatchMaker/
 │       └── types.go          # Core data structures
 │
 ├── docs/                      # Documentation
-├── examples/                  # Usage examples
+├── build/                     # Build output (versioned executables)
+├── bin/                       # Compiled binaries (patch-gen.exe, etc.)
+├── dist/                      # Distribution packages
+├── build.ps1                  # Build script (PowerShell)
+├── advanced-test.ps1          # Integration test suite (PowerShell)
+├── EXAMPLE_apply_patch.bat    # Example batch file for applying patches
 └── go.mod / go.sum           # Go module definitions
 ```
 
@@ -70,7 +75,7 @@ CyberPatchMaker/
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `scan_cache.go` | 259 | Cache directory scans for instant reload |
+| `scan_cache.go` | 258 | Cache directory scans for instant reload |
 
 **Exported Types:**
 - `ScanCache` - Cache manager
@@ -90,7 +95,7 @@ CyberPatchMaker/
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `config.go` | 204 | Configuration management |
+| `config.go` | 203 | Configuration management |
 
 **Exported Types:**
 - `Manager` - Configuration manager
@@ -110,7 +115,7 @@ CyberPatchMaker/
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `differ.go` | 266 | Binary diff generation and application |
+| `differ.go` | 265 | Binary diff generation and application |
 
 **Exported Types:**
 - `Differ` - Diff operations handler
@@ -134,7 +139,7 @@ CyberPatchMaker/
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `manager.go` | 278 | Manifest operations |
+| `manager.go` | 230 | Manifest operations |
 
 **Exported Types:**
 - `Manager` - Manifest manager
@@ -152,9 +157,9 @@ CyberPatchMaker/
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `applier.go` | 634 | Patch application |
-| `generator.go` | 315 | Patch generation |
-| `multipart.go` | 480 | Multi-part patch handling |
+| `applier.go` | 633 | Patch application |
+| `generator.go` | 314 | Patch generation |
+| `multipart.go` | 479 | Multi-part patch handling |
 
 **Applier Exported Types:**
 - `Applier` - Patch applier
@@ -182,9 +187,9 @@ CyberPatchMaker/
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `scanner.go` | 267 | Directory traversal |
-| `ignore.go` | 208 | Pattern matching |
-| `parallel.go` | 253 | Parallel scanning |
+| `scanner.go` | 266 | Directory traversal |
+| `ignore.go` | 207 | Pattern matching |
+| `parallel.go` | 252 | Parallel scanning |
 
 **Scanner Exported Types:**
 - `Scanner` - Directory scanner
@@ -215,8 +220,8 @@ CyberPatchMaker/
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `manager.go` | 481 | Version registry |
-| `version.go` | 88 | Version constants |
+| `manager.go` | 480 | Version registry |
+| `version.go` | 87 | Version constants |
 
 **Version Manager Exported Types:**
 - `Manager` - Version manager
@@ -248,11 +253,11 @@ CyberPatchMaker/
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `types.go` | 165 | Core data structures |
-| `checksum.go` | 47 | SHA-256 hashing |
-| `fileops.go` | 143 | File operations |
-| `compress.go` | 239 | Compression/decompression |
-| `patch_io.go` | 339 | Patch serialization |
+| `types.go` | 164 | Core data structures |
+| `checksum.go` | 46 | SHA-256 hashing |
+| `fileops.go` | 142 | File operations |
+| `compress.go` | 238 | Compression/decompression |
+| `patch_io.go` | 338 | Patch serialization |
 
 **types.go Exported Types:**
 - `Version` - Version information

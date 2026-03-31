@@ -10,7 +10,8 @@ CyberPatchMaker includes an intelligent backup system that creates a mirror-stru
 
 - **Modified Files**: Files that will be changed by the patch
 - **Deleted Files**: Files that will be removed by the patch
-- **Not Backed Up**: New files being added (since they don't exist yet)
+- **Deleted Directories**: Directories that will be removed, backed up with full contents using CopyDir
+- **Not Backed Up**: New files or directories being added (since they don't exist yet)
 
 ### Backup Location
 
@@ -75,13 +76,6 @@ To rollback a patch manually:
 # Apply patch without backup (NOT recommended)
 .\patch-apply.exe --patch patch.patch --current-dir C:\MyApp --verify --backup=false
 ```
-
-## GUI Usage
-
-1. Check "Create backup before patching" (enabled by default)
-2. Apply the patch
-3. Backup will be created in `target\backup.cyberpatcher`
-4. After successful patching, backup remains for manual rollback
 
 ## Benefits
 

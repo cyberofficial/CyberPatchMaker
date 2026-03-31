@@ -46,10 +46,10 @@ Applying patch from 1.0.0 to 1.0.1...
 Verifying current version...
 Pre-patch verification successful
 
-Creating selective backup...
-Backing up: program.exe
-Backing up: data\config.json
-Backup created in: C:\MyApp\backup.cyberpatcher
+Creating backup...
+Backed up 2 files
+Backup created at: C:\MyApp\backup.cyberpatcher
+Note: Backup will be preserved after patching for manual rollback
 
 Applying 20 operations...
   Modified: program.exe
@@ -58,9 +58,12 @@ Applying 20 operations...
 
 Post-patch verification successful
 
+Backup preserved at: C:\MyApp\backup.cyberpatcher
+To rollback: Copy files from backup folder to their original locations
+Patch applied successfully
+
 === Patch Applied Successfully ===
 Version updated from 1.0.0 to 1.0.1
-Backup preserved in: C:\MyApp\backup.cyberpatcher
 ```
 
 ---
@@ -135,23 +138,25 @@ Verifying current version...
 Pre-patch verification successful
 
 Creating backup...
+Backed up 2 files
 Backup created at: C:\MyApp\backup.cyberpatcher
+Note: Backup will be preserved after patching for manual rollback
 
 Applying 20 operations...
   Modified: program.exe
-  Error: failed to write file: permission denied
 
-Error: patch application failed
-Restoring from backup...
+Operation 5 failed, automatically restoring from backup...
+Restored 2 files from backup
 Backup restored successfully
 Installation returned to original state
-Backup preserved at: C:\MyApp\backup.cyberpatcher
-For manual rollback (if needed): Copy files from backup folder to their original locations
+
+Error: patch application failed
 ```
 
 **Automatic Rollback on Failure**
 - **Automatic restoration**: Failed patches automatically restore from backup
 - **Complete recovery**: All modified files are restored to their original state
+- **Added file/directory cleanup**: Files and directories added during the failed patch are removed during rollback
 - **Backup preserved**: Available for additional manual recovery if needed
 - **User safety**: No manual intervention required when patches fail
 
@@ -212,10 +217,17 @@ if createBackup {
    - Creates matching directory structure in backupDir
    - Copies file from targetDir to backupDir with preserved path
 4. For OpDeleteDir operations:
-   - Backs up entire directory that will be deleted (with all contents)
+   - Backs up entire directory that will be deleted (with all contents using CopyDir)
    - Copies entire directory tree to backup
-5. For OpAdd operations: **Skips** (new files don't exist yet)
+5. For OpAdd and OpAddDir operations: **Skips** (new files/directories don't exist yet)
 6. Uses `filepath.Join` for cross-platform paths
+
+**restoreMirrorBackup(backupDir, targetDir string, operations []utils.PatchOperation)**:
+1. Restores backed up files (OpModify, OpDelete) to original locations using CopyFile
+2. Restores backed up directories (OpDeleteDir) using CopyDir
+3. Removes files that were added during the failed patch (OpAdd)
+4. Removes directories that were added during the failed patch (OpAddDir)
+5. Reports counts of restored and cleaned up files
 
 ## Why This Design?
 
@@ -292,9 +304,9 @@ Backup created in `applier.go` **AFTER** pre-verification passes
   - Use correct patch for your version
   - Check for file corruption or modifications
 
-**Want to see what will be backed up:**
+**Want to see what will happen:**
 - Run applier with `--dry-run` flag
-- Output shows which files will be backed up before patching
+- Output shows which operations will be performed (add, modify, delete) and verifies key file and required files
 
 ## Related Documentation
 

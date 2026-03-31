@@ -33,7 +33,8 @@ CyberPatchMaker is designed as a modular, maintainable system with clear separat
 │  ├─ types.go      Core data structures                       │
 │  ├─ checksum.go   SHA-256 calculation                        │
 │  ├─ fileops.go    File operations (copy, ensure dir)         │
-│  └─ compress.go   Compression (zstd, gzip)                   │
+│  ├─ compress.go   Compression (zstd, gzip)                   │
+│  └─ patch_io.go   Patch serialization (save/load/streaming)  │
 └─────────────────────────────────────────────────────────────┘
                               ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -251,13 +252,14 @@ type Config struct {
 - Rollback handling
 
 **Key Methods:**
-- `GeneratePatch(from, to *Manifest) (*Patch, error)`
-- `ApplyPatch(patch, targetDir string, verify, backup bool) error`
+- `Generator.GeneratePatch(fromVersion, toVersion *Version, options *PatchOptions) (*Patch, error)` (generator.go)
+- `Applier.ApplyPatch(patch *Patch, targetDir string, verifyBefore, verifyAfter, createBackup bool) error` (applier.go)
+- `Applier.ApplyPatchWithPath(patch *Patch, targetDir, patchFilePath string, verifyBefore, verifyAfter, createBackup bool) error` (applier.go)
 - `verifyKeyFile(dir string, keyFile KeyFileInfo) error`
 - `verifyRequiredFiles(dir string, files []FileRequirement) error`
 - `verifyPatchedFiles(dir string, ops []PatchOperation) error`
-- `createBackup(srcDir, backupDir string) error`
-- `copyDir(src, dst string) error`
+- `createMirrorBackup(targetDir, backupDir string, ops []PatchOperation) error`
+- `restoreMirrorBackup(backupDir, targetDir string, ops []PatchOperation) error`
 
 **Responsibilities:**
 - Generate patch from two manifests
@@ -266,10 +268,10 @@ type Config struct {
 - Create backup after verification
 - Apply add/modify/delete operations
 - Verify patched version (post-verification)
-- Cleanup backup on success
-- Restore backup on failure
+- Preserve backup on success (for manual rollback)
+- Automatically restore from backup on failure
 
-**Lines of Code**: 1,429 lines (applier.go: 634, generator.go: 315, multipart.go: 480)
+**Lines of Code**: 1,426 lines (applier.go: 633, generator.go: 314, multipart.go: 479)
 
 ---
 
@@ -300,7 +302,7 @@ type Config struct {
 - `LargeFileThreshold`: 1 GB threshold
 - `DefaultMaxPartSize`: 4 GB default part size
 
-**Lines of Code**: 165 lines
+**Lines of Code**: 164 lines
 
 ---
 
@@ -378,7 +380,7 @@ Scanner (internal/core/scanner/scanner.go)
     ├─ Calculate File Hashes
     └─ Build Manifest
     ↓
-Manifest Comparator (internal/core/manifest/manifest.go)
+Manifest Comparator (internal/core/manifest/manager.go)
     ├─ Compare Manifests
     └─ Identify Changes
     ↓
@@ -386,7 +388,7 @@ Differ (internal/core/differ/differ.go)
     ├─ Generate Binary Diffs
     └─ Optimize Sizes
     ↓
-Patcher (internal/core/patcher/applier.go)
+Patcher (internal/core/patcher/generator.go)
     ├─ Create Patch Structure
     ├─ Package Operations
     └─ Add Metadata
@@ -433,8 +435,8 @@ Patcher.ApplyPatch (internal/core/patcher/applier.go)
     └─ Verify Key File Matches Target
     ↓
 5. CLEANUP
-    ├─ If Success: Remove Backup
-    └─ If Failure: Restore from Backup (in main.go)
+    ├─ If Success: Preserve Backup (for manual rollback)
+    └─ If Failure: Automatically Restore from Backup
     ↓
 Output: Success/Error Message
 ```
@@ -548,7 +550,7 @@ The CLI generator can create self-contained executables that embed patch data di
 
 ### File Structure
 
-A self-contained executable consists of three parts concatenated together:
+A self-contained executable consists of three parts concatenated together (with an optional sidecar blob for multi-part chunk metadata):
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -562,10 +564,15 @@ A self-contained executable consists of three parts concatenated together:
 │                                                              │
 │  Complete patch manifest with all operations                 │
 ├─────────────────────────────────────────────────────────────┤
+│               Sidecar Blob (optional)                        │
+│                                                              │
+│  Chunk metadata for multi-part patches: uint32 count, then   │
+│  for each: uint16 nameLen, name, uint64 dataLen, data        │
+├─────────────────────────────────────────────────────────────┤
 │                   128-byte Header                            │
 │              (metadata at end of file)                       │
 │                                                              │
-│  Magic bytes, offsets, sizes, checksum                       │
+│  Magic bytes, offsets, sizes, checksum, flags                │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -582,7 +589,8 @@ The header is always located at the **last 128 bytes** of the file:
 | 28-35 | 8 bytes | uint64 | DataSize | Size of compressed patch data |
 | 36-51 | 16 bytes | string | Compression | Type: "zstd", "gzip", or "none" |
 | 52-83 | 32 bytes | [32]byte | Checksum | SHA-256 hash of patch data |
-| 84-127 | 44 bytes | - | Reserved | Reserved for future use |
+| 84 | 1 byte | byte | Flags | Feature flags (bit 0 = silent mode) |
+| 85-127 | 43 bytes | - | Reserved | Reserved for future use |
 
 **Binary Layout:**
 ```go
@@ -594,7 +602,8 @@ type Header struct {
     DataSize    uint64    // Size of patch data
     Compression [16]byte  // Compression type
     Checksum    [32]byte  // SHA-256 of patch data
-    Reserved    [44]byte  // Future expansion
+    Flags       byte      // Feature flags (bit 0 = silent mode)
+    Reserved    [43]byte  // Future expansion
 }
 ```
 
@@ -608,8 +617,9 @@ When the generator creates a self-contained executable:
 4. **Build header**: Populate 128-byte header with metadata
 5. **Write combined file**:
    ```
-   output.exe = applier + patchData + header
+   output.exe = applier + patchData + [sidecarBlob] + header
    ```
+   The sidecar blob is optional and only present for multi-part patches that were chunked. It contains chunk JSON files that the applier extracts to disk at runtime.
 
 **Generator Code Location:** `cmd/generator/main.go` (createStandaloneExe function)
 
@@ -628,10 +638,16 @@ When a self-contained executable runs:
    - Check offsets are within file bounds
    - Prevent excessive allocation (max 1 GB patch data)
 7. **Read patch data**: Seeks to `DataOffset`, reads `DataSize` bytes
-8. **Verify checksum**: Validates SHA-256 hash of patch data
-9. **Decompress**: Decompresses based on `Compression` field
-10. **Parse JSON**: Decodes patch manifest
-11. **Load console**: Populates console interface with patch information automatically
+8. **Extract sidecar blobs** (if present): Any extra bytes between patch data and header are parsed as sidecar blobs (uint32 count, then name/data pairs) and written to disk as chunk metadata files
+9. **Verify checksum**: Validates SHA-256 hash of patch data
+10. **Check size limit**: If `DataSize > 1GB` and `--ignore1gb` is not set, warn and refuse to proceed
+11. **Extract silent flag**: Reads `Flags` byte, bit 0 indicates embedded silent mode
+12. **Decompress**: Decompresses based on `Compression` field
+13. **Parse JSON**: Decodes patch manifest
+14. **Load console**: Populates console interface with patch information automatically
+    - If `SimpleMode` field is true: runs `runSimpleMode()` (automated two-step flow: dry-run then apply)
+    - If embedded silent flag is set or `--silent` CLI flag: runs `runSilentMode()` (fully automated, no prompts)
+    - Otherwise: runs interactive console with menu options
 
 **Detection Code Location:** `cmd/applier/main.go` (checkEmbeddedPatch function)
 
@@ -671,10 +687,18 @@ When a self-contained executable runs:
 
 **Generator:**
 - `cmd/generator/main.go` - `createStandaloneExe()` function
-- Flag: `--create-exe`
+- Flag: `--create-exe` (create self-contained executable)
+- Flag: `--silent` (embed silent mode in generated executable)
+- Flag: `--crp` (create reverse patch for downgrades)
+- Flag: `--split-size` (custom multi-part split size, e.g., `2G`, `500M`)
+- Flag: `--ignore1gb` (bypass 1GB patch size limit)
 
 **Applier:**
 - `cmd/applier/main.go` - `checkEmbeddedPatch()` function
+- `runSilentMode()` - Fully automated patching (no prompts)
+- `runSimpleMode()` - Automated two-step flow (dry-run + apply)
+- Flag: `--silent` (silent mode for automation)
+- Flag: `--ignore1gb` (bypass 1GB size limit)
 
 **Documentation:**
 - [Self-Contained Executables Guide](self-contained-executables.md) - Complete user guide

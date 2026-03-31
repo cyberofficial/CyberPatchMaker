@@ -39,8 +39,11 @@ The scanner automatically skips `backup.cyberpatcher` during directory traversal
 
 ```go
 // From scanner.go
-if strings.Contains(relPath, "backup.cyberpatcher") {
-    return nil  // Skip this directory
+if relPath == "backup.cyberpatcher" || strings.HasPrefix(relPath, "backup.cyberpatcher/") {
+    if info.IsDir() {
+        return filepath.SkipDir
+    }
+    return nil
 }
 ```
 
@@ -53,8 +56,10 @@ The applier creates selective backups that exclude newly added files:
 // Only backup files that will be modified or deleted
 // OpAdd and OpAddDir operations are NOT backed up
 for _, op := range operations {
-    if op.Type == utils.OpModify || op.Type == utils.OpDelete || op.Type == utils.OpDeleteDir {
-        // Add to backup
+    if op.Type == utils.OpModify || op.Type == utils.OpDelete {
+        // Backup individual files that will be modified or deleted
+    } else if op.Type == utils.OpDeleteDir {
+        // Backup entire directory that will be deleted (with all contents)
     }
 }
 ```

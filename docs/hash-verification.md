@@ -457,116 +457,54 @@ CyberPatchMaker performs verification at three critical stages:
 #### 1. Buffered I/O
 
 ```go
-func calculateSHA256(filePath string) (string, error) {
+// CalculateFileChecksum computes the SHA-256 hash of a file
+func CalculateFileChecksum(filePath string) (string, error) {
     file, err := os.Open(filePath)
     if err != nil {
-        return "", err
+        return "", fmt.Errorf("failed to open file for checksum: %w", err)
     }
     defer file.Close()
-    
-    hasher := sha256.New()
-    
-    // Use 64KB buffer for optimal performance
-    buffer := make([]byte, 64*1024)
-    
-    for {
-        n, err := file.Read(buffer)
-        if n > 0 {
-            hasher.Write(buffer[:n])
-        }
-        if err == io.EOF {
-            break
-        }
-        if err != nil {
-            return "", err
-        }
+
+    hash := sha256.New()
+    if _, err := io.Copy(hash, file); err != nil {
+        return "", fmt.Errorf("failed to calculate checksum: %w", err)
     }
-    
-    return hex.EncodeToString(hasher.Sum(nil)), nil
+
+    return hex.EncodeToString(hash.Sum(nil)), nil
 }
 ```
 
-**Benefit**: Reduces memory usage and system call overhead.
+**Benefit**: Uses `io.Copy` for efficient streaming hash computation without manual buffer management.
 
 #### 2. Parallel Hashing
 
+Parallel file hashing is handled by the scanner's `ScanDirectoryParallel` and `ScanDirectoryParallelWithProgress` methods (`internal/core/scanner/parallel.go`). These methods use a worker pool to compute checksums for multiple files concurrently:
+
 ```go
-// Hash multiple files concurrently
-func hashFilesParallel(files []string, workers int) (map[string]string, error) {
-    type result struct {
-        file string
-        hash string
-        err  error
-    }
-    
-    jobs := make(chan string, len(files))
-    results := make(chan result, len(files))
-    
-    // Start worker pool
-    for w := 0; w < workers; w++ {
-        go func() {
-            for file := range jobs {
-                hash, err := calculateSHA256(file)
-                results <- result{file, hash, err}
-            }
-        }()
-    }
-    
-    // Send jobs
-    for _, file := range files {
-        jobs <- file
-    }
-    close(jobs)
-    
-    // Collect results
-    hashes := make(map[string]string)
-    for range files {
-        r := <-results
-        if r.err != nil {
-            return nil, r.err
-        }
-        hashes[r.file] = r.hash
-    }
-    
-    return hashes, nil
-}
+// The version manager dispatches parallel scanning when workerThreads > 1
+scan.ScanDirectoryParallelWithProgress(m.workerThreads, progressCallback)
 ```
+
+Each worker calls `utils.CalculateFileChecksum` on its assigned files. The caller configures worker count via `--jobs` (the CLI translates `0` to `runtime.NumCPU()`).
 
 **Benefit**: Utilize multiple CPU cores for faster verification of many files.
 
-#### 3. Memory-Mapped Files (Large Files)
+#### 3. Additional Checksum Utilities
 
 ```go
-func calculateSHA256Large(filePath string) (string, error) {
-    file, err := os.Open(filePath)
-    if err != nil {
-        return "", err
-    }
-    defer file.Close()
-    
-    stat, err := file.Stat()
-    if err != nil {
-        return "", err
-    }
-    
-    // Memory-map file for large files (>100MB)
-    if stat.Size() > 100*1024*1024 {
-        data, err := mmap.Map(file, mmap.RDONLY, 0)
-        if err != nil {
-            return "", err
-        }
-        defer data.Unmap()
-        
-        hash := sha256.Sum256(data)
-        return hex.EncodeToString(hash[:]), nil
-    }
-    
-    // Standard buffered I/O for smaller files
-    return calculateSHA256(filePath)
-}
+// CalculateDataChecksum computes the SHA-256 hash of byte data
+func CalculateDataChecksum(data []byte) string
+
+// CalculateStringChecksum computes the SHA-256 hash of a string
+func CalculateStringChecksum(text string) string
+
+// VerifyFileChecksum verifies a file's checksum matches the expected value
+func VerifyFileChecksum(filePath string, expectedChecksum string) (bool, error)
 ```
 
-**Benefit**: Faster for very large files (OS handles paging efficiently).
+- **`CalculateDataChecksum`**: Hashes a byte slice directly (used for in-memory data like diff results).
+- **`CalculateStringChecksum`**: Hashes a string (used for location-based cache key generation in scan cache).
+- **`VerifyFileChecksum`**: Convenience function that calculates a file's checksum and compares it to an expected value. Returns `(true, nil)` on match, `(false, nil)` on mismatch.
 
 ### Performance Targets
 
@@ -582,7 +520,7 @@ func calculateSHA256Large(filePath string) (string, error) {
 **Optimization Impact**:
 - **Parallel hashing** (8 workers): 3-5x faster
 - **Skip unchanged files**: 90%+ faster (cache hashes)
-- **Memory-mapped I/O**: 20-30% faster for large files
+- **Streaming I/O via io.Copy**: Efficient buffered reads without manual buffer management
 
 ## Security Considerations
 
@@ -767,37 +705,45 @@ Rolling back changes...
 
 
 
-**Example Output**:
+**Example Patch Metadata Format**:
 ```json
 {
-  "verification_date": "2025-01-04T10:30:00Z",
-  "patch": "1.0.0-to-1.0.3",
-  "result": "SUCCESS",
-  "files_verified": 156,
-  "files_passed": 156,
-  "files_failed": 0,
-  "duration_seconds": 12.5,
-  "details": [
+  "Header": {
+    "FormatVersion": 1,
+    "CreatedAt": "2025-01-04T10:30:00Z",
+    "Compression": "zstd",
+    "PatchSize": 5242880,
+    "Checksum": "patch_sha256_here..."
+  },
+  "FromVersion": "1.0.0",
+  "ToVersion": "1.0.3",
+  "FromKeyFile": {
+    "Path": "program.exe",
+    "Checksum": "abc123...",
+    "Size": 14680064
+  },
+  "ToKeyFile": {
+    "Path": "program.exe",
+    "Checksum": "xyz789...",
+    "Size": 15728640
+  },
+  "RequiredFiles": [
     {
-      "file": "program.exe",
-      "expected_hash": "abc123...",
-      "actual_hash": "abc123...",
-      "status": "PASS"
+      "Path": "program.exe",
+      "Checksum": "abc123...",
+      "Size": 14680064,
+      "IsRequired": true
+    }
+  ],
+  "Operations": [
+    {
+      "Type": 1,
+      "FilePath": "program.exe",
+      "OldChecksum": "abc123...",
+      "NewChecksum": "xyz789..."
     }
   ]
 }
-```
-
-### 4. Progressive Verification
-
-**Use Case**: Provide user feedback during lengthy verification
-
-**Design**:
-```
-Verifying source version...
-  [████████████████████        ] 75% (120/156 files)
-  Current: libs/somefile.dll
-  Elapsed: 8.5s | Remaining: ~3.2s
 ```
 
 ## Best Practices
