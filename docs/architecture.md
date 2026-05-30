@@ -9,12 +9,10 @@ patch-gen (cmd/generator/)          patch-apply (cmd/applier/)
     |                                     |
 Version Manager (version/)            Patcher.Applier (patcher/)
     |  register, scan, cache               |  verify, backup, apply, rollback
-Scanner (scanner/)                    +--> Differ (differ/ -- bsdiff wrapper)
+Scanner (scanner/)
     |  walk tree, hash files
 Manifest Manager (manifest/)
     |  create, compare, detect changes
-Differ (differ/)
-    |  bsdiff wrapper (available but NOT used by generator)
     v
 patcher.Generator -> streaming JSON + compression -> .patch file
 ```
@@ -39,7 +37,7 @@ patcher.Generator -> streaming JSON + compression -> .patch file
 
 **Config (`config/`)**: Application configuration load/save with platform-specific paths.
 
-**Differ (`differ/`)**: bsdiff/bspatch wrapper. Available but the generator currently uses full file replacement (`os.ReadFile`) for all files, not binary diffs.
+- _The differ package was removed in v1.0.17 — the generator uses full file replacement for all files._
 
 ### Utilities (`pkg/utils/`)
 

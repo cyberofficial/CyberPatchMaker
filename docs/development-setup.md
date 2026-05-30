@@ -55,7 +55,7 @@ Test data is auto-generated on first run. On subsequent runs, previous test data
 ```
 cmd/generator/main.go    -- CLI patch generator
 cmd/applier/main.go      -- CLI patch applier
-internal/core/           -- business logic (patcher, scanner, manifest, version, cache, differ, config)
+internal/core/           -- business logic (patcher, scanner, manifest, version, cache, config)
 pkg/utils/               -- shared types and utilities (types, checksum, fileops, compress, patch_io)
 ```
 
