@@ -1,14 +1,10 @@
 package main
 
 import (
-	"bufio"
 	"crypto/sha256"
-	"encoding/base64"
 	"encoding/binary"
-	"encoding/json"
 	"flag"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -152,6 +148,27 @@ func main() {
 	}
 }
 
+// detectKeyFile resolves the key file for a version directory.
+// If customKeyFile is non-empty, validates it exists. Otherwise auto-detects
+// from standard names: program.exe, game.exe, app.exe, main.exe.
+// Returns the key file name, or empty string with nil error if none auto-detected.
+func detectKeyFile(dirPath, customKeyFile string) (string, error) {
+	if customKeyFile != "" {
+		if utils.FileExists(filepath.Join(dirPath, customKeyFile)) {
+			return customKeyFile, nil
+		}
+		return "", fmt.Errorf("custom key file not found: %s", customKeyFile)
+	}
+
+	candidates := []string{"program.exe", "game.exe", "app.exe", "main.exe"}
+	for _, kf := range candidates {
+		if utils.FileExists(filepath.Join(dirPath, kf)) {
+			return kf, nil
+		}
+	}
+	return "", nil
+}
+
 // parseSplitSize parses a size string like "2G", "2GB", "500M", "500MB" into bytes
 func parseSplitSize(sizeStr string) (int64, error) {
 	sizeStr = strings.ToUpper(strings.TrimSpace(sizeStr))
@@ -225,32 +242,17 @@ func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, ou
 	}
 
 	// Determine key file to use
-	var keyFile string
-	if customKeyFile != "" {
-		// Use custom key file if provided
-		if utils.FileExists(filepath.Join(newVersionPath, customKeyFile)) {
-			keyFile = customKeyFile
-			fmt.Printf("Using custom key file: %s\n", keyFile)
-		} else {
-			fmt.Printf("Error: custom key file not found: %s\n", customKeyFile)
-			os.Exit(1)
-		}
-	} else {
-		// Auto-detect key file from common names
-		keyFiles := []string{"program.exe", "game.exe", "app.exe", "main.exe"}
-		for _, kf := range keyFiles {
-			if utils.FileExists(filepath.Join(newVersionPath, kf)) {
-				keyFile = kf
-				break
-			}
-		}
-		if keyFile == "" {
-			fmt.Println("Error: could not find key file (program.exe, game.exe, app.exe, or main.exe)")
-			fmt.Println("Hint: Use --key-file to specify a custom key file")
-			os.Exit(1)
-		}
-		fmt.Printf("Auto-detected key file: %s\n", keyFile)
+	keyFile, err := detectKeyFile(newVersionPath, customKeyFile)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
 	}
+	if keyFile == "" {
+		fmt.Println("Error: could not find key file (program.exe, game.exe, app.exe, or main.exe)")
+		fmt.Println("Hint: Use --key-file to specify a custom key file")
+		os.Exit(1)
+	}
+	fmt.Printf("Using key file: %s\n", keyFile)
 
 	toVer, err := versionMgr.RegisterVersion(newVersion, newVersionPath, keyFile)
 	if err != nil {
@@ -271,23 +273,14 @@ func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, ou
 		fmt.Printf("\nProcessing version %s...\n", fromVersion)
 
 		// Auto-detect key file for this source version (may differ from target)
-		var fromKeyFile string
-		if customKeyFile != "" {
-			// Use custom key file if specified
-			fromKeyFile = customKeyFile
-		} else {
-			// Auto-detect key file from common names for this version
-			keyFiles := []string{"program.exe", "game.exe", "app.exe", "main.exe"}
-			for _, kf := range keyFiles {
-				if utils.FileExists(filepath.Join(fromPath, kf)) {
-					fromKeyFile = kf
-					break
-				}
-			}
-			if fromKeyFile == "" {
-				fmt.Printf("Warning: skipping %s - no key file found (tried: program.exe, game.exe, app.exe, main.exe)\n", fromVersion)
-				continue
-			}
+		fromKeyFile, err := detectKeyFile(fromPath, customKeyFile)
+		if err != nil {
+			fmt.Printf("Warning: skipping %s - %v\n", fromVersion, err)
+			continue
+		}
+		if fromKeyFile == "" {
+			fmt.Printf("Warning: skipping %s - no key file found (tried: program.exe, game.exe, app.exe, main.exe)\n", fromVersion)
+			continue
 		}
 
 		fromVer, err := versionMgr.RegisterVersion(fromVersion, fromPath, fromKeyFile)
@@ -345,26 +338,17 @@ func generateSinglePatch(versionMgr *version.Manager, versionsDir, from, to, out
 
 	// Determine key file for FROM version
 	fromPath := filepath.Join(versionsDir, from)
-	var fromKeyFile string
-	if customKeyFile != "" {
-		// Use custom key file if provided
-		fromKeyFile = customKeyFile
-	} else {
-		// Auto-detect key file from common names
-		keyFiles := []string{"program.exe", "game.exe", "app.exe", "main.exe"}
-		for _, kf := range keyFiles {
-			if utils.FileExists(filepath.Join(fromPath, kf)) {
-				fromKeyFile = kf
-				break
-			}
-		}
-		if fromKeyFile == "" {
-			fmt.Println("Error: could not find key file in source version (program.exe, game.exe, app.exe, or main.exe)")
-			fmt.Println("Hint: Use --key-file to specify a custom key file")
-			os.Exit(1)
-		}
-		fmt.Printf("Auto-detected source key file: %s\n", fromKeyFile)
+	fromKeyFile, err := detectKeyFile(fromPath, customKeyFile)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
 	}
+	if fromKeyFile == "" {
+		fmt.Println("Error: could not find key file in source version (program.exe, game.exe, app.exe, or main.exe)")
+		fmt.Println("Hint: Use --key-file to specify a custom key file")
+		os.Exit(1)
+	}
+	fmt.Printf("Auto-detected source key file: %s\n", fromKeyFile)
 
 	// Register source version
 	fromVer, err := versionMgr.RegisterVersion(from, fromPath, fromKeyFile)
@@ -375,24 +359,17 @@ func generateSinglePatch(versionMgr *version.Manager, versionsDir, from, to, out
 
 	// Determine key file for TO version (may differ from source)
 	toPath := filepath.Join(versionsDir, to)
-	var toKeyFile string
-	if customKeyFile != "" {
-		toKeyFile = customKeyFile
-	} else {
-		keyFiles := []string{"program.exe", "game.exe", "app.exe", "main.exe"}
-		for _, kf := range keyFiles {
-			if utils.FileExists(filepath.Join(toPath, kf)) {
-				toKeyFile = kf
-				break
-			}
-		}
-		if toKeyFile == "" {
-			fmt.Println("Error: could not find key file in target version (program.exe, game.exe, app.exe, or main.exe)")
-			fmt.Println("Hint: Use --key-file to specify a custom key file")
-			os.Exit(1)
-		}
-		fmt.Printf("Auto-detected target key file: %s\n", toKeyFile)
+	toKeyFile, err := detectKeyFile(toPath, customKeyFile)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
 	}
+	if toKeyFile == "" {
+		fmt.Println("Error: could not find key file in target version (program.exe, game.exe, app.exe, or main.exe)")
+		fmt.Println("Hint: Use --key-file to specify a custom key file")
+		os.Exit(1)
+	}
+	fmt.Printf("Auto-detected target key file: %s\n", toKeyFile)
 
 	toVer, err := versionMgr.RegisterVersion(to, toPath, toKeyFile)
 	if err != nil {
@@ -449,26 +426,17 @@ func generateSinglePatchCustomPaths(versionMgr *version.Manager, fromPath, toPat
 	fmt.Printf("Generating patch from %s (%s) to %s (%s)...\n", fromVersion, fromPath, toVersion, toPath)
 
 	// Determine key file for FROM version
-	var fromKeyFile string
-	if customKeyFile != "" {
-		// Use custom key file if provided
-		fromKeyFile = customKeyFile
-	} else {
-		// Auto-detect key file from common names
-		keyFiles := []string{"program.exe", "game.exe", "app.exe", "main.exe"}
-		for _, kf := range keyFiles {
-			if utils.FileExists(filepath.Join(fromPath, kf)) {
-				fromKeyFile = kf
-				break
-			}
-		}
-		if fromKeyFile == "" {
-			fmt.Println("Error: could not find key file in source directory (program.exe, game.exe, app.exe, or main.exe)")
-			fmt.Println("Hint: Use --key-file to specify a custom key file")
-			os.Exit(1)
-		}
-		fmt.Printf("Auto-detected source key file: %s\n", fromKeyFile)
+	fromKeyFile, err := detectKeyFile(fromPath, customKeyFile)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
 	}
+	if fromKeyFile == "" {
+		fmt.Println("Error: could not find key file in source directory (program.exe, game.exe, app.exe, or main.exe)")
+		fmt.Println("Hint: Use --key-file to specify a custom key file")
+		os.Exit(1)
+	}
+	fmt.Printf("Auto-detected source key file: %s\n", fromKeyFile)
 
 	// Register source version
 	fmt.Printf("Registering source version %s...\n", fromVersion)
@@ -479,24 +447,17 @@ func generateSinglePatchCustomPaths(versionMgr *version.Manager, fromPath, toPat
 	}
 
 	// Determine key file for TO version (may differ from source)
-	var toKeyFile string
-	if customKeyFile != "" {
-		toKeyFile = customKeyFile
-	} else {
-		keyFiles := []string{"program.exe", "game.exe", "app.exe", "main.exe"}
-		for _, kf := range keyFiles {
-			if utils.FileExists(filepath.Join(toPath, kf)) {
-				toKeyFile = kf
-				break
-			}
-		}
-		if toKeyFile == "" {
-			fmt.Println("Error: could not find key file in target directory (program.exe, game.exe, app.exe, or main.exe)")
-			fmt.Println("Hint: Use --key-file to specify a custom key file")
-			os.Exit(1)
-		}
-		fmt.Printf("Auto-detected target key file: %s\n", toKeyFile)
+	toKeyFile, err := detectKeyFile(toPath, customKeyFile)
+	if err != nil {
+		fmt.Printf("Error: %v\n", err)
+		os.Exit(1)
 	}
+	if toKeyFile == "" {
+		fmt.Println("Error: could not find key file in target directory (program.exe, game.exe, app.exe, or main.exe)")
+		fmt.Println("Hint: Use --key-file to specify a custom key file")
+		os.Exit(1)
+	}
+	fmt.Printf("Auto-detected target key file: %s\n", toKeyFile)
 
 	// Register target version
 	fmt.Printf("Registering target version %s...\n", toVersion)
@@ -558,7 +519,6 @@ func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string
 	options := &utils.PatchOptions{
 		Compression:      compression,
 		CompressionLevel: level,
-		VerifyAfter:      true,
 		SkipIdentical:    true,
 	}
 
@@ -592,7 +552,7 @@ func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string
 		}
 
 		// Save multi-part patch (pass chunk size for additional per-part chunking)
-		if err := generator.SaveMultiPartPatch(parts, outputFile, compression, customMaxPartSize); err != nil {
+		if err := generator.SaveMultiPartPatch(parts, outputFile, compression, customMaxPartSize, level); err != nil {
 			return fmt.Errorf("failed to save multi-part patch: %w", err)
 		}
 
@@ -662,7 +622,6 @@ func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, revers
 	options := &utils.PatchOptions{
 		Compression:      compression,
 		CompressionLevel: level,
-		VerifyAfter:      verify,
 		SkipIdentical:    true,
 	}
 
@@ -711,68 +670,9 @@ func savePatch(patch *utils.Patch, filename string, options *utils.PatchOptions)
 }
 
 func savePatchWithCustomSize(patch *utils.Patch, filename string, options *utils.PatchOptions, customMaxPartSize int64) error {
-	// Create output file
-	outFile, err := os.Create(filename)
-	if err != nil {
-		return fmt.Errorf("failed to create patch file: %w", err)
-	}
-	defer outFile.Close()
-
-	// Create a pipe for streaming JSON encoding
-	jsonReader, jsonWriter := io.Pipe()
-	defer jsonReader.Close()
-
-	// Start custom streaming JSON encoding in a goroutine
-	encodeErr := make(chan error, 1)
-	go func() {
-		defer jsonWriter.Close()
-		encodeErr <- encodePatchStreaming(patch, jsonWriter)
-	}()
-
-	// Set up compression if needed
-	var finalReader io.Reader = jsonReader
-
-	if options.Compression != "none" && options.Compression != "" {
-		// Create a pipe for compression
-		compressedReader, compressor := io.Pipe()
-
-		// Start compression in a goroutine
-		go func() {
-			defer compressor.Close()
-			err := utils.CompressDataStreaming(jsonReader, compressor, options.Compression, options.CompressionLevel)
-			if err != nil {
-				compressor.CloseWithError(err)
-			}
-		}()
-
-		finalReader = compressedReader
-	}
-
-	// Create a hash writer to calculate checksum while writing
-	hasher := sha256.New()
-	multiWriter := io.MultiWriter(outFile, hasher)
-
-	// Copy data through compression and hashing
-	_, err = io.Copy(multiWriter, finalReader)
-	if err != nil {
-		return fmt.Errorf("failed to write patch data: %w", err)
-	}
-
-	// Close output file
-	if err := outFile.Close(); err != nil {
-		return fmt.Errorf("failed to close output file: %w", err)
-	}
-
-	// Check for encoding errors
-	if err := <-encodeErr; err != nil {
-		return fmt.Errorf("failed to encode patch: %w", err)
-	}
-
-	// Calculate checksum
-	checksum := fmt.Sprintf("%x", hasher.Sum(nil))
-	patch.Header.Checksum = checksum
-
-	return nil
+	// customMaxPartSize is unused in the save path itself — it's consumed by the
+	// caller (generatePatch) for multi-part splitting decisions before this is called.
+	return utils.SavePatch(patch, filename, options.Compression, options.CompressionLevel)
 }
 
 // createStandaloneCLIExe creates a self-contained CLI executable by appending patch data to CLI applier
@@ -924,217 +824,6 @@ func createStandaloneCLIExe(patchPath, exePath, compression string, silent bool)
 }
 
 // encodePatchStreaming writes the patch as JSON in a streaming fashion to avoid memory exhaustion
-func encodePatchStreaming(patch *utils.Patch, writer io.Writer) error {
-	// Create a buffered writer for better performance
-	bufWriter := bufio.NewWriterSize(writer, 64*1024) // 64KB buffer
-	defer bufWriter.Flush()
-
-	// Write opening brace
-	if _, err := bufWriter.WriteString("{\n"); err != nil {
-		return err
-	}
-
-	// Encode header
-	if err := encodeField(bufWriter, "Header", patch.Header, true); err != nil {
-		return err
-	}
-
-	// Encode simple fields
-	if err := encodeField(bufWriter, "FromVersion", patch.FromVersion, true); err != nil {
-		return err
-	}
-	if err := encodeField(bufWriter, "ToVersion", patch.ToVersion, true); err != nil {
-		return err
-	}
-	if err := encodeField(bufWriter, "FromKeyFile", patch.FromKeyFile, true); err != nil {
-		return err
-	}
-	if err := encodeField(bufWriter, "ToKeyFile", patch.ToKeyFile, true); err != nil {
-		return err
-	}
-	if err := encodeField(bufWriter, "RequiredFiles", patch.RequiredFiles, true); err != nil {
-		return err
-	}
-	if err := encodeField(bufWriter, "SimpleMode", patch.SimpleMode, true); err != nil {
-		return err
-	}
-
-	// Encode operations array manually to stream large data
-	if _, err := bufWriter.WriteString(`  "Operations": [`); err != nil {
-		return err
-	}
-
-	for i, op := range patch.Operations {
-		if i > 0 {
-			if _, err := bufWriter.WriteString(",\n"); err != nil {
-				return err
-			}
-		} else {
-			if _, err := bufWriter.WriteString("\n"); err != nil {
-				return err
-			}
-		}
-
-		if err := encodeOperation(bufWriter, op); err != nil {
-			return err
-		}
-	}
-
-	if _, err := bufWriter.WriteString("\n  ]\n"); err != nil {
-		return err
-	}
-
-	// Write closing brace
-	if _, err := bufWriter.WriteString("}\n"); err != nil {
-		return err
-	}
-
-	return bufWriter.Flush()
-}
-
-// encodeField encodes a single field with proper JSON formatting
-func encodeField(writer io.Writer, name string, value interface{}, addComma bool) error {
-	commaStr := ","
-	if !addComma {
-		commaStr = ""
-	}
-
-	// For simple types, use JSON encoding
-	data, err := json.MarshalIndent(value, "  ", "  ")
-	if err != nil {
-		return err
-	}
-
-	// Write field name and value
-	fieldStr := fmt.Sprintf("  \"%s\": ", name)
-	if _, err := writer.Write([]byte(fieldStr)); err != nil {
-		return err
-	}
-
-	// Write the JSON data, but indent it properly
-	lines := strings.Split(string(data), "\n")
-	for i, line := range lines {
-		if i > 0 {
-			if _, err := writer.Write([]byte("\n")); err != nil {
-				return err
-			}
-		}
-		if _, err := writer.Write([]byte(line)); err != nil {
-			return err
-		}
-	}
-
-	if _, err := writer.Write([]byte(commaStr + "\n")); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// encodeOperation encodes a single patch operation with streaming for large binary data
-func encodeOperation(writer io.Writer, op utils.PatchOperation) error {
-	// Write operation opening
-	if _, err := writer.Write([]byte("    {\n")); err != nil {
-		return err
-	}
-
-	// Encode simple fields
-	if err := encodeOperationField(writer, "Type", int(op.Type), true); err != nil {
-		return err
-	}
-	if err := encodeOperationField(writer, "FilePath", op.FilePath, true); err != nil {
-		return err
-	}
-	if err := encodeOperationField(writer, "BinaryDiff", op.BinaryDiff, true); err != nil {
-		return err
-	}
-
-	// Encode NewFile data - this is the large binary data that needs streaming
-	if err := encodeOperationField(writer, "NewFile", op.NewFile, true); err != nil {
-		return err
-	}
-
-	if err := encodeOperationField(writer, "OldChecksum", op.OldChecksum, true); err != nil {
-		return err
-	}
-	if err := encodeOperationField(writer, "NewChecksum", op.NewChecksum, true); err != nil {
-		return err
-	}
-	if err := encodeOperationField(writer, "Size", op.Size, false); err != nil {
-		return err
-	}
-
-	// Write operation closing
-	if _, err := writer.Write([]byte("\n    }")); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// encodeOperationField encodes a single field within an operation
-func encodeOperationField(writer io.Writer, name string, value interface{}, addComma bool) error {
-	commaStr := ","
-	if !addComma {
-		commaStr = ""
-	}
-
-	fieldStr := fmt.Sprintf("      \"%s\": ", name)
-	if _, err := writer.Write([]byte(fieldStr)); err != nil {
-		return err
-	}
-
-	// For byte slices (binary data), encode as base64 using streaming encoder
-	if byteData, ok := value.([]byte); ok {
-		// Write opening quote
-		if _, err := writer.Write([]byte("\"")); err != nil {
-			return err
-		}
-
-		// Create base64 encoder that writes directly to output
-		encoder := base64.NewEncoder(base64.StdEncoding, writer)
-
-		// Write data in chunks to avoid memory exhaustion
-		const chunkSize = 64 * 1024 // 64KB chunks
-		for i := 0; i < len(byteData); i += chunkSize {
-			end := i + chunkSize
-			if end > len(byteData) {
-				end = len(byteData)
-			}
-			if _, err := encoder.Write(byteData[i:end]); err != nil {
-				encoder.Close()
-				return err
-			}
-		}
-
-		// Close encoder to flush any remaining data
-		if err := encoder.Close(); err != nil {
-			return err
-		}
-
-		// Write closing quote and comma
-		if _, err := writer.Write([]byte(fmt.Sprintf("\"%s", commaStr))); err != nil {
-			return err
-		}
-	} else {
-		// For other types, use JSON encoding
-		data, err := json.Marshal(value)
-		if err != nil {
-			return err
-		}
-		jsonStr := string(data) + commaStr
-		if _, err := writer.Write([]byte(jsonStr)); err != nil {
-			return err
-		}
-	}
-
-	if _, err := writer.Write([]byte("\n")); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func printHelp() {
 	fmt.Printf("CyberPatchMaker - Patch Generator v%s\n", version.GetVersion())
 	fmt.Println("\nUsage:")

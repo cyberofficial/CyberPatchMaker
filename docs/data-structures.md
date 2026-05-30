@@ -251,7 +251,6 @@ Configures patch generation behavior.
 type PatchOptions struct {
     Compression       string // "zstd", "gzip", "none"
     CompressionLevel  int    // 1-4 for zstd, 1-3 for gzip
-    VerifyAfter       bool   // Verify patch after creation (currently unused)
     GenerateSignature bool   // Create digital signature (future)
     ParallelWorkers   int    // Number of parallel workers
     SkipIdentical     bool   // Skip binary-identical files

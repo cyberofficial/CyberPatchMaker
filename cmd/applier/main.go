@@ -197,69 +197,55 @@ func loadPatch(filename string) (*utils.Patch, error) {
 //	return &patch, nil
 //}
 
-// parsePatchDataStreaming parses patch data using streaming decompression to handle large files
+// parsePatchDataStreaming parses patch data using streaming decompression with magic-byte detection.
 func parsePatchDataStreaming(reader io.Reader) (*utils.Patch, error) {
-	// Read first few bytes to detect format without consuming the full stream
-	limitedReader := &io.LimitedReader{R: reader, N: 10}
-	header := make([]byte, 10)
-	n, err := limitedReader.Read(header)
-	if err != nil && err != io.EOF {
+	// Read first 4 bytes to detect compression format
+	magic := make([]byte, 4)
+	n, err := io.ReadFull(reader, magic)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 		return nil, fmt.Errorf("failed to read patch header: %w", err)
 	}
-	header = header[:n]
+	magic = magic[:n]
 
-	// Check if it starts with JSON (uncompressed)
-	if len(header) > 0 && header[0] == '{' {
-		// Uncompressed JSON - combine header with remaining reader
-		fullReader := io.MultiReader(bytes.NewReader(header), reader)
-		// Use a buffered reader with large buffer for large JSON documents
-		bufReader := bufio.NewReaderSize(fullReader, 64*1024*1024) // 64MB buffer
-		var patch utils.Patch
-		decoder := json.NewDecoder(bufReader)
-		decoder.UseNumber() // Preserve large numbers
-		if err := decoder.Decode(&patch); err != nil {
-			return nil, fmt.Errorf("failed to parse uncompressed patch JSON: %w", err)
-		}
-		return &patch, nil
+	// Detect compression from magic bytes
+	algo := utils.DetectCompression(magic)
+
+	// Reconstruct full reader
+	fullReader := io.MultiReader(bytes.NewReader(magic), reader)
+
+	var patchReader io.Reader
+	switch algo {
+	case "none":
+		patchReader = fullReader
+	case "zstd":
+		pr, pw := io.Pipe()
+		go func() {
+			defer pw.Close()
+			if err := utils.DecompressDataStreaming(fullReader, pw, "zstd"); err != nil {
+				pw.CloseWithError(err)
+			}
+		}()
+		patchReader = pr
+	case "gzip":
+		pr, pw := io.Pipe()
+		go func() {
+			defer pw.Close()
+			if err := utils.DecompressDataStreaming(fullReader, pw, "gzip"); err != nil {
+				pw.CloseWithError(err)
+			}
+		}()
+		patchReader = pr
+	default:
+		return nil, fmt.Errorf("unsupported compression format")
 	}
 
-	// Not uncompressed JSON, try compressed formats
-	// Combine header with remaining reader for decompression
-	fullReader := io.MultiReader(bytes.NewReader(header), reader)
-
-	// Try zstd decompression
-	zstdPipeReader, zstdPipeWriter := io.Pipe()
-	go func() {
-		defer zstdPipeWriter.Close()
-		if err := utils.DecompressDataStreaming(fullReader, zstdPipeWriter, "zstd"); err != nil {
-			zstdPipeWriter.CloseWithError(err)
-		}
-	}()
-
-	// Use buffered reader for large JSON documents
-	bufReader := bufio.NewReaderSize(zstdPipeReader, 64*1024*1024) // 64MB buffer
+	// 64KB buffer is sufficient for streaming JSON decoding
+	bufReader := bufio.NewReaderSize(patchReader, 64*1024)
 	var patch utils.Patch
 	decoder := json.NewDecoder(bufReader)
-	decoder.UseNumber() // Preserve large numbers as strings to avoid precision loss
-	if err := decoder.Decode(&patch); err == nil {
-		return &patch, nil
-	}
-
-	// Zstd failed, try gzip with fresh reader
-	fullReader = io.MultiReader(bytes.NewReader(header), reader)
-	gzipPipeReader, gzipPipeWriter := io.Pipe()
-	go func() {
-		defer gzipPipeWriter.Close()
-		if err := utils.DecompressDataStreaming(fullReader, gzipPipeWriter, "gzip"); err != nil {
-			gzipPipeWriter.CloseWithError(err)
-		}
-	}()
-
-	bufReader = bufio.NewReaderSize(gzipPipeReader, 64*1024*1024) // 64MB buffer
-	decoder = json.NewDecoder(bufReader)
-	decoder.UseNumber() // Preserve large numbers as strings to avoid precision loss
+	decoder.UseNumber()
 	if err := decoder.Decode(&patch); err != nil {
-		return nil, fmt.Errorf("failed to parse patch: unsupported compression or invalid format: %w", err)
+		return nil, fmt.Errorf("failed to parse patch: %w", err)
 	}
 
 	return &patch, nil

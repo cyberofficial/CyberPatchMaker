@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -12,7 +13,7 @@ import (
 )
 
 // SavePatch saves a patch to a file with optional compression
-func SavePatch(patch *Patch, filename string, compression string) error {
+func SavePatch(patch *Patch, filename string, compression string, level int) error {
 	// Create output file
 	outFile, err := os.Create(filename)
 	if err != nil {
@@ -41,7 +42,7 @@ func SavePatch(patch *Patch, filename string, compression string) error {
 		// Start compression in a goroutine
 		go func() {
 			defer compressor.Close()
-			err := CompressDataStreaming(jsonReader, compressor, compression, 3) // Default level 3
+			err := CompressDataStreaming(jsonReader, compressor, compression, level)
 			if err != nil {
 				compressor.CloseWithError(err)
 			}
@@ -77,37 +78,68 @@ func SavePatch(patch *Patch, filename string, compression string) error {
 	return nil
 }
 
-// LoadPatch loads a patch from a file
+// LoadPatch loads a patch from a file using streaming decompression.
 func LoadPatch(filename string) (*Patch, error) {
-	// Read file
-	data, err := os.ReadFile(filename)
+	file, err := os.Open(filename)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read patch file: %w", err)
+		return nil, fmt.Errorf("failed to open patch file: %w", err)
+	}
+	defer file.Close()
+
+	return loadPatchStreaming(file)
+}
+
+// loadPatchStreaming parses patch data using streaming and magic-byte detection.
+func loadPatchStreaming(reader io.Reader) (*Patch, error) {
+	// Read first 4 bytes to detect compression format without consuming the stream
+	magic := make([]byte, 4)
+	n, err := io.ReadFull(reader, magic)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
+		return nil, fmt.Errorf("failed to read patch header: %w", err)
+	}
+	magic = magic[:n]
+
+	// Detect compression format from magic bytes
+	algo := DetectCompression(magic)
+
+	// Reconstruct full reader with magic bytes prepended
+	fullReader := io.MultiReader(bytes.NewReader(magic), reader)
+
+	var patchReader io.Reader
+	switch algo {
+	case "none":
+		patchReader = fullReader
+	case "zstd":
+		pr, pw := io.Pipe()
+		go func() {
+			defer pw.Close()
+			if err := DecompressDataStreaming(fullReader, pw, "zstd"); err != nil {
+				pw.CloseWithError(err)
+			}
+		}()
+		patchReader = pr
+	case "gzip":
+		pr, pw := io.Pipe()
+		go func() {
+			defer pw.Close()
+			if err := DecompressDataStreaming(fullReader, pw, "gzip"); err != nil {
+				pw.CloseWithError(err)
+			}
+		}()
+		patchReader = pr
+	default:
+		return nil, fmt.Errorf("unsupported compression format")
 	}
 
-	// Try to parse as uncompressed JSON first
 	var patch Patch
-	if err := json.Unmarshal(data, &patch); err == nil {
-		return &patch, nil
+	bufReader := bufio.NewReaderSize(patchReader, 64*1024) // 64KB buffer is sufficient for streaming JSON
+	decoder := json.NewDecoder(bufReader)
+	decoder.UseNumber()
+	if err := decoder.Decode(&patch); err != nil {
+		return nil, fmt.Errorf("failed to parse patch: %w", err)
 	}
 
-	// Try decompressing with zstd
-	decompressed, err := DecompressData(data, "zstd")
-	if err == nil {
-		if err := json.Unmarshal(decompressed, &patch); err == nil {
-			return &patch, nil
-		}
-	}
-
-	// Try gzip
-	decompressed, err = DecompressData(data, "gzip")
-	if err == nil {
-		if err := json.Unmarshal(decompressed, &patch); err == nil {
-			return &patch, nil
-		}
-	}
-
-	return nil, fmt.Errorf("failed to load and decompress patch")
+	return &patch, nil
 }
 
 // encodePatchStreaming writes the patch as JSON in a streaming fashion to avoid memory exhaustion

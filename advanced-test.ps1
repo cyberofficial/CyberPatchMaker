@@ -3436,6 +3436,88 @@ if ($runlargefile) {
     }
 }
 
+# Test 61: Key File Detection - versions-dir mode
+Test-Step "Optimization: Key file auto-detection in versions-dir mode" {
+	$output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches-opt1 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Exit code $LASTEXITCODE" }
+	if (-not (Test-Path "testdata/advanced-output/patches-opt1/1.0.0-to-1.0.1.patch")) { throw "Patch not created" }
+}
+
+# Test 62: Key File Detection - custom paths mode
+Test-Step "Optimization: Key file auto-detection in from-dir/to-dir mode" {
+	$output = .\patch-gen.exe --from-dir .\testdata\versions\1.0.0 --to-dir .\testdata\versions\1.0.1 --output .\testdata\advanced-output\patches-opt2 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Exit code $LASTEXITCODE" }
+	if (-not (Test-Path "testdata/advanced-output/patches-opt2/1.0.0-to-1.0.1.patch")) { throw "Patch not created" }
+}
+
+# Test 63: Key File Detection --key-file override
+Test-Step "Optimization: Key file override with --key-file flag" {
+	if (Test-Path "testdata/versions-custom") { Remove-Item "testdata/versions-custom" -Recurse -Force }
+	New-Item -ItemType Directory -Force -Path "testdata/versions-custom/1.0.0" | Out-Null
+	New-Item -ItemType Directory -Force -Path "testdata/versions-custom/1.0.1" | Out-Null
+	Copy-Item "testdata/versions/1.0.0/program.exe" "testdata/versions-custom/1.0.0/myapp.exe"
+	Copy-Item "testdata/versions/1.0.0/config.json" "testdata/versions-custom/1.0.0/"
+	Copy-Item "testdata/versions/1.0.1/program.exe" "testdata/versions-custom/1.0.1/myapp.exe"
+	Copy-Item "testdata/versions/1.0.1/config.json" "testdata/versions-custom/1.0.1/"
+	if (Test-Path "testdata/versions/1.0.1/libs") { Copy-Item -Recurse "testdata/versions/1.0.1/libs" "testdata/versions-custom/1.0.1/" }
+	$output = .\patch-gen.exe --from-dir "testdata/versions-custom/1.0.0" --to-dir "testdata/versions-custom/1.0.1" --key-file myapp.exe --output "testdata/advanced-output/patches-opt3" 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Exit code $LASTEXITCODE" }
+	if (-not (Test-Path "testdata/advanced-output/patches-opt3/1.0.0-to-1.0.1.patch")) { throw "Patch not created" }
+	Remove-Item "testdata/versions-custom" -Recurse -Force
+}
+
+# Test 64: Compression Level - zstd level 4
+Test-Step "Optimization: zstd compression level 4" {
+	$output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches-opt4 --compression zstd --level 4 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Exit code $LASTEXITCODE" }
+	if (-not (Test-Path "testdata/advanced-output/patches-opt4/1.0.0-to-1.0.1.patch")) { throw "Patch not created" }
+}
+
+# Test 65: Compression Level - gzip level 3
+Test-Step "Optimization: gzip compression level 3" {
+	$output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches-opt5 --compression gzip --level 3 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Exit code $LASTEXITCODE" }
+	if (-not (Test-Path "testdata/advanced-output/patches-opt5/1.0.0-to-1.0.1.patch")) { throw "Patch not created" }
+}
+
+# Test 66: Streaming LoadPatch - zstd magic-byte detection
+Test-Step "Optimization: Streaming LoadPatch with zstd" {
+	$output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches-opt6 --compression zstd 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Gen failed: $output" }
+	New-Item -ItemType Directory -Force -Path "testdata/advanced-output" | Out-Null
+	Copy-Item -Recurse "testdata/versions/1.0.0" "testdata/advanced-output/t-opt6"
+	$output = .\patch-apply.exe --patch "testdata/advanced-output/patches-opt6/1.0.0-to-1.0.1.patch" --current-dir "testdata/advanced-output/t-opt6" --verify 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Apply failed: $output" }
+	$content = Get-Content "testdata/advanced-output/t-opt6/program.exe" -Raw
+	if ($content -notmatch "v1.0.1") { throw "Patch didn't update program.exe" }
+}
+
+# Test 67: Streaming LoadPatch - gzip magic-byte detection
+Test-Step "Optimization: Streaming LoadPatch with gzip" {
+	Copy-Item -Recurse "testdata/versions/1.0.0" "testdata/advanced-output/t-opt7" | Out-Null
+	$output = .\patch-apply.exe --patch "testdata/advanced-output/patches-opt5/1.0.0-to-1.0.1.patch" --current-dir "testdata/advanced-output/t-opt7" --verify 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Exit code $LASTEXITCODE" }
+	$content = Get-Content "testdata/advanced-output/t-opt7/program.exe" -Raw
+	if ($content -notmatch "v1.0.1") { throw "Patch didn't update program.exe" }
+}
+
+# Test 68: --crp reverse patch roundtrip
+Test-Step "Optimization: Forward and reverse patch roundtrip" {
+	$output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches-opt8 --crp --compression zstd 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Gen failed: $output" }
+	if (-not (Test-Path "testdata/advanced-output/patches-opt8/1.0.0-to-1.0.1.patch")) { throw "Forward patch not created" }
+	if (-not (Test-Path "testdata/advanced-output/patches-opt8/1.0.1-to-1.0.0.patch")) { throw "Reverse patch not created" }
+	Copy-Item -Recurse "testdata/versions/1.0.0" "testdata/advanced-output/t-opt8" | Out-Null
+	$output = .\patch-apply.exe --patch "testdata/advanced-output/patches-opt8/1.0.0-to-1.0.1.patch" --current-dir "testdata/advanced-output/t-opt8" --verify 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Forward apply failed: $output" }
+	$content = Get-Content "testdata/advanced-output/t-opt8/program.exe" -Raw
+	if ($content -notmatch "v1.0.1") { throw "Forward patch didn't upgrade" }
+	$output = .\patch-apply.exe --patch "testdata/advanced-output/patches-opt8/1.0.1-to-1.0.0.patch" --current-dir "testdata/advanced-output/t-opt8" --verify 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Reverse apply failed: $output" }
+	$content = Get-Content "testdata/advanced-output/t-opt8/program.exe" -Raw
+	if ($content -notmatch "v1.0.0") { throw "Reverse patch didn't downgrade" }
+}
+
 # Final summary
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan

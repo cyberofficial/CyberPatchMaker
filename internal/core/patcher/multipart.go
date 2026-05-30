@@ -119,7 +119,7 @@ func (g *Generator) SplitPatchIntoParts(patch *utils.Patch, maxPartSize int64) (
 }
 
 // SaveMultiPartPatch saves a multi-part patch to disk
-func (g *Generator) SaveMultiPartPatch(parts []*utils.Patch, basePath string, compression string, chunkSize int64) error {
+func (g *Generator) SaveMultiPartPatch(parts []*utils.Patch, basePath string, compression string, chunkSize int64, level int) error {
 	if len(parts) == 0 {
 		return fmt.Errorf("no parts to save")
 	}
@@ -141,7 +141,7 @@ func (g *Generator) SaveMultiPartPatch(parts []*utils.Patch, basePath string, co
 			part.MultiPart.PartHashes = nil
 		}
 
-		if err := utils.SavePatch(part, partPath, compression); err != nil {
+		if err := utils.SavePatch(part, partPath, compression, level); err != nil {
 			return fmt.Errorf("failed to save part %d: %w", i+1, err)
 		}
 	}
@@ -222,30 +222,7 @@ func (g *Generator) SaveMultiPartPatch(parts []*utils.Patch, basePath string, co
 			// Mark this part as chunked
 			chunked[i] = true
 
-			// Store chunk metadata in part 1 MultiPart info
-			if parts[0].MultiPart != nil {
-				if parts[0].MultiPart.PartHashes == nil {
-					parts[0].MultiPart.PartHashes = partHashes
-				}
-				if parts[0].MultiPart.PartHashes == nil {
-					parts[0].MultiPart.PartHashes = partHashes
-				}
-				if parts[0].MultiPart.PartHashes == nil {
-					// already handled, but keep safety
-				}
-				if parts[0].MultiPart.PartHashes != nil {
-					// initialize PartChunks map if not present by using a temporary map stored in header via PartHashes length
-					// Since MultiPart.PartChunks doesn't exist yet in struct, we'll use a new field by attaching to PartHashes via negative behavior is not allowed. Instead, we'll use the new PartChunk slice on the patch's MultiPart via reflection-like assignment: create a map by type assertion.
-				}
-				// Ensure PartChunks map exists
-				if parts[0].MultiPart.PartHashes != nil {
-					// lazily attach PartChunks by creating a temporary map in header using a well-known field: we will set parts[0].MultiPart.PartHashes later; instead store chunks in a companion file? Simpler: store chunk info in part 1 by creating a new field PartChunks using an auxiliary variable on the patch object.
-				}
-
-				// We'll attach chunk info by using a new field on MultiPart via an additional variable on the struct
-			}
-
-			// Save chunk info using the patch's header by creating a dedicated companion JSON sidecar
+			// Save chunk sidecar JSON file for reconstruction during load
 			// Sidecar filename: <baseFile>.part<partNum>.chunks.json
 			sidecarName := fmt.Sprintf("%s.part%d.chunks.json", baseFile, i+1)
 			sidecarPath := filepath.Join(baseDir, sidecarName)
@@ -291,7 +268,7 @@ func (g *Generator) SaveMultiPartPatch(parts []*utils.Patch, basePath string, co
 		stub.Operations = stubOps
 
 		// Save stub part 01
-		if err := utils.SavePatch(&stub, partPaths[0], compression); err != nil {
+		if err := utils.SavePatch(&stub, partPaths[0], compression, level); err != nil {
 			return fmt.Errorf("failed to save stubbed part 1: %w", err)
 		}
 		// Update reported size for part 1 to the stub size
@@ -301,7 +278,7 @@ func (g *Generator) SaveMultiPartPatch(parts []*utils.Patch, basePath string, co
 		}
 	} else {
 		// No stub needed; save full part 01 (with PartHashes filled)
-		if err := utils.SavePatch(parts[0], partPaths[0], compression); err != nil {
+		if err := utils.SavePatch(parts[0], partPaths[0], compression, level); err != nil {
 			return fmt.Errorf("failed to save updated part 1: %w", err)
 		}
 

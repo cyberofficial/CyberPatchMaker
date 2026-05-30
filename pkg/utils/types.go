@@ -138,9 +138,8 @@ type PatchHeader struct {
 // PatchOptions configures patch generation
 type PatchOptions struct {
 	Compression       string // "zstd", "gzip", "none"
-	CompressionLevel  int    // 1-9 or algorithm-specific
-	VerifyAfter       bool   // Verify patch after creation
-	GenerateSignature bool   // Create digital signature
+	CompressionLevel  int    // 1-4 for zstd, 1-3 for gzip
+	GenerateSignature bool   // Create digital signature (future)
 	ParallelWorkers   int    // Number of parallel workers
 	SkipIdentical     bool   // Skip binary-identical files
 }

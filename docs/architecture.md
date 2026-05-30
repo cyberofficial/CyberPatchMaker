@@ -91,5 +91,4 @@ Applier detects by reading last 128 bytes of its own file, validating magic, ver
 
 ## External Dependencies
 
-- `github.com/gabstv/go-bsdiff` — binary diffing (wrapped but not used by generator)
 - `github.com/klauspost/compress` — zstd compression
