@@ -4,7 +4,7 @@ Guide to running and understanding CyberPatchMaker's comprehensive test suite.
 
 ## Overview
 
-CyberPatchMaker includes a comprehensive test suite with 61 tests (58 standard + 3 optional) that validate all core functionality including generation, application, verification, error handling, backup system, and advanced scenarios like multi-hop patching, bidirectional patching, downgrade testing, compression formats, and automatic rollback.
+CyberPatchMaker includes a comprehensive test suite with 61 tests (59 standard + 2 optional) that validate all core functionality including generation, application, verification, error handling, backup system, and advanced scenarios like multi-hop patching, bidirectional patching, downgrade testing, compression formats, and automatic rollback.
 
 **Key Feature:** Test data is automatically generated on first run - no bloat files committed to the repository!
 
@@ -15,9 +15,9 @@ CyberPatchMaker includes a comprehensive test suite with 61 tests (58 standard +
 **File:** `advanced-test.ps1`
 **Shell:** PowerShell 5.1 or later
 **Platform:** Windows (PowerShell)
-**Tests:** 61 comprehensive tests (58 standard + 3 optional)
+**Tests:** 61 comprehensive tests (59 standard + 2 optional)
 **Test Data:** Auto-generated on first run (1.0.0, 1.0.1, 1.0.2)
-**Optional Test Flags:** `-run1gbtest`, `-runlargefile`, `-runstreamtest`
+**Optional Test Flags:** `-run1gbtest`, `-runlargefile`
 **Command Visibility:** Shows exact command-line for each operation (displayed in cyan)
 **Bidirectional Testing:** Includes upgrade/downgrade cycle verification
 
@@ -203,23 +203,23 @@ The advanced test suite includes 61 comprehensive tests organized into several c
 53. **Verify scan cache invalidation on file changes** - Cache invalidation
 
 ### Simple Mode Tests (Tests 54-58)
-54. **Verify patch generation with Simple Mode enabled** - Simple Mode generation
-55. **Verify simplified applier interface for Simple Mode patches** - Simplified applier
-56. **Verify complete Simple Mode workflow (generator -> applier)** - End-to-end
+54. **Verify Simple Mode struct field and encoding** - SimpleMode field in Patch struct
+55. **Verify runSimpleMode function exists** - Simplified applier interface
+56. **Verify Simple Mode workflow infrastructure** - End-to-end (field exists, function callable)
 57. **Verify Simple Mode documentation and feature completeness** - Feature validation
 58. **Verify Simple Mode addresses real-world use cases** - Use case scenarios
 
-### .cyberignore Advanced & Large File Tests (Tests 59-61)
+**Note:** The `SimpleMode` field and `runSimpleMode()` function exist in the codebase but no generator code path currently sets `SimpleMode = true`. These tests verify the infrastructure exists.
+
+### .cyberignore Advanced & Large File Tests (Tests 59-60)
 59. **Verify .cyberignore absolute path pattern support** - Absolute path patterns
-60. **Verify .data directory streaming for large files** *(optional: -runstreamtest)* - Streaming
-61. **Verify large file chunked processing and memory optimization** *(optional: -runlargefile)* - Chunked processing
+60. **Verify large file chunked processing and memory optimization** *(optional: -runlargefile)* - Chunked processing
 
 ### Test Data Structure
 
 **Auto-generated test versions:**
 
 **Version 1.0.0** (Baseline - 3 files, 2 directories):
-3. Checks test file exists in each version
 
 **Expected result:** All directories and files present
 
@@ -462,11 +462,8 @@ The test suite supports optional flags for testing advanced features:
 # Test chunked processing for 1.5GB file (memory optimization)
 .\advanced-test.ps1 -runlargefile
 
-# Test .data directory creation and large file streaming
-.\advanced-test.ps1 -runstreamtest
-
 # Combine flags
-.\advanced-test.ps1 -run1gbtest -runlargefile -runstreamtest
+.\advanced-test.ps1 -run1gbtest -runlargefile
 ```
 
 ---
@@ -477,14 +474,14 @@ The test suite supports optional flags for testing advanced features:
 
 ```bash
 # Create new version directory
-mkdir testdata/1.0.3
+mkdir testdata/versions/1.0.3
 
 # Add test files
-echo "Version 1.0.3" > testdata/1.0.3/test-app.txt
-echo "New feature data" > testdata/1.0.3/feature.txt
+echo "Version 1.0.3" > testdata/versions/1.0.3/test-app.txt
+echo "New feature data" > testdata/versions/1.0.3/feature.txt
 
 # Generate patches
-./patch-gen.exe --versions-dir testdata \
+./patch-gen.exe --versions-dir testdata/versions \
             --new-version 1.0.3 \
             --output testdata/patches
 ```
@@ -510,9 +507,9 @@ rm patch-gen.exe patch-apply.exe
 
 ## Troubleshooting Test Failures
 
-### Build Failures (Test 1)
+### Build Failures
 
-**Symptom:** Test 1 fails with compilation errors
+**Symptom:** Build step fails with compilation errors
 
 **Solutions:**
 1. Check Go version: `go version` (need 1.24.0+)
@@ -522,9 +519,9 @@ rm patch-gen.exe patch-apply.exe
 
 ---
 
-### Directory Structure Failures (Test 2)
+### Directory Structure Failures
 
-**Symptom:** Test 2 fails to find testdata
+**Symptom:** Setup fails to find testdata
 
 **Solutions:**
 1. Run tests from project root
@@ -534,7 +531,7 @@ rm patch-gen.exe patch-apply.exe
 
 ---
 
-### Generation Failures (Test 3)
+### Generation Failures
 
 **Symptom:** Generator command fails
 
@@ -547,7 +544,7 @@ rm patch-gen.exe patch-apply.exe
 
 ---
 
-### Application Failures (Test 5)
+### Application Failures
 
 **Symptom:** Applier command fails
 
@@ -560,9 +557,9 @@ rm patch-gen.exe patch-apply.exe
 
 ---
 
-### Pre-Verification Test Failures (Test 8)
+### Pre-Verification Failures
 
-**Symptom:** Test 8 passes when it should detect corruption
+**Symptom:** Corruption detection test passes when it should report failure
 
 **Solutions:**
 1. Verify corruption step actually modifies file

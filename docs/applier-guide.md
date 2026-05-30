@@ -456,129 +456,28 @@ If any check fails:
 
 ---
 
-## Simple Mode for End Users
+## Simple Mode for End Users (Fully Automated)
 
 ### Overview
 
-**Available since v1.0.9**: Patch creators can enable **Simple Mode** when generating self-contained executables. This provides end users with a fully automated patching experience.
+**Available since v1.0.9**: The `SimpleMode` field in the `Patch` struct and `runSimpleMode()` function exist in the codebase. When set to `true`, Simple Mode provides a fully automated patching experience — dry-run validation followed by automatic patch application with no user interaction.
 
-This is distinct from the `--silent` automation flag - instead, this feature is **configured by the patch creator** during patch generation using the `SimpleMode` field in the patch structure.
+**Current status:** No generator code path currently sets `SimpleMode = true`. The field and function are reserved for future use. Silent Mode (`--silent` flag) is the currently available automation path for self-contained executables.
 
-### How It Works
+### How It Works (When Enabled)
 
-When a patch is created with Simple Mode enabled:
+The applier's `runSimpleMode()` function:
 
-**For CLI Executables (Fully Automated):**
-- **No user prompts** - completely automated patching
-- Automatically uses **current directory** as target
-- Automatically enables **backup** (recommended)
-- Automatically runs **dry-run first** to validate
-- If dry-run succeeds, **automatically applies patch**
-- Creates detailed log file: `<patchname>_<utctime>_log.txt`
-- Shows progress in console and logs everything to file
-- Exit code 0 on success, 1 on failure
+1. Reads patch metadata from the embedded self-contained executable
+2. Uses current directory as target
+3. Runs automatic dry-run validation (key file + required files)
+4. If validation passes, applies the patch with verification and backup
+5. Logs all output to `<patchname>_<utctime>_log.txt`
+6. Exits with code 0 on success, 1 on failure
 
-### User Experience Example
+### No Menu or Prompts
 
-**CLI Mode (Fully Automated):**
-```
-==============================================
-  CyberPatchMaker - Self-Contained Patch
-==============================================
-
-==============================================
-          Simple Patch Application
-==============================================
-
-Automated patching from "1.0.0" to "1.0.3"
-
-Patch Information:
-  Started:      2025-10-12 18:30:45 UTC
-  From Version: 1.0.0
-  To Version:   1.0.3
-  Key File:     program.exe
-  Target Dir:   C:\MyApp
-  Backup:       Enabled
-  Compression:  zstd
-
-==============================================
-Step 1: Dry Run (Validation)
-==============================================
-
-Testing patch application without making changes...
-
-Verifying key file: program.exe
-✓ Key file verified
-
-Verifying 15 required files...
-✓ All required files verified
-
-✓ Dry run completed successfully
-
-==============================================
-Step 2: Applying Patch
-==============================================
-
-Applying patch with backup enabled...
-
-[Patch application output...]
-
-==============================================
-          Patch Applied Successfully
-==============================================
-
-Version updated: 1.0.0 → 1.0.3
-
-========================================
-Status: SUCCESS
-Completed: 2025-10-12 18:31:12 UTC
-========================================
-
-Log saved to: 1.0.0-to-1.0.3_1728756645_log.txt
-```
-
-### Benefits
-
-**For Patch Creators:**
-- Professional, polished interface for clients
-- Reduced support burden
-- Users can't accidentally disable critical safety features
-- Better user experience for non-technical users
-- CLI mode is fully automated - no user interaction needed
-
-**For End Users:**
-- **CLI: Zero interaction** - just double-click and it patches
-- No confusing technical jargon
-- Essential safety features always enabled
-- Automatic dry-run validation before applying
-- Complete logs saved automatically for troubleshooting
-
-### When This Mode is Used
-
-Patch creators enable this when:
-- Distributing to non-technical end users
-- Client deployments with limited support
-- Enterprise environments requiring simplified UX
-- Any scenario where advanced options shouldn't be exposed
-- Need for zero-interaction patching (CLI mode)
-
-### How to Create Patches with This Feature
-
-See [Generator Guide - Simple Mode](generator-guide.md#example-8-simple-mode-for-end-users) for instructions on creating patches with this feature enabled.
-
-### Technical Details
-
-When Simple Mode is enabled:
-
-**CLI Mode (Fully Automated):**
-- **Target Directory**: Automatically uses current directory
-- **Verification**: Always enabled (before and after)
-- **Backup**: Always enabled (no prompt)
-- **Dry Run**: Automatically performed first
-- **Patch Application**: Automatically applied if dry-run succeeds
-- **Logging**: All output saved to `<patchname>_<utctime>_log.txt`
-- **Exit Codes**: 0 on success, 1 on failure
-- **No User Prompts**: Completely non-interactive
+Simple Mode does **not** show a menu or prompt for user decisions. Unlike the interactive mode (which presents options 1-6), Simple Mode runs automatically from start to finish. All safety features (verification, backup) are enabled by default.
 
 ---
 
@@ -908,7 +807,7 @@ For testing environments where speed matters more than safety:
 
 ```bash
 # Skip verification and backup (FASTER but RISKY!)
-patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./test-app
+patch-apply --patch ./patches/1.0.0-to-1.0.3.patch --current-dir ./test-app --verify=false --backup=false
 ```
 
 **WARNING:** Only use this for disposable test environments!
@@ -1037,6 +936,6 @@ patch-apply --patch ./patches/1.0.1-to-1.0.2.patch --current-dir \\server\share\
 ## Related Documentation
 
 - [Generator Tool Guide](generator-guide.md) - Creating patches
-- [Backup Lifecycle](backup-lifecycle.md) - Understanding backups
+- [Backup System](backup-system.md) - Backup, lifecycle, and rollback
 - [Hash Verification](hash-verification.md) - How verification works
 - [Troubleshooting](troubleshooting.md) - Common issues

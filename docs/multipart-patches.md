@@ -88,7 +88,7 @@ File 6: 9.8GB
 patch-gen.exe --from-dir "C:\Version1" --to-dir "C:\Version2" --output patches
 
 # Output:
-# Patch size (15.2 GB) exceeds 4GB limit, splitting into multiple parts...
+# Patch size (27.5 GB) exceeds 4GB limit, splitting into multiple parts...
 # Split patch into 5 parts
 #   Part 1: 6 operations, ~2.6GB
 #   Part 2: 1 operation, ~2.2GB
@@ -198,11 +198,12 @@ For patches where individual parts exceed the configured split size, CyberPatchM
 
 ### When Chunking Occurs
 
-- Default part size limit: 4GB (configurable via `--splitsize`)
-- When a saved part file exceeds the split size (`chunkSize`, which equals the `--splitsize` value), the system:
-  1. Chunks the part data into smaller files (~500MB-1GB each)
+- Chunking is opt-in: only activates when `--splitsize` is explicitly provided
+- When a saved part file exceeds the split size, the system:
+  1. Chunks the part data into smaller files (each sized to the `--splitsize` value)
   2. Creates a `.chunks.json` sidecar file with chunk metadata
   3. Reconstructs the part on-the-fly when loading
+- Without `--splitsize`, parts are never chunked even if they exceed 4GB
 
 ### Chunk File Structure
 
@@ -369,9 +370,9 @@ At runtime, the applier reads the 128-byte header from the end of the executable
 
 ### Out of Memory Despite Multi-Part
 
-**Cause:** Individual operations still too large (>4GB single file)
+**Cause:** Individual operations still very large despite multi-part splitting
 
-**Solution:** Currently unsupported - file size exceeds system limits
+**Solution:** Use `--splitsize` with a smaller value to enable chunk sidecar splitting, which further subdivides oversized parts. The chunk sidecar system handles files of any size.
 
 ## Performance Considerations
 

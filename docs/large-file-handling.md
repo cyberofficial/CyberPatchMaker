@@ -1,154 +1,35 @@
 # Large File Handling
 
-CyberPatchMaker now includes automatic memory-optimized handling for large files (>1GB). This feature prevents memory exhaustion when working with massive game codebases or enterprise applications.
-
 ## Overview
 
-When generating or applying patches, CyberPatchMaker automatically detects large files and uses **full file replacement** for generation and **chunked writing** during application. This ensures that even files measuring 20GB+ can be processed reliably.
+The generator uses **full file replacement** for all files — every modified or added file is read into memory via `os.ReadFile()` and stored as `PatchOperation.NewFile`. There is no binary diff generation (bsdiff) in the current generator flow.
 
-## Key Features
+During patch **application**, files larger than 1GB are written in 128MB chunks to avoid memory pressure from the write buffer.
 
-### Automatic Detection
-- Files larger than **1GB** are automatically handled using full file replacement
-- No configuration required - the system handles this transparently
-- Progress indicators show real-time status for large file operations
+## Constants
 
-### Memory-Efficient Operations
-
-#### Patch Generation
-- **Large file additions**: Entire file is read into memory and stored in the patch
-- **Large file modifications**: Full file replacement (not chunked binary diffs)
-- **Progress tracking**: Shows percentage and MB processed/total
-
-#### Patch Application
-- **Chunked writing**: Large results are written in 128MB chunks
-- **Memory limits**: Never loads both file versions simultaneously
-- **Safe operations**: Checksums verified after each operation
-
-## Technical Details
-
-### Constants
 ```go
-ChunkSize = 128 * 1024 * 1024  // 128 MB per chunk
-LargeFileThreshold = 1024 * 1024 * 1024  // 1 GB threshold
-DefaultMaxPartSize = 4 * 1024 * 1024 * 1024  // 4 GB max part size (for multi-part patches)
+ChunkSize          = 128 * 1024 * 1024  // 128 MB per chunk
+LargeFileThreshold = 1024 * 1024 * 1024 // 1 GB threshold for chunked writing
+DefaultMaxPartSize = 4 * 1024 * 1024 * 1024 // 4 GB max part size
 ```
 
-### Processing Strategy
+## Patch Generation
 
-#### For Added Files (>1GB)
-1. Detect file size exceeds threshold
-2. Use full file replacement strategy -- read entire file into memory with `os.ReadFile`
-3. Store file data directly in `op.NewFile`
-4. Show progress during processing
+All files (any size) are read fully into memory with `os.ReadFile()` and stored directly in the patch operation's `NewFile` field. This means the generator requires sufficient RAM for the largest single file being processed.
 
-#### For Modified Files (>1GB)
-1. Detect either old or new file exceeds threshold
-2. Use full file replacement strategy instead of binary diff
-3. Read entire new file into memory with `os.ReadFile`
-4. Store file data directly in `op.NewFile` (no bsdiff for very large files)
-5. Return file reference for patch operation
+## Patch Application
 
-**Note:** For files exceeding 1GB, CyberPatchMaker uses full file replacement rather than binary diff generation. This prevents memory exhaustion while maintaining patch integrity. The large file size means the binary diff would be similar in size to the full file, so replacement is more efficient.
+During application, files larger than `LargeFileThreshold` (1GB) are written in 128MB chunks instead of a single `os.WriteFile` call. However, the patch file is fully loaded and deserialized into memory first (via `os.ReadFile` and JSON decoding), so peak memory is at minimum the size of the largest file in the patch. Chunked writes only limit write-buffer overhead.
 
-#### For Applying Patches
-1. Check if target file exceeds threshold
-2. Apply binary diff to generate result
-3. Write result in 128MB chunks if large
-4. Verify checksums
-5. Show progress during write
+Progress indicators show real-time status during chunked writes.
 
-### Performance Benefits
+## Memory Considerations
 
-**Before (without chunked processing):**
-- 23.4GB file + 23.4GB file = 46.8GB RAM required
-- System with 32GB RAM: Memory exhaustion, page file usage, system slowdown
+- **Generation**: Requires enough RAM for the largest file being read. A 20GB file needs 20GB+ RAM.
+- **Application**: The patch file must be fully loaded and deserialized into memory, so peak memory is at minimum the size of the largest file in the patch. Chunked writes only limit write-buffer overhead.
+- **Multi-part patches**: Patches >4GB are automatically split into parts to manage individual file sizes.
 
-**After (with large file handling):**
-- Generation: Reads entire file into memory (requires sufficient RAM for largest file)
-- Application: Peak memory usage ~256MB (2x 128MB chunks during chunked writing)
-- Stable operation on systems with sufficient RAM
+## Performance
 
-## Example Output
-
-### Generating Patch with Large File
-```
-Processing 1 added files...
-  Large file detected (23456 MB), using full file replacement: assets/game.pak
-  Progress: 100.0% (23456/23456 MB)
-  Add (large): assets/game.pak (23456 MB)
-
-Processing 1 modified files (generating diffs)...
-  Large file detected (old: 12000 MB, new: 13500 MB), using full replacement: data/world.bin
-  Progress: 100.0% (13500/13500 MB)
-  Modify (full replacement): data/world.bin (size: 13500 MB)
-```
-
-### Applying Patch with Large File
-```
-Applying 2 operations...
-  Large file add detected (23456 MB), writing in chunks: assets/game.pak
-  Write progress: 100.0% (23456/23456 MB)
-  Added (large): assets/game.pak (23456 MB)
-
-  Large file modify detected (12000 MB), applying patch in chunks: data/world.bin
-  Writing large result (13500 MB) in chunks...
-  Write progress: 100.0% (13500/13500 MB)
-  Modified (large): data/world.bin (13500 MB)
-```
-
-## Best Practices
-
-### For Developers
-1. **System Requirements**: Recommend at least 8GB RAM for typical operations
-2. **Large Projects**: 16GB+ RAM recommended for game projects with 20GB+ files
-3. **Progress Monitoring**: Console output shows real-time progress for large operations
-4. **Disk Space**: Ensure adequate temp space (2x largest file size recommended)
-
-### For System Administrators
-1. **Temp Directory**: Ensure temp partition has sufficient space
-2. **I/O Performance**: SSD recommended for temp directory location
-3. **Process Priority**: Consider running with normal priority to avoid system impact
-
-## Limitations
-
-### Current Implementation
-- Generation reads entire files into memory (requires sufficient RAM for the largest file)
-- Application uses chunked writing for large files (adds minor overhead ~5-10% slower)
-- Temp files created during application processing (automatically cleaned up)
-
-### Future Improvements
-- Reduce chunk size for very memory-constrained systems
-- Add configuration option for custom chunk sizes
-- Implement even more aggressive memory optimization
-
-## Troubleshooting
-
-### High Memory Usage
-If you still experience high memory usage:
-1. Check that files are actually >1GB (threshold check)
-2. Verify sufficient temp space available
-3. Close other memory-intensive applications
-4. Consider processing files individually instead of batch mode
-
-### Slow Performance
-Generation of large file patches may be slower due to full file reads:
-1. Generation: Full file read requires sufficient memory for the largest file
-2. Application: Chunked writing adds ~5-10% overhead but prevents memory issues
-3. Check disk I/O performance (temp directory)
-4. Consider upgrading to SSD if using HDD
-5. Ensure antivirus isn't scanning temp files
-
-## Version History
-
-- **v1.0.6**: Initial implementation of large file handling
-  - Automatic detection of files >1GB
-  - Full file replacement for generation (reads entire file into memory)
-  - Chunked writing during application (128MB chunks)
-  - Progress indicators for large operations
-
-## Related Documentation
-
-- [Hash Verification](hash-verification.md) - How checksums work with large files
-- [Compression Guide](compression-guide.md) - Compression with chunked data
-- [Troubleshooting](troubleshooting.md) - Common issues and solutions
+Chunked writing during application adds ~5-10% overhead compared to a single write, but prevents memory exhaustion on systems with limited RAM.

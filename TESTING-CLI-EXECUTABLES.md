@@ -239,7 +239,7 @@ After manual testing, users can:
 For more information, see:
 - [Self-Contained Executables Guide](docs/self-contained-executables.md)
 - [Generator Guide](docs/generator-guide.md)
-- [CLI Examples](docs/CLI-EXAMPLES.md)
+- [CLI Reference](docs/cli-reference.md)
 - [Applier Guide](docs/applier-guide.md)
 
 ## Feedback

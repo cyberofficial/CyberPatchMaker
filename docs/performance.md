@@ -65,7 +65,7 @@ cache.LoadScan(versionNumber, location)  // Instant load
 
 ```go
 // The CLI layer handles auto-detection:
-// --jobs 0  →  runtime.NumCPU() cores (set in cmd/generator/main.go)
+// --jobs 0  →  runtime.NumCPU() cores (default is set in config.go via runtime.NumCPU())
 // The version manager then calls:
 scan.ScanDirectoryParallelWithProgress(workerCount, progressCallback)
 
@@ -101,33 +101,11 @@ scan.ScanDirectoryParallelWithProgress(8, progressCallback)  // Use 8 workers
 - Slightly more complex logic
 - Must track operation types
 
-### 4. Memory-Optimized Large File Handling
+### 4. Large File Handling
 
 **Problem**: Loading multi-GB files causes memory exhaustion
 
-**Solution**: Chunked processing with 128MB chunks
-
-```go
-const (
-    ChunkSize          = 128 * 1024 * 1024  // 128 MB
-    LargeFileThreshold = 1024 * 1024 * 1024 // 1 GB
-)
-
-// Process in chunks instead of loading entire file
-for chunk := 0; chunk < totalChunks; chunk++ {
-    offset := chunk * ChunkSize
-    processChunk(offset, ChunkSize)
-}
-```
-
-**Benefits:**
-- Constant memory usage regardless of file size
-- Can handle 20GB+ files with <500MB RAM
-- Progress reporting during processing
-
-**Trade-offs:**
-- ~5-10% slower due to chunk overhead
-- More complex code
+**Current behavior**: The generator reads all files entirely into memory via `os.ReadFile` (see `large-file-handling.md` for details). Chunked writes during application (128MB chunks, `ChunkSize` constant) limit write-buffer overhead but do not reduce overall memory because the patch data is fully loaded during deserialization.
 
 ### 5. Compression
 
@@ -205,7 +183,7 @@ operation.NewFile = readFile(newFilePath)
 | Manifest | O(n) | n = number of files |
 | Patch | O(k) | k = size of changes |
 | Backup | O(m) | m = size of modified/deleted files |
-| Memory | O(1) | Streaming I/O for large files |
+| Memory | O(f) | f = size of largest changed file (generation reads all files into memory) |
 
 ## Compression Performance
 

@@ -91,13 +91,15 @@ patches/
 
 ### File Structure
 
-A self-contained executable consists of three parts:
+A self-contained executable consists of up to four parts:
 
 ```
 ┌─────────────────────────────┐
 │ patch-apply.exe             │  ← Base applier (~50 MB)
 ├─────────────────────────────┤
 │ Compressed Patch Data       │  ← Your patch (varies)
+├─────────────────────────────┤
+│ Sidecar Blob (optional)     │  ← Chunk metadata for multi-part patches
 ├─────────────────────────────┤
 │ 128-byte Header             │  ← Metadata at end
 └─────────────────────────────┘

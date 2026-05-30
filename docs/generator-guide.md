@@ -62,10 +62,10 @@ Successfully generated 3 patches
 To create one patch between two specific versions:
 
 ```bash
-patch-gen --versions-dir ./versions --from 1.0.0 --to 1.0.3 --output ./patches/custom-patch.patch
+patch-gen --versions-dir ./versions --from 1.0.0 --to 1.0.3 --output ./patches
 ```
 
-This requires both versions to already be registered in the system.
+This registers both versions automatically during the generation process.
 
 ---
 
@@ -107,8 +107,9 @@ This requires both versions to already be registered in the system.
 - Example: `1.0.3`
 
 **`--output <path>`**
-- Full path to output patch file
-- Example: `./patches/1.0.0-to-1.0.3.patch`
+- Full path to the output directory for patch files
+- Directory is created if it doesn't exist
+- Patches named automatically: `{from}-to-{to}.patch`
 
 ### Optional Options
 
@@ -135,9 +136,10 @@ This requires both versions to already be registered in the system.
 
 **`--verify`**
 - Verify patches after creation
-- Simulates patch application to ensure it works
+- Re-loads and validates patch metadata
 - Recommended for production patches
 - Adds time to generation process
+- **Note:** Verification is always enabled during patch generation regardless of this flag
 
 **`--create-exe`**
 - Create self-contained CLI executable
@@ -249,7 +251,7 @@ This requires both versions to already be registered in the system.
 **Custom Path Example:**
 ```bash
 # Generate patch from arbitrary locations
-patch-gen --from-dir D:\old\1.0.0 --to-dir C:\new\1.0.3 --output ./patch.patch
+patch-gen --from-dir D:\old\1.0.0 --to-dir C:\new\1.0.3 --output ./patches
 ```
 
 **When to Use Custom Paths:**
@@ -403,7 +405,7 @@ Upload these patches to your update server.
 Generate a specific patch with gzip compression:
 
 ```bash
-patch-gen --from 1.0.0 --to 1.0.2 --output ./patches/legacy.patch --compression gzip --verify
+patch-gen --versions-dir ./versions --from 1.0.0 --to 1.0.2 --output ./patches --compression gzip --verify
 ```
 
 ---
@@ -535,60 +537,11 @@ See [Downgrade Guide](downgrade-guide.md) for complete documentation.
 
 ### Example 8: Simple Mode for End Users
 
-**Available since v1.0.9**: Enable simplified interface for end users when creating self-contained executables.
+**Available since v1.0.9**: The `SimpleMode` field in the `Patch` struct and `runSimpleMode()` function exist in the codebase. When enabled, Simple Mode provides a fully automated patching experience (automatic dry-run validation followed by patch application with no user interaction).
 
-When you distribute patches to clients who will give the executables to their users, you can enable **Simple Mode** to provide a streamlined, user-friendly experience. This hides advanced options and shows only what end users need.
+**Current status:** No generator code path currently sets `SimpleMode = true`. The field exists in the patch structure and the applier respects it, but it is reserved for future use. Silent Mode (`--silent` flag) is the currently available automation option for self-contained executables.
 
-**Using CLI Generator:**
-
-Simple Mode is set automatically when generating self-contained executables. The `SimpleMode` field in the patch structure is enabled to provide a streamlined experience for end users.
-
-**Note:** Simple Mode is different from the `--silent` flag (which is for fully automatic patching with no user interaction).
-
-**What Users See (CLI exe):**
-- Clean console interface showing patch info
-- Simple menu with only 3 options:
-  1. Dry Run (test without making changes)
-  2. Apply Patch
-  3. Exit
-- Backup option available before applying
-- No confusing technical details
-
-**Benefits:**
-- **Simplified UX**: End users see only what they need
-- **Reduced Support**: Fewer questions about advanced options
-- **Professional**: Cleaner interface for client distributions
-- **Safety**: Critical options (verify, auto-detect) forced on
-- **Flexibility**: Backup and dry run still available
-
-**Example Workflow:**
-
-```bash
-# Software vendor creates patches with Simple Mode
-patch-gen --versions-dir ./releases \
-          --new-version 2.0.0 \
-          --output ./dist \
-          --create-exe \
-          --verify
-
-# Distribute the .exe files to clients
-# Clients give them to end users
-# End users double-click and see simple interface
-```
-
-**When to Use Simple Mode:**
-- Distributing to non-technical end users
-- Client deployments where support is limited
-- Enterprise environments with IT policies
-- Any scenario where simplified UX is desired
-
-**When NOT to Use Simple Mode:**
-- Internal development/testing
-- Technical users who need full control
-- Debugging or troubleshooting patches
-- Advanced deployment scenarios
-
-**Remember:** Simple Mode (SimpleMode field) = Simplified UI | Silent Mode (--silent flag) = Automation
+**Note:** Simple Mode is different from the `--silent` flag (Simple Mode = automated two-step flow with verbose output; Silent Mode = minimal-output automation for scripting).
 
 ---
 

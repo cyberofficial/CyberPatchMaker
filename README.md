@@ -84,7 +84,7 @@ The `--verify` flag ensures everything is checked before and after patching, wit
 - [Generator Guide](docs/generator-guide.md) - All patch creation options
 - [Applier Guide](docs/applier-guide.md) - All patch application options
 - [CLI Reference](docs/cli-reference.md) - Complete command reference
-- [CLI Examples](docs/CLI-EXAMPLES.md) - Common usage patterns
+- [CLI Reference](docs/cli-reference.md) - All commands and options
 - [Downgrade Guide](docs/downgrade-guide.md) - Rollback to previous versions
 - [Multi-Part Patches](docs/multipart-patches.md) - Handling patches >4GB (automatic splitting)
 
@@ -219,7 +219,7 @@ CyberPatchMaker compares two versions of your software and creates a small patch
 - [Architecture](docs/architecture.md) - System design and components
 - [Hash Verification](docs/hash-verification.md) - Security and verification
 - [Key File System](docs/key-file-system.md) - Version identification
-- [Backup Lifecycle](docs/backup-lifecycle.md) - Backup and recovery process
+- [Backup System](docs/backup-system.md) - Backup, lifecycle, and recovery
 - [Backup System](docs/backup-system.md) - Comprehensive backup management
 - [Version Management](docs/version-management.md) - How versions are tracked
 
@@ -248,7 +248,7 @@ patch-apply --patch 1.0.0-to-1.0.2.patch --current-dir ./myapp --verify
 # Done! Their version 1.0.0 is now version 1.0.2
 ```
 
-**More examples:** [CLI Examples](docs/CLI-EXAMPLES.md)
+**More examples:** [CLI Reference](docs/cli-reference.md)
 
 ## What's Included
 
@@ -281,7 +281,7 @@ The test suite automatically validates:
 
 **Testing documentation:**
 - [Testing Guide](docs/testing-guide.md) - How to test your patches
-- [Advanced Test Summary](docs/ADVANCED-TEST-SUMMARY.md) - Detailed test results
+- [Testing Guide](docs/testing-guide.md) - Running and writing tests
 
 ## Performance & Reliability
 
@@ -310,7 +310,7 @@ All documentation is in the [docs/](docs/) folder:
 
 **Getting Started:**
 - [Quick Start](docs/quick-start.md) - Get up and running fast
-- [CLI Examples](docs/CLI-EXAMPLES.md) - Common usage patterns
+- [CLI Reference](docs/cli-reference.md) - All commands and options
 - [Development Setup](docs/development-setup.md) - Developer guide
 
 **Reference:**
@@ -325,7 +325,7 @@ All documentation is in the [docs/](docs/) folder:
 - [Architecture](docs/architecture.md) - System design
 - [Testing Guide](docs/testing-guide.md) - Testing your patches
 - [Troubleshooting](docs/troubleshooting.md) - Common issues
-- [Advanced Test Summary](docs/ADVANCED-TEST-SUMMARY.md) - Detailed test results
+- [Testing Guide](docs/testing-guide.md) - Running and writing tests
 - [Scan Caching](docs/scan-caching.md) - Instant patch generation with cached scans
 - [Large File Handling](docs/large-file-handling.md) - Memory optimization for large files
 - [Backup System](docs/backup-system.md) - Comprehensive backup management
@@ -333,7 +333,7 @@ All documentation is in the [docs/](docs/) folder:
 - [Version Management](docs/version-management.md) - How versions are tracked
 - [Compression Guide](docs/compression-guide.md) - Compression options
 - [Hash Verification](docs/hash-verification.md) - Security and verification
-- [Backup Lifecycle](docs/backup-lifecycle.md) - Backup and recovery process
+- [Backup System](docs/backup-system.md) - Backup, lifecycle, and recovery
 - [Multi-Part Patches](docs/multipart-patches.md) - Handling large patches
 - [Cyberignore Guide](docs/cyberignore-guide.md) - File exclusion patterns
 

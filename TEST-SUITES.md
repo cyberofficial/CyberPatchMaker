@@ -4,7 +4,7 @@ This document provides an overview of the comprehensive test suite for CyberPatc
 
 ## Overview
 
-CyberPatchMaker includes a comprehensive test suite with 61 tests (58 standard + 3 optional) to ensure reliability and correctness:
+CyberPatchMaker includes a comprehensive test suite with 61 tests (59 standard + 2 optional) to ensure reliability and correctness:
 
 | Tests | Coverage | Complexity | Purpose |
 |-------|----------|------------|---------|
@@ -16,7 +16,7 @@ CyberPatchMaker includes a comprehensive test suite with 61 tests (58 standard +
 
 **File**: `advanced-test.ps1` (Windows only, ~500 lines)
 
-### Test Coverage (61 tests: 58 standard + 3 optional)
+### Test Coverage (61 tests: 59 standard + 2 optional)
 
 #### Basic Verification (3 tests)
 1. Verify executables exist
@@ -55,7 +55,7 @@ CyberPatchMaker includes a comprehensive test suite with 61 tests (58 standard +
 41-46. Scan cache tests, silent mode log files, embedded silent flag
 47-53. Scan cache testing (caching, custom dir, force rescan, performance, validation, invalidation)
 54-58. Simple Mode feature validation
-59-61. .cyberignore advanced patterns, streaming, large file handling (3 optional)
+59-60. .cyberignore advanced patterns, large file handling (2 optional)
 
 ### Test Data
 
@@ -188,7 +188,7 @@ Advanced Features Verified:
 
 | Capability | Description |
 |-----------|-------------|
-| **Test Count** | 61 comprehensive tests (58 standard + 3 optional) |
+| **Test Count** | 61 comprehensive tests (59 standard + 2 optional) |
 | **Test Data Items** | 17 items across 3 versions |
 | **Nesting Depth** | 3 levels deep with complex structures |
 | **Compression Formats** | 3 formats tested (zstd, gzip, none) |
@@ -211,8 +211,8 @@ Based on comprehensive testing, CyberPatchMaker is **production ready**:
 ## Documentation
 
 - **Test Suite**: See `advanced-test.ps1`
-- **Test Results**: See `ADVANCED-TEST-SUMMARY.md`
-- **Test Results**: See `ADVANCED-TEST-SUMMARY.md`
+- **Test Suite**: See `advanced-test.ps1`
+- **Test Results**: See `docs/testing-guide.md`
 - **Main README**: See `README.md`
 
 ## Future Test Enhancements

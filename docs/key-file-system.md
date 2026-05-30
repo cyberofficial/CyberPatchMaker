@@ -36,7 +36,7 @@ A **key file** is any designated file (typically the main program or a critical 
 
 - **Path**: Relative path from version root (e.g., `program.exe`, `bin/app.exe`, `core.dll`, `data.bin`)
 - **Checksum**: SHA-256 hash of the file's binary content
-- **Size**: File size in bytes (secondary verification)
+- **Size**: File size in bytes (stored for reference; not used in verification)
 - **File Type**: Can be any file type - executables, libraries, data files, configuration files, etc.
 
 ### Version Identification
@@ -133,7 +133,7 @@ Version registration happens automatically when you generate patches. The system
    }
 ```
 
-### During Patch Application
+### Key File Metadata in Patch
 
 ```
 1. Read patch metadata:

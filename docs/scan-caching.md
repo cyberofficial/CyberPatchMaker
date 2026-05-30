@@ -51,7 +51,6 @@ The location hash ensures that cached scans from one directory cannot be mistake
 {
   "version": "1.0.0",
   "location": "/path/to/versions/1.0.0",
-  "location_hash": "a1b2c3d4e5f6g7h8",
   "key_file": {
     "Path": "game.exe",
     "Checksum": "abc123...",
@@ -67,7 +66,8 @@ The location hash ensures that cached scans from one directory cannot be mistake
     "TotalFiles": 34650,
     "Checksum": "def456..."
   },
-  "cached_at": "2024-01-15T10:30:05Z"
+  "cached_at": "2024-01-15T10:30:05Z",
+  "location_hash": "a1b2c3d4e5f6g7h8"
 }
 ```
 
@@ -243,4 +243,4 @@ docker run -v ./cache:/app/.data patch-gen \
 
 - [Version Management](version-management.md) - How versions are tracked
 - [Generator Guide](generator-guide.md) - CLI flags for scan caching
-- [Performance](architecture.md#performance-characteristics) - System performance details
+- [Performance](performance.md) - Performance characteristics

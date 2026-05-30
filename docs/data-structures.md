@@ -146,7 +146,7 @@ type PatchOperation struct {
 
 **Data Storage Strategy:**
 - All modified files: Use `NewFile` with full replacement
-- `BinaryDiff` is only used during patch application for backward compatibility with old-format patches
+- `BinaryDiff` is never populated by the current generator flow and is reserved for future use
 
 ---
 
@@ -251,7 +251,7 @@ Configures patch generation behavior.
 type PatchOptions struct {
     Compression       string // "zstd", "gzip", "none"
     CompressionLevel  int    // 1-4 for zstd, 1-3 for gzip
-    VerifyAfter       bool   // Verify patch after creation
+    VerifyAfter       bool   // Verify patch after creation (currently unused)
     GenerateSignature bool   // Create digital signature (future)
     ParallelWorkers   int    // Number of parallel workers
     SkipIdentical     bool   // Skip binary-identical files
@@ -371,6 +371,4 @@ type CachedScanInfo struct {
 
 ## Related Documentation
 
-- [Code Structure](code-structure.md) - File organization
-- [Architecture](architecture.md) - System design
-- [API Reference](#) - Function signatures (future)
+- [Architecture](architecture.md) - System design and code organization
