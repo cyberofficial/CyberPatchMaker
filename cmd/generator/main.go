@@ -303,7 +303,7 @@ func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, ou
 			// Create forward exe if requested
 			if createExe {
 				exePath := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.exe", fromVersion, newVersion))
-				if err := createStandaloneCLIExe(patchFile, exePath, compression, silent); err != nil {
+				if err := createStandaloneCLIExe(resolvePatchFile(patchFile), exePath, compression, silent); err != nil {
 					fmt.Printf("Warning: failed to create forward executable for %s: %v\n", fromVersion, err)
 				} else {
 					fmt.Printf("✓ Forward executable: %s\n", exePath)
@@ -311,7 +311,7 @@ func generateAllPatches(versionMgr *version.Manager, versionsDir, newVersion, ou
 
 				// Create reverse exe
 				reverseExePath := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s_rev.exe", newVersion, fromVersion))
-				if err := createStandaloneCLIExe(reversePatchFile, reverseExePath, compression, silent); err != nil {
+				if err := createStandaloneCLIExe(resolvePatchFile(reversePatchFile), reverseExePath, compression, silent); err != nil {
 					fmt.Printf("Warning: failed to create reverse executable to %s: %v\n", fromVersion, err)
 				} else {
 					fmt.Printf("✓ Reverse executable: %s\n", reverseExePath)
@@ -393,14 +393,14 @@ func generateSinglePatch(versionMgr *version.Manager, versionsDir, from, to, out
 		// Create executables if requested
 		if createExe {
 			exePath := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.exe", from, to))
-			if err := createStandaloneCLIExe(patchFile, exePath, compression, silent); err != nil {
+			if err := createStandaloneCLIExe(resolvePatchFile(patchFile), exePath, compression, silent); err != nil {
 				fmt.Printf("Error: failed to create forward executable: %v\n", err)
 				os.Exit(1)
 			}
 			fmt.Printf("✓ Created forward executable: %s\n", exePath)
 
 			reverseExePath := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s_rev.exe", to, from))
-			if err := createStandaloneCLIExe(reversePatchFile, reverseExePath, compression, silent); err != nil {
+			if err := createStandaloneCLIExe(resolvePatchFile(reversePatchFile), reverseExePath, compression, silent); err != nil {
 				fmt.Printf("Error: failed to create reverse executable: %v\n", err)
 				os.Exit(1)
 			}
@@ -487,14 +487,14 @@ func generateSinglePatchCustomPaths(versionMgr *version.Manager, fromPath, toPat
 		// Create executables if requested
 		if createExe {
 			exePath := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s.exe", fromVersion, toVersion))
-			if err := createStandaloneCLIExe(patchFile, exePath, compression, silent); err != nil {
+			if err := createStandaloneCLIExe(resolvePatchFile(patchFile), exePath, compression, silent); err != nil {
 				fmt.Printf("Error: failed to create forward executable: %v\n", err)
 				os.Exit(1)
 			}
 			fmt.Printf("✓ Created forward executable: %s\n", exePath)
 
 			reverseExePath := filepath.Join(outputDir, fmt.Sprintf("%s-to-%s_rev.exe", toVersion, fromVersion))
-			if err := createStandaloneCLIExe(reversePatchFile, reverseExePath, compression, silent); err != nil {
+			if err := createStandaloneCLIExe(resolvePatchFile(reversePatchFile), reverseExePath, compression, silent); err != nil {
 				fmt.Printf("Error: failed to create reverse executable: %v\n", err)
 				os.Exit(1)
 			}
@@ -669,6 +669,17 @@ func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, revers
 
 func savePatch(patch *utils.Patch, filename string, options *utils.PatchOptions) error {
 	return savePatchWithCustomSize(patch, filename, options, 0)
+}
+
+// resolvePatchFile checks if the patch was saved as multi-part (.01.patch) and returns
+// the correct path. This is needed because savePatchWithSplitting may save as .01.patch
+// instead of .patch when the patch was split, and the callers still hold the .patch path.
+func resolvePatchFile(patchPath string) string {
+	part01 := strings.TrimSuffix(patchPath, ".patch") + ".01.patch"
+	if utils.FileExists(part01) {
+		return part01
+	}
+	return patchPath
 }
 
 func savePatchWithCustomSize(patch *utils.Patch, filename string, options *utils.PatchOptions, customMaxPartSize int64) error {
