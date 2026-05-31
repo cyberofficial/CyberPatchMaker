@@ -2317,10 +2317,10 @@ Test-Step "Verify --crp flag creates reverse patches for downgrades" {
     Write-Host "  [OK] Forward patch created: 1.0.0-to-1.0.1.patch" -ForegroundColor Green
     
     # Verify reverse patch created
-    if (-not (Test-Path "$crpTestDir\1.0.1-to-1.0.0.patch")) {
-        throw "Reverse patch (1.0.1-to-1.0.0.patch) not created"
+    if (-not (Test-Path "$crpTestDir\1.0.1-to-1.0.0_rev.patch")) {
+        throw "Reverse patch (1.0.1-to-1.0.0_rev.patch) not created"
     }
-    Write-Host "  [OK] Reverse patch created: 1.0.1-to-1.0.0.patch" -ForegroundColor Green
+    Write-Host "  [OK] Reverse patch created: 1.0.1-to-1.0.0_rev.patch" -ForegroundColor Green
     
     # Test 2: Verify reverse patch content
     Write-Host "  Verifying reverse patch operations..." -ForegroundColor Gray
@@ -2348,8 +2348,8 @@ Test-Step "Verify --crp flag creates reverse patches for downgrades" {
     $expectedFiles = @(
         "$crpExeDir\1.0.0-to-1.0.1.patch",
         "$crpExeDir\1.0.0-to-1.0.1.exe",
-        "$crpExeDir\1.0.1-to-1.0.0.patch",
-        "$crpExeDir\1.0.1-to-1.0.0.exe"
+        "$crpExeDir\1.0.1-to-1.0.0_rev.patch",
+        "$crpExeDir\1.0.1-to-1.0.0_rev.exe"
     )
     
     foreach ($file in $expectedFiles) {
@@ -2386,7 +2386,7 @@ Test-Step "Verify --crp flag creates reverse patches for downgrades" {
     
     # Apply reverse patch (1.0.1 -> 1.0.0)
     Write-Host "  Applying reverse patch (1.0.1 -> 1.0.0)..." -ForegroundColor Gray
-    Copy-Item "$crpTestDir\1.0.1-to-1.0.0.patch" "$applyTestDir\reverse.patch"
+    Copy-Item "$crpTestDir\1.0.1-to-1.0.0_rev.patch" "$applyTestDir\reverse.patch"
     $output = & .\patch-apply.exe --patch "$applyTestDir\reverse.patch" --current-dir $applyTestDir 2>&1 | Out-String
     
     if ($LASTEXITCODE -ne 0) {
@@ -3504,13 +3504,13 @@ Test-Step "Optimization: Forward and reverse patch roundtrip" {
 	$output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches-opt8 --crp --compression zstd 2>&1
 	if ($LASTEXITCODE -ne 0) { throw "Gen failed: $output" }
 	if (-not (Test-Path "testdata/advanced-output/patches-opt8/1.0.0-to-1.0.1.patch")) { throw "Forward patch not created" }
-	if (-not (Test-Path "testdata/advanced-output/patches-opt8/1.0.1-to-1.0.0.patch")) { throw "Reverse patch not created" }
+	if (-not (Test-Path "testdata/advanced-output/patches-opt8/1.0.1-to-1.0.0_rev.patch")) { throw "Reverse patch not created" }
 	Copy-Item -Recurse "testdata/versions/1.0.0" "testdata/advanced-output/t-opt8" | Out-Null
 	$output = .\patch-apply.exe --patch "testdata/advanced-output/patches-opt8/1.0.0-to-1.0.1.patch" --current-dir "testdata/advanced-output/t-opt8" --verify 2>&1
 	if ($LASTEXITCODE -ne 0) { throw "Forward apply failed: $output" }
 	$content = Get-Content "testdata/advanced-output/t-opt8/program.exe" -Raw
 	if ($content -notmatch "v1.0.1") { throw "Forward patch didn't upgrade" }
-	$output = .\patch-apply.exe --patch "testdata/advanced-output/patches-opt8/1.0.1-to-1.0.0.patch" --current-dir "testdata/advanced-output/t-opt8" --verify 2>&1
+	$output = .\patch-apply.exe --patch "testdata/advanced-output/patches-opt8/1.0.1-to-1.0.0_rev.patch" --current-dir "testdata/advanced-output/t-opt8" --verify 2>&1
 	if ($LASTEXITCODE -ne 0) { throw "Reverse apply failed: $output" }
 	$content = Get-Content "testdata/advanced-output/t-opt8/program.exe" -Raw
 	if ($content -notmatch "v1.0.0") { throw "Reverse patch didn't downgrade" }
