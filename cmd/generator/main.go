@@ -641,11 +641,10 @@ func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, revers
 		return fmt.Errorf("forward patch validation failed: %w", err)
 	}
 
-	// Save forward patch
-	if err := savePatchWithCustomSize(forwardPatch, forwardFile, options, customMaxPartSize); err != nil {
+	// Save forward patch (auto-splits into multi-part if needed)
+	if err := savePatchWithSplitting(generator, forwardPatch, forwardFile, compression, level, customMaxPartSize); err != nil {
 		return fmt.Errorf("failed to save forward patch: %w", err)
 	}
-	fmt.Printf("Patch saved to: %s\n", forwardFile)
 
 	// Generate reverse patch (to → from) - REUSES SAME SCAN DATA!
 	// No need to rescan directories since we already have all the data
@@ -660,11 +659,10 @@ func generatePatchWithReverse(fromVer, toVer *utils.Version, forwardFile, revers
 		return fmt.Errorf("reverse patch validation failed: %w", err)
 	}
 
-	// Save reverse patch
-	if err := savePatchWithCustomSize(reversePatch, reverseFile, options, customMaxPartSize); err != nil {
+	// Save reverse patch (auto-splits into multi-part if needed)
+	if err := savePatchWithSplitting(generator, reversePatch, reverseFile, compression, level, customMaxPartSize); err != nil {
 		return fmt.Errorf("failed to save reverse patch: %w", err)
 	}
-	fmt.Printf("Reverse patch saved to: %s\n", reverseFile)
 
 	return nil
 }
@@ -677,6 +675,36 @@ func savePatchWithCustomSize(patch *utils.Patch, filename string, options *utils
 	// customMaxPartSize is unused in the save path itself — it's consumed by the
 	// caller (generatePatch) for multi-part splitting decisions before this is called.
 	return utils.SavePatch(patch, filename, options.Compression, options.CompressionLevel)
+}
+
+// savePatchWithSplitting saves a patch, splitting into multi-part if total size exceeds maxPartSize.
+func savePatchWithSplitting(generator *patcher.Generator, patch *utils.Patch, outputFile, compression string, level int, customMaxPartSize int64) error {
+	var maxPartSize int64 = utils.DefaultMaxPartSize
+	if customMaxPartSize > 0 {
+		maxPartSize = customMaxPartSize
+	}
+
+	totalSize := generator.CalculatePatchSize(patch)
+	if totalSize > maxPartSize {
+		fmt.Printf("\nPatch size (%d bytes / %.2f GB) exceeds %.2f GB limit, splitting into multiple parts...\n",
+			totalSize, float64(totalSize)/(1024*1024*1024), float64(maxPartSize)/(1024*1024*1024))
+
+		parts, err := generator.SplitPatchIntoParts(patch, maxPartSize)
+		if err != nil {
+			return fmt.Errorf("failed to split patch: %w", err)
+		}
+
+		if err := generator.SaveMultiPartPatch(parts, outputFile, compression, customMaxPartSize, level); err != nil {
+			return fmt.Errorf("failed to save multi-part patch: %w", err)
+		}
+		fmt.Printf("✓ Multi-part patch saved: %d parts\n", len(parts))
+	} else {
+		if err := utils.SavePatch(patch, outputFile, compression, level); err != nil {
+			return fmt.Errorf("failed to save patch: %w", err)
+		}
+		fmt.Printf("Patch saved to: %s\n", outputFile)
+	}
+	return nil
 }
 
 // createStandaloneCLIExe creates a self-contained CLI executable by appending patch data to CLI applier
