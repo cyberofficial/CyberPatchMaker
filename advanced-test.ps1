@@ -3456,9 +3456,7 @@ Test-Step "Optimization: Key file override with --key-file flag" {
 	New-Item -ItemType Directory -Force -Path "testdata/versions-custom/1.0.0" | Out-Null
 	New-Item -ItemType Directory -Force -Path "testdata/versions-custom/1.0.1" | Out-Null
 	Copy-Item "testdata/versions/1.0.0/program.exe" "testdata/versions-custom/1.0.0/myapp.exe"
-	Copy-Item "testdata/versions/1.0.0/config.json" "testdata/versions-custom/1.0.0/"
 	Copy-Item "testdata/versions/1.0.1/program.exe" "testdata/versions-custom/1.0.1/myapp.exe"
-	Copy-Item "testdata/versions/1.0.1/config.json" "testdata/versions-custom/1.0.1/"
 	if (Test-Path "testdata/versions/1.0.1/libs") { Copy-Item -Recurse "testdata/versions/1.0.1/libs" "testdata/versions-custom/1.0.1/" }
 	$output = .\patch-gen.exe --from-dir "testdata/versions-custom/1.0.0" --to-dir "testdata/versions-custom/1.0.1" --key-file myapp.exe --output "testdata/advanced-output/patches-opt3" 2>&1
 	if ($LASTEXITCODE -ne 0) { throw "Exit code $LASTEXITCODE" }

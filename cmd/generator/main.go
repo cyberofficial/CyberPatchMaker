@@ -460,6 +460,10 @@ func generateSinglePatchCustomPaths(versionMgr *version.Manager, fromPath, toPat
 	fmt.Printf("Auto-detected target key file: %s\n", toKeyFile)
 
 	// Register target version
+	// If from/to have the same directory name, unregister source first to avoid collision
+	if fromVersion == toVersion {
+		versionMgr.UnregisterVersion(fromVersion)
+	}
 	fmt.Printf("Registering target version %s...\n", toVersion)
 	toVer, err := versionMgr.RegisterVersion(toVersion, toPath, toKeyFile)
 	if err != nil {
