@@ -546,7 +546,7 @@ func generatePatch(fromVer, toVer *utils.Version, outputFile, compression string
 	}
 
 	if totalSize > maxPartSize {
-		fmt.Printf("\nPatch size (%d bytes / %.2f GB) exceeds %.2f GB limit, splitting into multiple parts...\n",
+		fmt.Printf("\nUncompressed data size (%d bytes / %.2f GB) exceeds %.2f GB limit, splitting into multiple parts...\n",
 			totalSize, float64(totalSize)/(1024*1024*1024), float64(maxPartSize)/(1024*1024*1024))
 
 		// Split patch into parts
@@ -697,7 +697,7 @@ func savePatchWithSplitting(generator *patcher.Generator, patch *utils.Patch, ou
 
 	totalSize := generator.CalculatePatchSize(patch)
 	if totalSize > maxPartSize {
-		fmt.Printf("\nPatch size (%d bytes / %.2f GB) exceeds %.2f GB limit, splitting into multiple parts...\n",
+		fmt.Printf("\nUncompressed data size (%d bytes / %.2f GB) exceeds %.2f GB limit, splitting into multiple parts...\n",
 			totalSize, float64(totalSize)/(1024*1024*1024), float64(maxPartSize)/(1024*1024*1024))
 
 		parts, err := generator.SplitPatchIntoParts(patch, maxPartSize)
