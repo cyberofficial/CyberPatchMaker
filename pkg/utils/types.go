@@ -71,6 +71,15 @@ type PartHash struct {
 	Size       int64  // Part file size in bytes
 }
 
+// PartChunk describes a chunk of a larger part file when a part is further split
+type PartChunk struct {
+	PartNumber  int    // Parent part number (1-indexed)
+	ChunkNumber int    // Chunk order within the part (1-indexed)
+	FileName    string // Filename of the chunk (relative to patch directory)
+	Checksum    string // SHA-256 checksum of this chunk
+	Size        int64  // Size in bytes of this chunk
+}
+
 // FileRequirement specifies a file that must exist with exact hash
 type FileRequirement struct {
 	Path       string // Relative file path
@@ -129,9 +138,8 @@ type PatchHeader struct {
 // PatchOptions configures patch generation
 type PatchOptions struct {
 	Compression       string // "zstd", "gzip", "none"
-	CompressionLevel  int    // 1-9 or algorithm-specific
-	VerifyAfter       bool   // Verify patch after creation
-	GenerateSignature bool   // Create digital signature
+	CompressionLevel  int    // 1-4 for zstd, 1-3 for gzip
+	GenerateSignature bool   // Create digital signature (future)
 	ParallelWorkers   int    // Number of parallel workers
 	SkipIdentical     bool   // Skip binary-identical files
 }

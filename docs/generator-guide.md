@@ -6,18 +6,6 @@ Complete guide to using the CyberPatchMaker generator tool for creating delta pa
 
 The generator tool creates efficient binary patches between software versions. It compares two complete directory trees and generates a small patch file containing only the changes.
 
-> **NOTE: GUI Alternative Available**
-> 
-> For a visual interface with additional features like self-contained executables, see the [GUI Usage Guide](gui-usage.md).
-> 
-> The GUI includes:
-> - User-friendly interface for all options
-> - Real-time validation and progress monitoring
-> - **Self-contained executable creation** (generates standalone `.exe` files with embedded patches)
-> - Batch mode for generating multiple patches at once
-> 
-> This guide focuses on the command-line tool.
-
 ## Basic Usage
 
 ### Generate Patches from All Versions to New Version
@@ -74,10 +62,10 @@ Successfully generated 3 patches
 To create one patch between two specific versions:
 
 ```bash
-patch-gen --from 1.0.0 --to 1.0.3 --output ./patches/custom-patch.patch
+patch-gen --versions-dir ./versions --from 1.0.0 --to 1.0.3 --output ./patches
 ```
 
-This requires both versions to already be registered in the system.
+This registers both versions automatically during the generation process.
 
 ---
 
@@ -103,19 +91,25 @@ This requires both versions to already be registered in the system.
 
 ### Required Options (Single Patch Mode)
 
+**`--versions-dir <path>`**
+- Directory containing version folders
+- Required to locate source and target version directories
+- Example: `./versions`
+
 **`--from <version>`**
 - Source version number
-- Must be a registered version
+- Must match a folder name in `--versions-dir`
 - Example: `1.0.0`
 
 **`--to <version>`**
 - Target version number
-- Must be a registered version
+- Must match a folder name in `--versions-dir`
 - Example: `1.0.3`
 
 **`--output <path>`**
-- Full path to output patch file
-- Example: `./patches/1.0.0-to-1.0.3.patch`
+- Full path to the output directory for patch files
+- Directory is created if it doesn't exist
+- Patches named automatically: `{from}-to-{to}.patch`
 
 ### Optional Options
 
@@ -126,26 +120,45 @@ This requires both versions to already be registered in the system.
 - gzip is more universally compatible
 - none is fastest but largest patches
 
+**`--key-file <filename>`**
+- Specify a custom key file to use for version identification
+- Overrides auto-detection of key file (program.exe, game.exe, app.exe, main.exe)
+- Example: `--key-file my_app.exe` or `--key-file custom_executable.exe`
+- Useful when the main executable has a non-standard name
+- Default: Auto-detects from standard key file names
+
 **`--level <1-4>`**
-- Compression level (zstd only)
-- 1 = Fastest, largest files
-- 3 = Default, balanced (recommended)
-- 4 = Slowest, smallest files
+- Compression level (applies to zstd and gzip)
+- **zstd**: Levels 1-4 (1 = fastest/largest, 4 = slowest/smallest)
+- **gzip**: Levels 1-3 (1 = fastest/largest, 3 = slowest/smallest)
+- Default: 3 (balanced, recommended)
 - Higher levels take longer but save bandwidth
 
 **`--verify`**
 - Verify patches after creation
-- Simulates patch application to ensure it works
+- Re-loads and validates patch metadata
 - Recommended for production patches
 - Adds time to generation process
+- **Note:** Verification is always enabled during patch generation regardless of this flag
 
 **`--create-exe`**
 - Create self-contained CLI executable
 - Embeds patch data into a standalone `.exe` file
 - Creates both `.patch` file and `.exe` file
-- Uses CLI applier (console interface) instead of GUI
+- Uses CLI applier (console interface)
 - See [Self-Contained Executables Guide](self-contained-executables.md) for details
 - Works with all generation modes (single, batch, custom paths)
+
+**`--silent`**
+- Embed silent mode flag into generated self-contained executables
+- Only works with `--create-exe` flag (no effect without it)
+- When embedded, executable automatically applies patch without user prompts
+- Overrides interactive console menu - patch applies immediately on launch
+- Creates log file `log_<epochtime>.txt` with execution details
+- Perfect for distributing automated patches to end users
+- Example: `patch-gen --create-exe --silent --from-dir v1 --to-dir v2 --output patches`
+- Users run: `1.0.0-to-1.0.1.exe` (no flags needed, applies automatically)
+- See [Self-Contained Executables Guide](self-contained-executables.md) for details
 
 **`--crp`** (Create Reverse Patch)
 - Automatically create reverse patch for downgrades
@@ -190,6 +203,31 @@ This requires both versions to already be registered in the system.
 - Scales based on available CPU cores and I/O bandwidth
 - Works with all generation modes and compression options
 
+**`--splitsize <size>`** (Multi-Part Split Size)
+- Custom size for splitting large patches into multiple parts
+- Format: Number followed by unit (M/MB for megabytes, G/GB for gigabytes)
+- Examples: `2G`, `2GB`, `500M`, `500MB`
+- Default: `4GB` (4 gigabytes)
+- Minimum recommended: `100MB` (requires confirmation if below)
+- Use cases:
+  - Hosting platforms with file size limits
+  - Email attachments or transfer services with restrictions
+  - Memory-constrained systems during patch application
+- See [Multi-Part Patches Guide](multipart-patches.md) for details
+
+**`--bypasssplitlimit`**
+- Bypass the 100MB minimum split size confirmation prompt
+- Only meaningful when used with `--splitsize` below 100MB
+- Without this flag: Generator prompts for confirmation if split size < 100MB
+- With this flag: Generator proceeds without asking
+- Warning: Very small split sizes create many parts (not recommended)
+- Use case: Automated scripts where confirmation prompts would block execution
+
+**`--version`**
+- Display version information for the generator tool
+- Prints version string and exits
+- Example: `patch-gen --version`
+
 **`--help`**
 - Display usage information
 - Shows all available options
@@ -201,19 +239,19 @@ This requires both versions to already be registered in the system.
 - Overrides `--versions-dir` and `--from`
 - Use when source version is not in versions directory
 - Example: `D:\builds\old-version`
-- Cannot be used with `--versions-dir`
+- Takes priority over `--versions-dir`/`--from`/`--to` (provides custom source path directly)
 
 **`--to-dir <path>`**
 - Full path to target version directory
 - Overrides `--versions-dir` and `--to`
 - Use when target version is not in versions directory
 - Example: `C:\projects\new-release`
-- Cannot be used with `--versions-dir`
+- Takes priority over `--versions-dir`/`--from`/`--to` (provides custom target path directly)
 
 **Custom Path Example:**
 ```bash
 # Generate patch from arbitrary locations
-patch-gen --from-dir D:\old\1.0.0 --to-dir C:\new\1.0.3 --output ./patch.patch
+patch-gen --from-dir D:\old\1.0.0 --to-dir C:\new\1.0.3 --output ./patches
 ```
 
 **When to Use Custom Paths:**
@@ -367,7 +405,7 @@ Upload these patches to your update server.
 Generate a specific patch with gzip compression:
 
 ```bash
-patch-gen --from 1.0.0 --to 1.0.2 --output ./patches/legacy.patch --compression gzip --verify
+patch-gen --versions-dir ./versions --from 1.0.0 --to 1.0.2 --output ./patches --compression gzip --verify
 ```
 
 ---
@@ -499,74 +537,103 @@ See [Downgrade Guide](downgrade-guide.md) for complete documentation.
 
 ### Example 8: Simple Mode for End Users
 
-**NEW in v1.0.9**: Enable simplified interface for end users when creating self-contained executables.
+**Available since v1.0.9**: The `SimpleMode` field in the `Patch` struct and `runSimpleMode()` function exist in the codebase. When enabled, Simple Mode provides a fully automated patching experience (automatic dry-run validation followed by patch application with no user interaction).
 
-When you distribute patches to clients who will give the executables to their users, you can enable **Simple Mode** to provide a streamlined, user-friendly experience. This hides advanced options and shows only what end users need.
+**Current status:** No generator code path currently sets `SimpleMode = true`. The field exists in the patch structure and the applier respects it, but it is reserved for future use. Silent Mode (`--silent` flag) is the currently available automation option for self-contained executables.
 
-**Using GUI Generator:**
+**Note:** Simple Mode is different from the `--silent` flag (Simple Mode = automated two-step flow with verbose output; Silent Mode = minimal-output automation for scripting).
 
-1. Open the Patch Generator GUI
-2. Configure your patch settings (from/to versions, compression, etc.)
-3. Check **"Enable Simple Mode for End Users"** checkbox
-4. Click "Generate Patch" or "Generate + Create EXE"
+---
 
-**Using CLI Generator:**
+### Example 9: Embedded Silent Mode for Automated Patches
 
-Currently, Simple Mode can only be enabled via the GUI. The CLI generator does not have a `--simple-mode` flag. The `SimpleMode` field in the patch structure is set by the GUI when the checkbox is checked.
+**Available since v1.0.11**: Create self-contained executables that automatically apply patches without user interaction.
 
-**Note:** Simple Mode is different from the `--silent` flag (which is for fully automatic patching with no user interaction).
+The `--silent` flag embeds silent mode into generated executables, making them perfect for automated deployments where you want users to simply run the file and have it patch automatically.
 
-**What Users See (GUI exe):**
-- Simple message: "You are about to patch from [version] to [version]"
-- Create backup checkbox (checked by default)
-- Dry Run button (to test without changes)
-- Apply Patch button
-- Advanced options are hidden/disabled
-
-**What Users See (CLI exe):**
-- Clean console interface showing patch info
-- Simple menu with only 3 options:
-  1. Dry Run (test without making changes)
-  2. Apply Patch
-  3. Exit
-- Backup option available before applying
-- No confusing technical details
-
-**Benefits:**
-- **Simplified UX**: End users see only what they need
-- **Reduced Support**: Fewer questions about advanced options
-- **Professional**: Cleaner interface for client distributions
-- **Safety**: Critical options (verify, auto-detect) forced on
-- **Flexibility**: Backup and dry run still available
-
-**Example Workflow:**
+**Create Silent Mode Executable:**
 
 ```bash
-# Software vendor creates patches (enable Simple Mode via GUI checkbox)
-patch-gen --versions-dir ./releases \
-          --new-version 2.0.0 \
-          --output ./dist \
-          --create-exe \
-          --verify
+# Single patch with embedded silent mode
+patch-gen --from-dir "C:\releases\1.0.0" --to-dir "C:\releases\1.0.1" --output ./patches --create-exe --silent
 
-# Distribute the .exe files to clients
-# Clients give them to end users
-# End users double-click and see simple interface
+# Batch mode with silent executables for all versions
+patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --create-exe --silent --verify
 ```
 
-**When to Use Simple Mode:**
-- Distributing to non-technical end users
-- Client deployments where support is limited
-- Enterprise environments with IT policies
-- Any scenario where simplified UX is desired
+**Result:**
+```
+patches/
+├── 1.0.0-to-1.0.3.patch     ← Standard patch file
+├── 1.0.0-to-1.0.3.exe       ← Silent mode embedded executable
+├── 1.0.1-to-1.0.3.patch
+├── 1.0.1-to-1.0.3.exe       ← Silent mode embedded executable
+├── 1.0.2-to-1.0.3.patch
+└── 1.0.2-to-1.0.3.exe       ← Silent mode embedded executable
+```
 
-**When NOT to Use Simple Mode:**
-- Internal development/testing
-- Technical users who need full control
-- Debugging or troubleshooting patches
-- Advanced deployment scenarios
+**User Experience:**
+- User downloads `1.0.0-to-1.0.3.exe`
+- User double-clicks the executable
+- Patch applies automatically (no prompts, no menus)
+- Creates log file `log_<epochtime>.txt` with complete execution details
+- Returns exit code 0 on success, 1 on failure
 
-**Remember:** Simple Mode (SimpleMode field) = Simplified UI | Silent Mode (--silent flag) = Automation
+**Difference from Applier --silent Flag:**
+- **Generator --silent**: Embeds silent mode INTO the executable itself
+  - User runs: `1.0.0-to-1.0.1.exe` (applies automatically)
+  - No command-line flags needed by end user
+  - Silent behavior is built into the file
+  
+- **Applier --silent**: Command-line flag for interactive executables
+  - User runs: `1.0.0-to-1.0.1.exe --silent` (requires flag)
+  - Works with any self-contained executable
+  - Silent behavior activated by user
+
+**Combined with --crp for Bidirectional Silent Patches:**
+
+```bash
+# Create both upgrade and downgrade silent executables
+patch-gen --from-dir "C:\releases\1.0.0" --to-dir "C:\releases\1.0.1" --output ./patches --create-exe --silent --crp
+```
+
+**Result:**
+```
+patches/
+├── 1.0.0-to-1.0.1.patch     ← Forward patch
+├── 1.0.0-to-1.0.1.exe       ← Forward silent executable (auto-upgrade)
+├── 1.0.1-to-1.0.0.patch     ← Reverse patch
+└── 1.0.1-to-1.0.0.exe       ← Reverse silent executable (auto-downgrade)
+```
+
+**When to Use Embedded Silent Mode:**
+- Distributing to end users for one-click automated updates
+- Enterprise deployments with minimal user interaction
+- Kiosk or unattended systems that need automatic patching
+- Game patches where users just want updates to "work"
+- Any scenario where you want simplest possible user experience
+
+**When NOT to Use Embedded Silent Mode:**
+- Users need to review patch details before applying
+- Testing environments where control is needed
+- Situations where backup/dry-run decisions should be user-controlled
+- When users need to specify custom target directories
+
+**Log File Details:**
+When a silent mode executable runs, it creates a timestamped log file:
+- Filename: `log_<unix_timestamp>.txt`
+- Location: Same directory as executable
+- Contents: Patch info, target directory, success/failure status, error messages
+- Enables audit trails for automated deployments
+
+**Security Note:**
+Silent mode executables apply patches immediately without confirmation. Ensure:
+- Patches are from trusted sources
+- Users understand what the executable does
+- Files are distributed through secure channels
+- Digital signatures verify authenticity
+
+See [Self-Contained Executables Guide](self-contained-executables.md) for complete documentation on silent mode behavior and log file formats.
 
 ---
 

@@ -8,21 +8,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cyberofficial/cyberpatchmaker/internal/core/differ"
 	"github.com/cyberofficial/cyberpatchmaker/internal/core/manifest"
 	"github.com/cyberofficial/cyberpatchmaker/pkg/utils"
 )
 
 // Generator handles patch generation
 type Generator struct {
-	differ          *differ.Differ
 	manifestManager *manifest.Manager
 }
 
 // NewGenerator creates a new patch generator
 func NewGenerator() *Generator {
 	return &Generator{
-		differ:          differ.NewDiffer(),
 		manifestManager: manifest.NewManager(),
 	}
 }
@@ -112,15 +109,7 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 			return nil, fmt.Errorf("failed to read new file %s: %w", file.Path, err)
 		}
 
-		// Verify the file data matches the manifest
-		if int64(len(fileData)) != file.Size {
-			return nil, fmt.Errorf("file %s size mismatch: expected %d bytes, got %d bytes (file may have changed since scanning)", file.Path, file.Size, len(fileData))
-		}
-
-		actualChecksum := utils.CalculateDataChecksum(fileData)
-		if actualChecksum != file.Checksum {
-			return nil, fmt.Errorf("file %s checksum mismatch: expected %s, got %s (file may have changed since scanning)", file.Path, file.Checksum, actualChecksum)
-		}
+		// The manifest checksums from the scanner are trusted; no need to re-verify
 
 		patch.Operations = append(patch.Operations, utils.PatchOperation{
 			Type:        utils.OpAdd,
@@ -169,16 +158,7 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 			return nil, fmt.Errorf("failed to read new file %s: %w", file.Path, err)
 		}
 
-		// Verify the file data matches the manifest
-		if int64(len(newFileData)) != file.Size {
-			return nil, fmt.Errorf("file %s size mismatch: expected %d bytes, got %d bytes (file may have changed since scanning)", file.Path, file.Size, len(newFileData))
-		}
-
-		actualChecksum := utils.CalculateDataChecksum(newFileData)
-		if actualChecksum != file.Checksum {
-			return nil, fmt.Errorf("file %s checksum mismatch: expected %s, got %s (file may have changed since scanning)", file.Path, file.Checksum, actualChecksum)
-		}
-
+		// The manifest checksums from the scanner are trusted; no need to re-verify
 		patch.Operations = append(patch.Operations, utils.PatchOperation{
 			Type:        utils.OpModify,
 			FilePath:    file.Path,

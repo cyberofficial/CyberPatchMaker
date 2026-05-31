@@ -91,13 +91,15 @@ patches/
 
 ### File Structure
 
-A self-contained executable consists of three parts:
+A self-contained executable consists of up to four parts:
 
 ```
 ┌─────────────────────────────┐
 │ patch-apply.exe             │  ← Base applier (~50 MB)
 ├─────────────────────────────┤
 │ Compressed Patch Data       │  ← Your patch (varies)
+├─────────────────────────────┤
+│ Sidecar Blob (optional)     │  ← Chunk metadata for multi-part patches
 ├─────────────────────────────┤
 │ 128-byte Header             │  ← Metadata at end
 └─────────────────────────────┘
@@ -116,7 +118,8 @@ Located at the end of the file:
 | 28-35 | 8 bytes | Data Size | Size of patch data |
 | 36-51 | 16 bytes | Compression | Type: "zstd", "gzip", or "none" |
 | 52-83 | 32 bytes | Checksum | SHA-256 of patch data |
-| 84-127 | 44 bytes | Reserved | For future use |
+| 84 | 1 byte | Flags | Feature flags (bit 0: silent mode) |
+| 85-127 | 43 bytes | Reserved | For future use |
 
 ### Detection Process
 
@@ -127,14 +130,17 @@ When `patch-apply.exe` starts:
    - Validates format version (only v1 supported)
    - Checks for magic bytes "CPMPATCH"
    - Verifies `DataOffset == StubSize` (no gaps)
-   - Validates `StubSize + DataSize + HEADER_SIZE == fileSize` (exact match)
+   - Validates `StubSize + DataSize + HEADER_SIZE <= fileSize` (minimum check; extra bytes allowed for sidecar data)
    - Ensures offsets are within file bounds
    - Limits patch size to max 1 GB (prevents memory exhaustion)
 4. If all validations pass:
    - Extracts patch data from validated offset
    - Verifies SHA-256 checksum
    - Decompresses if needed
+   - **Checks Flags byte (offset 84) for embedded silent mode (bit 0)**
    - Loads patch into console automatically
+   - **If silent mode embedded**: Applies patch immediately without prompts
+   - **If not silent mode**: Shows interactive console menu
 5. If any validation fails:
    - Runs in normal mode (browse for .patch file)
 
@@ -234,9 +240,10 @@ Need help? Visit: https://support.mygame.com/updates
      2. Apply Patch
      3. Toggle 1GB Bypass Mode (currently: Disabled)
      4. Change Target Directory
-     5. Exit
+     5. Specify Custom Key File
+     6. Exit
    ==============================================
-   Select option [1-5]:
+   Select option [1-6]:
    ```
 4. **Choose Option**: Select 1 for dry run or 2 to apply
 5. **Apply**: Confirm with "yes" when prompted
@@ -252,17 +259,66 @@ Need help? Visit: https://support.mygame.com/updates
 
 ### Automation Mode (Silent Flag)
 
-Self-contained executables support a `--silent` flag for **fully automated patching** without user interaction:
+Self-contained executables support silent mode for **fully automated patching** without user interaction. There are two ways to enable silent mode:
+
+#### Method 1: Embed Silent Mode (Generator --silent Flag)
+
+**Recommended for end-user distribution** - Silent mode is built into the executable itself:
 
 ```powershell
-# Automated silent patching
-1.2.4-to-1.2.5.exe --silent
+# Create executable with embedded silent mode
+patch-gen --from-dir "C:\releases\1.0.0" --to-dir "C:\releases\1.0.1" --output ./patches --create-exe --silent
 
-# Silent mode with explicit target directory
-1.2.4-to-1.2.5.exe --silent --current-dir C:\MyApp
+# User simply runs the file (no flags needed)
+1.0.0-to-1.0.1.exe
 ```
 
-**Features:**
+**How it works:**
+- Generator's `--silent` flag embeds silent mode flag into the executable header (Flags byte, bit 0)
+- When the executable runs, it detects the embedded flag automatically
+- Applies patch immediately without showing menu or prompts
+- No command-line flags needed by end user
+
+**Benefits:**
+- Simplest user experience (just run the file)
+- No confusion about flags or options
+- Perfect for distributing to non-technical users
+- User can't accidentally run in interactive mode
+
+#### Method 2: Command-Line Silent Flag (Applier --silent)
+
+**For flexibility** - Any self-contained executable can be run in silent mode:
+
+```powershell
+# Run any self-contained executable in silent mode
+1.0.0-to-1.0.1.exe --silent
+
+# Silent mode with explicit target directory
+1.0.0-to-1.0.1.exe --silent --current-dir C:\MyApp
+```
+
+**How it works:**
+- Works with any self-contained executable (doesn't need to be created with --silent)
+- User provides `--silent` flag when running the executable
+- Overrides interactive menu and applies patch automatically
+
+**Benefits:**
+- Works with existing executables
+- Flexibility to choose interactive or silent mode
+- Useful for scripting with standard executables
+
+#### Comparison: Embedded vs Command-Line Silent Mode
+
+| Feature | Embedded (--silent) | Command-Line (--silent) |
+|---------|---------------------|-------------------------|
+| **Generator Command** | `patch-gen --create-exe --silent ...` | `patch-gen --create-exe ...` |
+| **User Command** | `1.0.0-to-1.0.1.exe` | `1.0.0-to-1.0.1.exe --silent` |
+| **Behavior** | Always silent | Silent when flag provided |
+| **Best For** | End-user distribution | Scripting/automation |
+| **User Control** | No (always silent) | Yes (choose at runtime) |
+| **Simplicity** | Highest (no flags) | Moderate (requires flag) |
+
+**Features (Both Methods):**
 - **No prompts**: Applies patch automatically without asking
 - **Default settings**: Uses verify=true and backup=true
 - **Exit codes**: Returns 0 on success, 1 on failure

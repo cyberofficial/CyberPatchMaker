@@ -4,7 +4,7 @@ Guide to running and understanding CyberPatchMaker's comprehensive test suite.
 
 ## Overview
 
-CyberPatchMaker includes a comprehensive test suite with 59 tests that validate all core functionality including generation, application, verification, error handling, backup system, and advanced scenarios like multi-hop patching, bidirectional patching, downgrade testing, compression formats, and automatic rollback.
+CyberPatchMaker includes a comprehensive test suite with 61 tests (59 standard + 2 optional) that validate all core functionality including generation, application, verification, error handling, backup system, and advanced scenarios like multi-hop patching, bidirectional patching, downgrade testing, compression formats, and automatic rollback.
 
 **Key Feature:** Test data is automatically generated on first run - no bloat files committed to the repository!
 
@@ -15,8 +15,9 @@ CyberPatchMaker includes a comprehensive test suite with 59 tests that validate 
 **File:** `advanced-test.ps1`
 **Shell:** PowerShell 5.1 or later
 **Platform:** Windows (PowerShell)
-**Tests:** 59 comprehensive tests
+**Tests:** 61 comprehensive tests (59 standard + 2 optional)
 **Test Data:** Auto-generated on first run (1.0.0, 1.0.1, 1.0.2)
+**Optional Test Flags:** `-run1gbtest`, `-runlargefile`
 **Command Visibility:** Shows exact command-line for each operation (displayed in cyan)
 **Bidirectional Testing:** Includes upgrade/downgrade cycle verification
 
@@ -60,11 +61,11 @@ Testing: Apply zstd patch to complex directory structure
 ✓ PASSED: Apply zstd patch to complex directory structure
 
 ...
-(All 28 tests with command visibility)
+(All 61 tests with command visibility)
 ========================================
 Advanced Test Results
 ========================================
-Passed: 59
+Passed: 61
 Failed: 0
 
 ✓ All advanced tests passed!
@@ -125,50 +126,100 @@ ls testdata/patches/
 
 ## Test Suite Overview
 
-The advanced test suite includes 59 comprehensive tests organized into several categories:
+The advanced test suite includes 61 comprehensive tests organized into several categories:
 
-### Core Functionality Tests (Tests 1-6)
-1. **Build Generator Tool** - Verifies patch-gen.exe compiles correctly
-2. **Build Applier Tool** - Verifies patch-apply.exe compiles correctly
-3. **Auto-Generate Test Versions** - Creates test data (1.0.0, 1.0.1, 1.0.2) if missing
-4. **Generate Patches (Batch)** - Tests batch patch generation from all versions to 1.0.2
-5. **Patch File Verification** - Confirms all expected patch files were created
-6. **Apply Simple Patch** - Tests basic patch application (1.0.0 → 1.0.1)
+### Build & Setup Tests (Tests 1-3)
+1. **Verify executables exist** - Confirms patch-gen.exe and patch-apply.exe build successfully
+2. **Setup advanced test environment** - Creates the test output directory structure
+3. **Verify test versions exist** - Confirms all three test versions (1.0.0, 1.0.1, 1.0.2) are present
 
-### Verification Tests (Tests 7-9)
-7. **Verify Patch Results** - Confirms all files match expected checksums after patching
-8. **Pre-Verification Test** - Ensures system detects source version before patching
-9. **Wrong Version Detection** - Verifies system rejects patches for wrong versions
+### Patch Generation Tests (Tests 4-8)
+4. **Generate complex patch (1.0.1 -> 1.0.2) with zstd** - zstd compression
+5. **Generate same patch with gzip compression** - gzip compression
+6. **Generate same patch with no compression** - uncompressed
+7. **Compare compression efficiency** - Verify all three methods produce valid patches
+8. **Dry-run complex patch application** - Preview mode without changes
 
-### Compression Tests (Tests 10-12)
-10. **Zstd Compression** - Tests high-performance zstd compression
-11. **Gzip Compression** - Tests universal gzip compression
-12. **No Compression** - Tests uncompressed patches
+### Patch Application Tests (Tests 9-15)
+9. **Apply zstd patch to complex directory structure** - Apply zstd-compressed patch
+10. **Apply gzip patch to complex directory structure** - Apply gzip-compressed patch
+11. **Apply uncompressed patch to complex directory structure** - Apply uncompressed patch
+12. **Verify complex directory structure after patching** - Verify file tree integrity
+13. **Verify new files added in nested paths** - Check added files in subdirectories
+14. **Verify modified files match version 1.0.2** - Check modified files
+15. **Verify all compression methods produce identical results** - Cross-compression validation
 
-### Advanced Scenario Tests (Tests 13-16)
-13. **Complex Directory Structure** - Tests 3-level nested directories (1.0.1 → 1.0.2)
-14. **Multi-Hop Patching** - Tests sequential patching (1.0.0 → 1.0.1 → 1.0.2)
-15. **File Corruption Detection** - Verifies system detects corrupted files before patching
-16. **Dry-Run Mode** - Tests preview mode without making changes
+### Multi-Hop & Downgrade Tests (Tests 16-20)
+16. **Test multi-hop patching scenario** - Sequential patching (1.0.0 -> 1.0.1 -> 1.0.2)
+17. **Generate downgrade patch (1.0.2 -> 1.0.1)** - Downgrade patch generation
+18. **Apply downgrade patch to revert version** - Downgrade patch application
+19. **Verify downgrade results match version 1.0.1** - Verify downgrade correctness
+20. **Test bidirectional patching cycle** - Complete upgrade/downgrade cycle
 
-### Bidirectional Patching Tests (Tests 17-20)
-17. **Generate Downgrade Patch** - Tests downgrade patch generation (1.0.2 → 1.0.1)
-18. **Apply Downgrade Patch** - Tests downgrade patch application and verification
-19. **Verify Downgrade Results** - Confirms downgraded version matches expected state
-20. **Bidirectional Cycle** - Tests complete upgrade/downgrade cycle (1.0.1 ↔ 1.0.2)
+### Error Detection Tests (Tests 21-22)
+21. **Verify patch rejection for wrong source version** - Wrong version rejection
+22. **Verify detection of corrupted files in source** - Corruption detection
 
-### Error Handling & Safety Tests (Tests 21-24)
-21. **Wrong Version Detection** - Verifies patches are rejected for wrong versions
-22. **Backup System** - Verifies automatic backup creation and restoration
-23. **Performance Benchmark** - Measures patch generation speed
-24. **Verify All Operations** - Final comprehensive check of all test versions
+### Backup System Tests (Tests 23-27b)
+23. **Verify backup creation and mirror structure** - Backup with mirror directory structure
+24. **Verify selective backup (only modified/deleted files)** - Only changed files backed up
+25. **Verify backup is preserved after successful patching** - Backup preserved post-patch
+26. **Verify manual rollback from backup works** - Manual restore from backup
+27. **Verify backup handles complex nested paths** - Deep path backup
+27b. **Verify deleted directories are backed up with all contents** - Deleted directory backup
+
+### Performance & Custom Paths Tests (Tests 28-35)
+28. **Verify patch generation performance** - Speed benchmarking
+29. **Test custom paths mode with different directories** - Custom --from-dir/--to-dir
+30. **Apply patch generated with custom paths mode** - Apply custom paths patch
+31. **Test custom paths with complex nested directories** - Complex custom paths
+32. **Verify version number extraction from directory names** - Version from dir name
+33. **Test compression options with custom paths** - Compression with custom paths
+34. **Test error handling for non-existent directories** - Error handling
+35. **Verify backward compatibility with legacy --versions-dir mode** - Legacy mode
+
+### Self-Contained Executable Tests (Tests 36-40)
+36. **Test CLI self-contained executable creation** - --create-exe flag
+37. **Verify CLI executable structure and header** - Magic bytes verification
+38. **Test batch mode with CLI executable creation** - Batch exe creation
+39. **Test 1GB bypass with large patch creation** *(optional: -run1gbtest)* - Large patches
+40. **Verify CLI executables use CLI applier** - CLI applier verification
+
+### File Exclusion & Silent Mode Tests (Tests 41-46)
+41. **Verify backup.cyberpatcher directories are excluded** - Backup exclusion
+42. **Verify .cyberignore file pattern matching** - Cyberignore patterns
+43. **Verify self-contained executable --silent flag for automation** - Silent mode
+44. **Verify silent mode generates timestamped log files** - Log file generation
+45. **Verify generator --silent flag embeds silent mode in created executables** - Embedded silent
+46. **Verify --crp flag creates reverse patches for downgrades** - Reverse patches
+
+### Scan Cache Tests (Tests 47-53)
+47. **Verify scan cache basic functionality with --savescans** - Cache creation
+48. **Verify scan cache custom directory with --scandata** - Custom cache dir
+49. **Verify force rescan with --rescan flag** - Force rescan
+50. **Verify scan cache performance improvement** - Performance comparison
+51. **Verify scan cache works with custom paths mode** - Cache + custom paths
+52. **Verify scan cache file structure and content** - Cache file validation
+53. **Verify scan cache invalidation on file changes** - Cache invalidation
+
+### Simple Mode Tests (Tests 54-58)
+54. **Verify Simple Mode struct field and encoding** - SimpleMode field in Patch struct
+55. **Verify runSimpleMode function exists** - Simplified applier interface
+56. **Verify Simple Mode workflow infrastructure** - End-to-end (field exists, function callable)
+57. **Verify Simple Mode documentation and feature completeness** - Feature validation
+58. **Verify Simple Mode addresses real-world use cases** - Use case scenarios
+
+**Note:** The `SimpleMode` field and `runSimpleMode()` function exist in the codebase but no generator code path currently sets `SimpleMode = true`. These tests verify the infrastructure exists.
+
+### .cyberignore Advanced & Large File Tests (Tests 59-60)
+59. **Verify .cyberignore absolute path pattern support** - Absolute path patterns
+60. **Verify large file chunked processing and memory optimization** *(optional: -runlargefile)* - Chunked processing
 
 ### Test Data Structure
 
 **Auto-generated test versions:**
 
 **Version 1.0.0** (Baseline - 3 files, 2 directories):
-3. Checks test file exists in each version
 
 **Expected result:** All directories and files present
 
@@ -269,7 +320,7 @@ echo "Version 1.0.0" > testdata/manual/1.0.0/app.exe
 echo "Version 1.0.1" > testdata/manual/1.0.1/app.exe
 
 # Generate patch
-./generator --versions-dir testdata/manual \
+./patch-gen.exe --versions-dir testdata/manual \
             --new-version 1.0.1 \
             --output testdata/manual/patches
 
@@ -288,7 +339,7 @@ mkdir -p testdata/manual/test-app
 cp testdata/manual/1.0.0/app.exe testdata/manual/test-app/
 
 # Apply patch
-./applier --patch testdata/manual/patches/1.0.0-to-1.0.1.patch \
+./patch-apply.exe --patch testdata/manual/patches/1.0.0-to-1.0.1.patch \
           --current-dir testdata/manual/test-app \
           --verify
 
@@ -308,7 +359,7 @@ mkdir -p testdata/manual/test-app
 cp testdata/manual/1.0.0/app.exe testdata/manual/test-app/
 
 # Dry-run (no changes)
-./applier --patch testdata/manual/patches/1.0.0-to-1.0.1.patch \
+./patch-apply.exe --patch testdata/manual/patches/1.0.0-to-1.0.1.patch \
           --current-dir testdata/manual/test-app \
           --dry-run
 
@@ -327,7 +378,7 @@ mkdir -p testdata/manual/corrupted
 echo "Corrupted Version" > testdata/manual/corrupted/app.exe
 
 # Try to apply patch (should fail)
-./applier --patch testdata/manual/patches/1.0.0-to-1.0.1.patch \
+./patch-apply.exe --patch testdata/manual/patches/1.0.0-to-1.0.1.patch \
           --current-dir testdata/manual/corrupted \
           --verify
 
@@ -344,8 +395,8 @@ ls testdata/manual/corrupted.backup
 **Generating a downgrade patch:**
 
 ```bash
-# Generate downgrade patch (1.0.1 → 1.0.0)
-./generator --versions-dir testdata/manual \
+# Generate downgrade patch (1.0.1 -> 1.0.0)
+./patch-gen.exe --versions-dir testdata/manual \
             --from 1.0.1 \
             --to 1.0.0 \
             --output testdata/manual/patches
@@ -363,7 +414,7 @@ mkdir -p testdata/manual/test-downgrade
 cp testdata/manual/1.0.1/app.exe testdata/manual/test-downgrade/
 
 # Apply downgrade patch
-./applier --patch testdata/manual/patches/1.0.1-to-1.0.0.patch \
+./patch-apply.exe --patch testdata/manual/patches/1.0.1-to-1.0.0.patch \
           --current-dir testdata/manual/test-downgrade \
           --verify
 
@@ -380,7 +431,7 @@ mkdir -p testdata/manual/test-bidirectional
 cp testdata/manual/1.0.0/app.exe testdata/manual/test-bidirectional/
 
 # Upgrade to 1.0.1
-./applier --patch testdata/manual/patches/1.0.0-to-1.0.1.patch \
+./patch-apply.exe --patch testdata/manual/patches/1.0.0-to-1.0.1.patch \
           --current-dir testdata/manual/test-bidirectional \
           --verify
 
@@ -388,7 +439,7 @@ cat testdata/manual/test-bidirectional/app.exe
 # Should show: Version 1.0.1
 
 # Downgrade back to 1.0.0
-./applier --patch testdata/manual/patches/1.0.1-to-1.0.0.patch \
+./patch-apply.exe --patch testdata/manual/patches/1.0.1-to-1.0.0.patch \
           --current-dir testdata/manual/test-bidirectional \
           --verify
 
@@ -400,29 +451,20 @@ cat testdata/manual/test-bidirectional/app.exe
 
 ---
 
-## Continuous Integration
+## Optional Test Flags
 
-### GitHub Actions Example
+The test suite supports optional flags for testing advanced features:
 
-```yaml
-name: Test CyberPatchMaker
+```powershell
+# Test large patches >1GB (requires significant disk space and time)
+.\advanced-test.ps1 -run1gbtest
 
-on: [push, pull_request]
+# Test chunked processing for 1.5GB file (memory optimization)
+.\advanced-test.ps1 -runlargefile
 
-jobs:
-  test-windows:
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v4
-        with:
-          go-version: '1.24.0'
-      - name: Run advanced test suite
-        run: .\advanced-test.ps1
-        shell: pwsh
+# Combine flags
+.\advanced-test.ps1 -run1gbtest -runlargefile
 ```
-
-**Note:** Test data is auto-generated on first run, so no additional setup is required
 
 ---
 
@@ -432,14 +474,14 @@ jobs:
 
 ```bash
 # Create new version directory
-mkdir testdata/1.0.3
+mkdir testdata/versions/1.0.3
 
 # Add test files
-echo "Version 1.0.3" > testdata/1.0.3/test-app.txt
-echo "New feature data" > testdata/1.0.3/feature.txt
+echo "Version 1.0.3" > testdata/versions/1.0.3/test-app.txt
+echo "New feature data" > testdata/versions/1.0.3/feature.txt
 
 # Generate patches
-./generator --versions-dir testdata \
+./patch-gen.exe --versions-dir testdata/versions \
             --new-version 1.0.3 \
             --output testdata/patches
 ```
@@ -458,16 +500,16 @@ rm -rf testdata/1.0.0-test
 rm -rf testdata/1.0.1-test
 
 # Remove executables (rebuild from source)
-rm generator applier
+rm patch-gen.exe patch-apply.exe
 ```
 
 ---
 
 ## Troubleshooting Test Failures
 
-### Build Failures (Test 1)
+### Build Failures
 
-**Symptom:** Test 1 fails with compilation errors
+**Symptom:** Build step fails with compilation errors
 
 **Solutions:**
 1. Check Go version: `go version` (need 1.24.0+)
@@ -477,9 +519,9 @@ rm generator applier
 
 ---
 
-### Directory Structure Failures (Test 2)
+### Directory Structure Failures
 
-**Symptom:** Test 2 fails to find testdata
+**Symptom:** Setup fails to find testdata
 
 **Solutions:**
 1. Run tests from project root
@@ -489,7 +531,7 @@ rm generator applier
 
 ---
 
-### Generation Failures (Test 3)
+### Generation Failures
 
 **Symptom:** Generator command fails
 
@@ -502,7 +544,7 @@ rm generator applier
 
 ---
 
-### Application Failures (Test 5)
+### Application Failures
 
 **Symptom:** Applier command fails
 
@@ -515,9 +557,9 @@ rm generator applier
 
 ---
 
-### Pre-Verification Test Failures (Test 8)
+### Pre-Verification Failures
 
-**Symptom:** Test 8 passes when it should detect corruption
+**Symptom:** Corruption detection test passes when it should report failure
 
 **Solutions:**
 1. Verify corruption step actually modifies file

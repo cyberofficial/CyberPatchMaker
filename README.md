@@ -1,6 +1,7 @@
 # CyberPatchMaker
 
-**Update your software smarter, not harder.**
+**Update your software smarter, not harder.**  
+[View Wiki](https://github.com/cyberofficial/CyberPatchMaker/wiki) | [Quick Start](docs/quick-start.md) | [CLI Reference](docs/cli-reference.md)
 
 CyberPatchMaker creates tiny update files for large applications. Instead of downloading a whole 5GB app again, download just a few megabytes of changes.
 
@@ -32,6 +33,7 @@ Perfect for:
 - **Scan Caching** - Cache directory scans for instant patch generation (15+ min → <1 sec for large projects)
 - **Simple Mode for End Users** - Simplified interface for non-technical users with basic options
 - **Silent Mode** - Fully automatic patching with zero user interaction, automatic log file generation (CLI only)
+- **Embedded Silent Mode** - Generator `--silent` flag embeds auto-apply behavior into executables (no user flags needed)
 - **Large File Handling** - Automatic memory-optimized processing for files >1GB, prevents memory exhaustion
 - **Multi-Part Patches** - Automatic splitting of patches >4GB into manageable parts (prevents memory exhaustion with 18GB+ patches)
 - **Parallel Processing** - Multi-threaded patch generation using multiple CPU cores for faster processing
@@ -65,6 +67,12 @@ patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches
 
 This automatically creates patch files from all previous versions to version 1.0.3.
 
+You can also create forward and reverse patches in one go with the `--crp` flag:
+
+```bash
+patch-gen --from-dir ./v1.0.0 --to-dir ./v1.0.1 --output ./patches --crp --create-exe
+```
+
 ### Applying a Patch
 
 Update your application with a patch file:
@@ -83,9 +91,8 @@ The `--verify` flag ensures everything is checked before and after patching, wit
 - [Generator Guide](docs/generator-guide.md) - All patch creation options
 - [Applier Guide](docs/applier-guide.md) - All patch application options
 - [CLI Reference](docs/cli-reference.md) - Complete command reference
-- [CLI Examples](docs/CLI-EXAMPLES.md) - Common usage patterns
 - [Downgrade Guide](docs/downgrade-guide.md) - Rollback to previous versions
-- [Multi-Part Patches](docs/multipart-patches.md) - Handling patches >4GB (automatic splitting)
+- [Multi-Part Patches](docs/multipart-patches.md) - Handling patches over 4GB
 
 ### Advanced Options
 
@@ -218,8 +225,7 @@ CyberPatchMaker compares two versions of your software and creates a small patch
 - [Architecture](docs/architecture.md) - System design and components
 - [Hash Verification](docs/hash-verification.md) - Security and verification
 - [Key File System](docs/key-file-system.md) - Version identification
-- [Backup Lifecycle](docs/backup-lifecycle.md) - Backup and recovery process
-- [Backup System](docs/backup-system.md) - Comprehensive backup management
+- [Backup System](docs/backup-system.md) - Backup, rollback, and recovery
 - [Version Management](docs/version-management.md) - How versions are tracked
 
 ## Complete Example
@@ -247,7 +253,7 @@ patch-apply --patch 1.0.0-to-1.0.2.patch --current-dir ./myapp --verify
 # Done! Their version 1.0.0 is now version 1.0.2
 ```
 
-**More examples:** [CLI Examples](docs/CLI-EXAMPLES.md)
+**More examples:** [CLI Reference](docs/cli-reference.md)
 
 ## What's Included
 
@@ -278,9 +284,7 @@ The test suite automatically validates:
 - Backup and rollback systems
 - Complex directory structures
 
-**Testing documentation:**
-- [Testing Guide](docs/testing-guide.md) - How to test your patches
-- [Advanced Test Summary](docs/ADVANCED-TEST-SUMMARY.md) - Detailed test results
+**Testing documentation:** [Testing Guide](docs/testing-guide.md)
 
 ## Performance & Reliability
 
@@ -305,35 +309,17 @@ The test suite automatically validates:
 
 ## Documentation
 
-All documentation is in the [docs/](docs/) folder:
+Full documentation is available on the [GitHub Wiki](https://github.com/cyberofficial/CyberPatchMaker/wiki) and in the [docs/](docs/) folder.
 
-**Getting Started:**
-- [Quick Start](docs/quick-start.md) - Get up and running fast
-- [CLI Examples](docs/CLI-EXAMPLES.md) - Common usage patterns
-- [Development Setup](docs/development-setup.md) - Developer guide
+**Getting Started:** [Quick Start](docs/quick-start.md) - [CLI Reference](docs/cli-reference.md) - [Development Setup](docs/development-setup.md)
 
-**Reference:**
-- [Generator Guide](docs/generator-guide.md) - Creating patches
-- [Applier Guide](docs/applier-guide.md) - Applying patches
-- [Self-Contained Executables](docs/self-contained-executables.md) - Standalone patch distribution
-- [CLI Reference](docs/cli-reference.md) - All commands and options
-- [Simple Mode Guide](docs/simple-mode-guide.md) - Simplified interface for end users
+**User Guides:** [Generator](docs/generator-guide.md) - [Applier](docs/applier-guide.md) - [Self-Contained Executables](docs/self-contained-executables.md) - [Simple Mode](docs/simple-mode-guide.md) - [Downgrade](docs/downgrade-guide.md)
 
-**Advanced:**
-- [How It Works](docs/how-it-works.md) - Technical deep dive
-- [Architecture](docs/architecture.md) - System design
-- [Testing Guide](docs/testing-guide.md) - Testing your patches
-- [Troubleshooting](docs/troubleshooting.md) - Common issues
-- [Advanced Test Summary](docs/ADVANCED-TEST-SUMMARY.md) - Detailed test results
-- [Large File Handling](docs/large-file-handling.md) - Memory optimization for large files
-- [Backup System](docs/backup-system.md) - Comprehensive backup management
-- [Key File System](docs/key-file-system.md) - Version identification
-- [Version Management](docs/version-management.md) - How versions are tracked
-- [Compression Guide](docs/compression-guide.md) - Compression options
-- [Hash Verification](docs/hash-verification.md) - Security and verification
-- [Backup Lifecycle](docs/backup-lifecycle.md) - Backup and recovery process
-- [Multi-Part Patches](docs/multipart-patches.md) - Handling large patches
-- [Cyberignore Guide](docs/cyberignore-guide.md) - File exclusion patterns
+**Concepts:** [How It Works](docs/how-it-works.md) - [Architecture](docs/architecture.md) - [Backup System](docs/backup-system.md) - [Key File System](docs/key-file-system.md) - [Hash Verification](docs/hash-verification.md) - [Version Management](docs/version-management.md)
+
+**Features:** [Scan Caching](docs/scan-caching.md) - [Large File Handling](docs/large-file-handling.md) - [Multi-Part Patches](docs/multipart-patches.md) - [Compression](docs/compression-guide.md) - [Cyberignore](docs/cyberignore-guide.md)
+
+**Reference:** [Testing Guide](docs/testing-guide.md) - [Troubleshooting](docs/troubleshooting.md) - [Performance](docs/performance.md)
 
 ## Contributing
 

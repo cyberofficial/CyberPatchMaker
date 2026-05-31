@@ -260,13 +260,33 @@ D:\dev-builds\           # Development builds
 
 ## Registering Versions
 
+### Manager Methods
+
+The `version.Manager` (in `internal/core/version/manager.go`) provides the following public methods:
+
+| Method | Description |
+|--------|-------------|
+| `NewManager()` | Create a new version manager with default settings (single-threaded) |
+| `SetWorkerThreads(threads int)` | Set number of parallel workers for scanning (minimum 1) |
+| `GetScanCache()` | Returns the `*cache.ScanCache` instance (nil if caching not enabled) |
+| `GetRegistry()` | Returns the `*Registry` containing all registered versions |
+| `SaveRegistry(filePath string)` | Persist all version manifests to disk (each version gets its own JSON file in a `manifests/` subdirectory) |
+| `LoadRegistry(filePath string)` | Load version manifests from disk (reads all `.json` files from the `manifests/` subdirectory) |
+| `EnableScanCache(cacheDir string, forceRescan bool)` | Enable scan caching with specified cache directory |
+| `RegisterVersion(versionNumber, location, keyFilePath string)` | Register and scan a new version |
+| `UnregisterVersion(versionNumber string)` | Remove a version from the registry |
+| `GetVersion(versionNumber string)` | Retrieve a registered version (returns `*utils.Version, error`) |
+| `ListVersions()` | Return all registered versions |
+| `RescanVersion(versionNumber string)` | Rescan a version's directory and update its manifest |
+| `VerifyVersion(versionNumber string)` | Verify all files in a version match their checksums (returns `[]string, error`) |
+
 ### Automatic Registration
 
 When generating patches, versions are automatically registered:
 
 ```bash
 # This automatically registers all versions in ./versions
-./generator --versions-dir ./versions \
+patch-gen --versions-dir ./versions \
             --new-version 1.0.2 \
             --output ./patches
 ```
@@ -333,12 +353,12 @@ ln -s /mnt/storage/versions/1.0.0 versions/1.0.0
 **3. Generate patches incrementally:**
 ```bash
 # Generate patches for recent versions only
-./generator --versions-dir ./versions \
+patch-gen --versions-dir ./versions \
             --new-version 2.1.0 \
             --from 2.0.0 \
             --output ./patches
 
-./generator --versions-dir ./versions \
+patch-gen --versions-dir ./versions \
             --new-version 2.1.0 \
             --from 2.0.5 \
             --output ./patches
@@ -448,12 +468,12 @@ rm -rf versions/archive/
 xcopy C:\versions D:\versions /E /I
 
 # 2. Update generator usage
-./generator --versions-dir D:\versions \
+patch-gen --versions-dir D:\versions \
             --new-version 1.0.3 \
             --output D:\patches
 
 # 3. Verify patches work
-./applier --patch D:\patches\1.0.0-to-1.0.3.patch \
+patch-apply --patch D:\patches\1.0.0-to-1.0.3.patch \
           --current-dir ./test-app \
           --dry-run \
           --verify
@@ -495,7 +515,7 @@ mv versions ~/Dropbox/CyberPatchMaker/versions
 ln -s ~/Dropbox/CyberPatchMaker/versions versions
 
 # 3. Generate patches
-./generator --versions-dir ~/Dropbox/CyberPatchMaker/versions \
+patch-gen --versions-dir ~/Dropbox/CyberPatchMaker/versions \
             --new-version 1.0.3 \
             --output ~/Dropbox/CyberPatchMaker/patches
 ```
@@ -605,7 +625,7 @@ ls -la versions/
 ls -la versions/1.0.0/
 
 # Use absolute path
-./generator --versions-dir /full/path/to/versions \
+patch-gen --versions-dir /full/path/to/versions \
             --new-version 1.0.1 \
             --output ./patches
 ```

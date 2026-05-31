@@ -32,7 +32,8 @@ type EmbeddedPatchHeader struct {
 	DataSize    uint64
 	Compression [16]byte
 	Checksum    [32]byte
-	Reserved    [44]byte
+	Flags       byte
+	Reserved    [43]byte
 }
 
 func main() {
@@ -62,10 +63,11 @@ func main() {
 	}
 
 	// Check if patch data is embedded in this executable
-	patch, targetDir, isEmbedded := checkEmbeddedPatch(*ignore1GB)
+	patch, targetDir, isEmbedded, embeddedSilent := checkEmbeddedPatch(*ignore1GB)
 
 	if isEmbedded && patch != nil {
-		if *silent {
+		// Use embedded silent flag if set, otherwise check command-line flag
+		if embeddedSilent || *silent {
 			// Silent mode: apply patch automatically
 			runSilentMode(patch, targetDir, *currentDir, *keyFile)
 			return
@@ -169,95 +171,81 @@ func loadPatch(filename string) (*utils.Patch, error) {
 	return parsePatchDataStreaming(file)
 }
 
-// parsePatchData parses patch data, automatically detecting and decompressing if needed
-func parsePatchData(data []byte) (*utils.Patch, error) {
-	// Try to detect compression and decompress
-	// First try as JSON directly
-	var patch utils.Patch
-	if err := json.Unmarshal(data, &patch); err != nil {
-		// Try decompressing with zstd
-		decompressed, err := utils.DecompressData(data, "zstd")
-		if err != nil {
-			// Try gzip
-			decompressed, err = utils.DecompressData(data, "gzip")
-			if err != nil {
-				return nil, fmt.Errorf("failed to decompress or parse patch: %w", err)
-			}
-		}
-		data = decompressed
+//// parsePatchData parses patch data, automatically detecting and decompressing if needed
+//func parsePatchData(data []byte) (*utils.Patch, error) {
+//	// Try to detect compression and decompress
+//	// First try as JSON directly
+//	var patch utils.Patch
+//	if err := json.Unmarshal(data, &patch); err != nil {
+//		// Try decompressing with zstd
+//		decompressed, err := utils.DecompressData(data, "zstd")
+//		if err != nil {
+//			// Try gzip
+//			decompressed, err = utils.DecompressData(data, "gzip")
+//			if err != nil {
+//				return nil, fmt.Errorf("failed to decompress or parse patch: %w", err)
+//			}
+//		}
+//		data = decompressed
+//
+//		// Try parsing again
+//		if err := json.Unmarshal(data, &patch); err != nil {
+//			return nil, fmt.Errorf("failed to parse patch JSON: %w", err)
+//		}
+//	}
+//
+//	return &patch, nil
+//}
 
-		// Try parsing again
-		if err := json.Unmarshal(data, &patch); err != nil {
-			return nil, fmt.Errorf("failed to parse patch JSON: %w", err)
-		}
-	}
-
-	return &patch, nil
-}
-
-// parsePatchDataStreaming parses patch data using streaming decompression to handle large files
+// parsePatchDataStreaming parses patch data using streaming decompression with magic-byte detection.
 func parsePatchDataStreaming(reader io.Reader) (*utils.Patch, error) {
-	// Read first few bytes to detect format without consuming the full stream
-	limitedReader := &io.LimitedReader{R: reader, N: 10}
-	header := make([]byte, 10)
-	n, err := limitedReader.Read(header)
-	if err != nil && err != io.EOF {
+	// Read first 4 bytes to detect compression format
+	magic := make([]byte, 4)
+	n, err := io.ReadFull(reader, magic)
+	if err != nil && err != io.EOF && err != io.ErrUnexpectedEOF {
 		return nil, fmt.Errorf("failed to read patch header: %w", err)
 	}
-	header = header[:n]
+	magic = magic[:n]
 
-	// Check if it starts with JSON (uncompressed)
-	if len(header) > 0 && header[0] == '{' {
-		// Uncompressed JSON - combine header with remaining reader
-		fullReader := io.MultiReader(bytes.NewReader(header), reader)
-		// Use a buffered reader with large buffer for large JSON documents
-		bufReader := bufio.NewReaderSize(fullReader, 64*1024*1024) // 64MB buffer
-		var patch utils.Patch
-		decoder := json.NewDecoder(bufReader)
-		decoder.UseNumber() // Preserve large numbers
-		if err := decoder.Decode(&patch); err != nil {
-			return nil, fmt.Errorf("failed to parse uncompressed patch JSON: %w", err)
-		}
-		return &patch, nil
+	// Detect compression from magic bytes
+	algo := utils.DetectCompression(magic)
+
+	// Reconstruct full reader
+	fullReader := io.MultiReader(bytes.NewReader(magic), reader)
+
+	var patchReader io.Reader
+	switch algo {
+	case "none":
+		patchReader = fullReader
+	case "zstd":
+		pr, pw := io.Pipe()
+		go func() {
+			defer pw.Close()
+			if err := utils.DecompressDataStreaming(fullReader, pw, "zstd"); err != nil {
+				pw.CloseWithError(err)
+			}
+		}()
+		patchReader = pr
+	case "gzip":
+		pr, pw := io.Pipe()
+		go func() {
+			defer pw.Close()
+			if err := utils.DecompressDataStreaming(fullReader, pw, "gzip"); err != nil {
+				pw.CloseWithError(err)
+			}
+		}()
+		patchReader = pr
+	default:
+		return nil, fmt.Errorf("unsupported compression format")
 	}
 
-	// Not uncompressed JSON, try compressed formats
-	// Combine header with remaining reader for decompression
-	fullReader := io.MultiReader(bytes.NewReader(header), reader)
-
-	// Try zstd decompression
-	zstdPipeReader, zstdPipeWriter := io.Pipe()
-	go func() {
-		defer zstdPipeWriter.Close()
-		if err := utils.DecompressDataStreaming(fullReader, zstdPipeWriter, "zstd"); err != nil {
-			zstdPipeWriter.CloseWithError(err)
-		}
-	}()
-
-	// Use buffered reader for large JSON documents
-	bufReader := bufio.NewReaderSize(zstdPipeReader, 64*1024*1024) // 64MB buffer
+	// 64KB buffer is sufficient for streaming JSON decoding
+	bufReader := bufio.NewReaderSize(patchReader, 64*1024)
 	var patch utils.Patch
 	decoder := json.NewDecoder(bufReader)
-	decoder.UseNumber() // Preserve large numbers as strings to avoid precision loss
-	if err := decoder.Decode(&patch); err == nil {
-		return &patch, nil
-	}
-
-	// Zstd failed, try gzip with fresh reader
-	fullReader = io.MultiReader(bytes.NewReader(header), reader)
-	gzipPipeReader, gzipPipeWriter := io.Pipe()
-	go func() {
-		defer gzipPipeWriter.Close()
-		if err := utils.DecompressDataStreaming(fullReader, gzipPipeWriter, "gzip"); err != nil {
-			gzipPipeWriter.CloseWithError(err)
-		}
-	}()
-
-	bufReader = bufio.NewReaderSize(gzipPipeReader, 64*1024*1024) // 64MB buffer
-	decoder = json.NewDecoder(bufReader)
-	decoder.UseNumber() // Preserve large numbers as strings to avoid precision loss
+	decoder.UseNumber()
 	if err := decoder.Decode(&patch); err != nil {
-		return nil, fmt.Errorf("failed to parse patch: unsupported compression or invalid format: %w", err)
+		return nil, fmt.Errorf("failed to parse patch: %w", err)
 	}
 
 	return &patch, nil
@@ -401,93 +389,141 @@ func performDryRun(patch *utils.Patch, currentDir string, customKeyFile string) 
 }
 
 // checkEmbeddedPatch checks if this executable contains an embedded patch
-func checkEmbeddedPatch(ignore1GB bool) (*utils.Patch, string, bool) {
+// Returns: patch, targetDir, isEmbedded, embeddedSilent
+func checkEmbeddedPatch(ignore1GB bool) (*utils.Patch, string, bool, bool) {
 	// Get path to this executable
 	exePath, err := os.Executable()
 	if err != nil {
-		return nil, "", false
+		return nil, "", false, false
 	}
 
 	// Open executable for reading
 	file, err := os.Open(exePath)
 	if err != nil {
-		return nil, "", false
+		return nil, "", false, false
 	}
 	defer file.Close()
 
 	// Get file size
 	stat, err := file.Stat()
 	if err != nil {
-		return nil, "", false
+		return nil, "", false, false
 	}
 	fileSize := stat.Size()
 
 	// Check if file is large enough for header
 	if fileSize < HEADER_SIZE {
-		return nil, "", false
+		return nil, "", false, false
 	}
 
 	// Read header from end of file
 	headerOffset := fileSize - HEADER_SIZE
 	if _, err := file.Seek(headerOffset, io.SeekStart); err != nil {
-		return nil, "", false
+		return nil, "", false, false
 	}
 
 	headerBytes := make([]byte, HEADER_SIZE)
 	if _, err := io.ReadFull(file, headerBytes); err != nil {
-		return nil, "", false
+		return nil, "", false, false
 	}
 
 	// Parse header
 	var header EmbeddedPatchHeader
 	buf := bytes.NewReader(headerBytes)
 	if err := binary.Read(buf, binary.LittleEndian, &header); err != nil {
-		return nil, "", false
+		return nil, "", false, false
 	}
 
 	// Validate magic bytes
 	magic := string(bytes.TrimRight(header.Magic[:], "\x00"))
 	if magic != MAGIC_BYTES {
-		return nil, "", false
+		return nil, "", false, false
 	}
 
 	// Validate version
 	if header.Version != 1 {
-		return nil, "", false
+		return nil, "", false, false
 	}
 
-	// Validate structure
+	// Validate structure: data must start immediately after stub
 	if header.DataOffset != header.StubSize {
-		return nil, "", false
+		return nil, "", false, false
 	}
 
-	expectedSize := header.StubSize + header.DataSize + HEADER_SIZE
-	if expectedSize != uint64(fileSize) {
-		return nil, "", false
+	// Allow optional sidecar blob between patch data and header (we may embed chunk JSONs)
+	minExpectedSize := header.StubSize + header.DataSize + HEADER_SIZE
+	if uint64(fileSize) < minExpectedSize {
+		return nil, "", false, false
 	}
+
+	// Extract silent flag from Flags byte (bit 0)
+	embeddedSilent := (header.Flags & 0x01) != 0
 
 	// Check size limit (1GB)
 	const maxPatchSize = 1 << 30 // 1 GB
 	if !ignore1GB && header.DataSize > maxPatchSize {
 		fmt.Printf("Warning: Patch size (%d bytes) exceeds 1GB limit\n", header.DataSize)
 		fmt.Println("Use --ignore1gb flag if you want to proceed anyway")
-		return nil, "", false
+		return nil, "", false, false
 	}
+
 
 	// Read patch data
 	if _, err := file.Seek(int64(header.DataOffset), io.SeekStart); err != nil {
-		return nil, "", false
+		return nil, "", false, false
 	}
 
 	patchData := make([]byte, header.DataSize)
 	if _, err := io.ReadFull(file, patchData); err != nil {
-		return nil, "", false
+		return nil, "", false, false
+	}
+
+	// If there are extra bytes between patch data and header, treat them as sidecar blob
+	extraBytes := int64(fileSize) - int64(minExpectedSize)
+	var writtenSidecars []string
+	if extraBytes > 0 {
+		// Read sidecar blob
+		sidecarOffset := int64(header.DataOffset + header.DataSize)
+		if _, err := file.Seek(sidecarOffset, io.SeekStart); err == nil {
+			sidecarData := make([]byte, extraBytes)
+			if _, err := io.ReadFull(file, sidecarData); err == nil {
+				// Parse sidecar format: uint32 count, then for each: uint16 nameLen, name bytes, uint64 dataLen, data bytes
+				r := bytes.NewReader(sidecarData)
+				var count uint32
+				if err := binary.Read(r, binary.LittleEndian, &count); err == nil {
+					for i := uint32(0); i < count; i++ {
+						var nameLen uint16
+						if err := binary.Read(r, binary.LittleEndian, &nameLen); err != nil {
+							break
+						}
+						nameBytes := make([]byte, nameLen)
+						if _, err := io.ReadFull(r, nameBytes); err != nil {
+							break
+						}
+						var dataLen uint64
+						if err := binary.Read(r, binary.LittleEndian, &dataLen); err != nil {
+							break
+						}
+						dataBytes := make([]byte, dataLen)
+						if _, err := io.ReadFull(r, dataBytes); err != nil {
+							break
+						}
+						// Write sidecar file into exe directory
+						exeDir := filepath.Dir(exePath)
+						sidePath := filepath.Join(exeDir, string(nameBytes))
+						if err := os.WriteFile(sidePath, dataBytes, 0644); err == nil {
+							writtenSidecars = append(writtenSidecars, sidePath)
+						}
+					}
+				}
+			}
+		}
 	}
 
 	// Verify checksum
 	actualChecksum := sha256.Sum256(patchData)
 	if !bytes.Equal(actualChecksum[:], header.Checksum[:]) {
-		return nil, "", false
+		return nil, "", false, false
 	}
 
 	// The embedded patch data is the raw .patch file content (part 01 if multi-part)
@@ -505,16 +541,63 @@ func checkEmbeddedPatch(ignore1GB bool) (*utils.Patch, string, bool) {
 		// Save in exe directory with the correct base name so LoadMultiPartPatch finds the parts
 		tempPart01 := filepath.Join(exeDir, exeBaseName+".01.patch")
 
+		// Before writing part 01 temp, verify that any extracted sidecars reference existing chunk files.
+		// If any listed chunk file is missing, fail early to avoid silently falling back to a full part.
+		exeDir := filepath.Dir(exePath)
+		for _, sc := range writtenSidecars {
+			// Read sidecar JSON
+			sb, err := os.ReadFile(sc)
+			if err != nil {
+				// cleanup and fail
+				for _, p := range writtenSidecars {
+					_ = os.Remove(p)
+				}
+				return nil, "", false, false
+			}
+			var parsed struct {
+				PartNumber int                 `json:"part_number"`
+				Chunks     []utils.PartChunk   `json:"chunks"`
+			}
+			if err := json.Unmarshal(sb, &parsed); err != nil {
+				for _, p := range writtenSidecars {
+					_ = os.Remove(p)
+				}
+				return nil, "", false, false
+			}
+			// Verify each chunk file exists
+			for _, ch := range parsed.Chunks {
+				chunkPath := filepath.Join(exeDir, ch.FileName)
+				if !utils.FileExists(chunkPath) {
+					// cleanup and fail with clear message
+					for _, p := range writtenSidecars {
+						_ = os.Remove(p)
+					}
+					fmt.Fprintf(os.Stderr, "Error: missing chunk file required by embedded sidecar: %s\n", chunkPath)
+					return nil, "", false, false
+				}
+			}
+		}
+
 		// Write part 01 data to temporary file
 		if err := os.WriteFile(tempPart01, patchData, 0644); err != nil {
-			return nil, "", false
+			// cleanup any written sidecars
+			for _, p := range writtenSidecars {
+				_ = os.Remove(p)
+			}
+			return nil, "", false, false
 		}
-		defer os.Remove(tempPart01) // Clean up temporary file
+		// Clean up temporary file and any written sidecars after loading
+		defer func() {
+			_ = os.Remove(tempPart01)
+			for _, p := range writtenSidecars {
+				_ = os.Remove(p)
+			}
+		}()
 
 		// Load all parts using multi-part loader
 		patch, err = patcher.LoadMultiPartPatch(tempPart01)
 		if err != nil {
-			return nil, "", false
+			return nil, "", false, false
 		}
 
 		fmt.Printf("✓ Loaded multi-part patch from embedded part 01 + external parts\n")
@@ -522,12 +605,16 @@ func checkEmbeddedPatch(ignore1GB bool) (*utils.Patch, string, bool) {
 		// Single-part patch: Parse embedded data directly
 		patch, err = parsePatchDataStreaming(bytes.NewReader(patchData))
 		if err != nil {
-			return nil, "", false
+			// cleanup any written sidecars
+			for _, p := range writtenSidecars {
+				_ = os.Remove(p)
+			}
+			return nil, "", false, false
 		}
 	} // Get current directory as default target
 	targetDir, _ := os.Getwd()
 
-	return patch, targetDir, true
+	return patch, targetDir, true, embeddedSilent
 }
 
 // runSilentMode applies the patch automatically without user interaction (for automation)
@@ -632,7 +719,7 @@ func runSilentMode(patch *utils.Patch, defaultTargetDir string, customTargetDir 
 // - Runs dry-run first to verify
 // - Applies patch if dry-run succeeds
 // - Logs everything to <patchname>_<utctime>_log.txt
-func runSimpleMode(patch *utils.Patch, defaultTargetDir string, reader *bufio.Reader) {
+func runSimpleMode(patch *utils.Patch, defaultTargetDir string) {
 	// Use current directory as target
 	targetDir := defaultTargetDir
 
@@ -834,7 +921,7 @@ func runInteractiveMode(patch *utils.Patch, defaultTargetDir string, ignore1GB b
 
 	// Check if patch creator enabled simple mode for end users
 	if patch.SimpleMode {
-		runSimpleMode(patch, defaultTargetDir, reader)
+		runSimpleMode(patch, defaultTargetDir)
 		return
 	}
 

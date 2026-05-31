@@ -4,13 +4,13 @@ package version
 // Update these values when releasing a new version
 const (
 	// Major version number
-	Major = 1
+	Major = 2
 
 	// Minor version number
 	Minor = 0
 
 	// Patch version number
-	Patch = 14
+	Patch = 0
 
 	// PreRelease suffix (e.g., "alpha", "beta", "rc1")
 	// Leave empty for stable releases

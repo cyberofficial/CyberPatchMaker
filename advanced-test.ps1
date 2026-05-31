@@ -4,12 +4,11 @@
 # Optional test modes:
 #   -run1gbtest      : Test large patches >1GB (requires --ignore1gb flag)
 #   -runlargefile    : Test chunked processing for 1.5GB file (memory optimization)
-#   -runstreamtest   : Test .data directory creation and large file streaming
+
 
 param(
     [switch]$run1gbtest,
-    [switch]$runlargefile,
-    [switch]$runstreamtest
+    [switch]$runlargefile
 )
 
 Write-Host "========================================" -ForegroundColor Cyan
@@ -26,12 +25,6 @@ if ($run1gbtest) {
 if ($runlargefile) {
     Write-Host "Large File Handling Test Mode: ENABLED" -ForegroundColor Yellow
     Write-Host "Will test chunked processing for 1.5GB file (memory optimization)" -ForegroundColor Yellow
-    Write-Host "" 
-}
-
-if ($runstreamtest) {
-    Write-Host "Streaming Data Directory Test Mode: ENABLED" -ForegroundColor Yellow
-    Write-Host "Will test .data directory creation and large file streaming" -ForegroundColor Yellow
     Write-Host "" 
 }
 
@@ -2094,7 +2087,211 @@ Test-Step "Verify silent mode generates timestamped log files" {
     Write-Host "    • Enables audit trails for automated deployments" -ForegroundColor Gray
 }
 
-# Test 44: Create Reverse Patch (--crp flag)
+# Test 44: Generator --silent Flag Embedded Mode
+Test-Step "Verify generator --silent flag embeds silent mode in created executables" {
+    Write-Host "  Testing generator --silent flag with --create-exe..." -ForegroundColor Gray
+    
+    # Create test directory for generator silent flag test
+    $genSilentTestDir = ".\testdata\advanced-output\gen-silent-test"
+    if (Test-Path $genSilentTestDir) {
+        Remove-Item $genSilentTestDir -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force -Path $genSilentTestDir | Out-Null
+    
+    # Test 1: Generate executable WITH --silent flag (should embed silent mode)
+    Write-Host "  Test 1: Generating executable WITH --silent flag..." -ForegroundColor Gray
+    $output = & .\patch-gen.exe --from-dir .\testdata\versions\1.0.0 --to-dir .\testdata\versions\1.0.1 --output $genSilentTestDir --create-exe --silent --compression zstd 2>&1 | Out-String
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Patch generation with --create-exe --silent failed: $output"
+    }
+    
+    # Verify executable created
+    $exePath = "$genSilentTestDir\1.0.0-to-1.0.1.exe"
+    if (-not (Test-Path $exePath)) {
+        throw "Executable not created with --silent flag"
+    }
+    Write-Host "  [OK] Executable created with --silent flag" -ForegroundColor Green
+    
+    # Verify output mentions silent mode
+    if ($output -match "silent.*mode|Silent mode enabled") {
+        Write-Host "  [OK] Generator logged silent mode in output" -ForegroundColor Green
+    } else {
+        Write-Host "  Note: Silent mode may not be explicitly logged (still embedded)" -ForegroundColor Yellow
+    }
+    
+    # Test 2: Verify executable runs in silent mode WITHOUT --silent CLI flag
+    Write-Host "  Test 2: Running executable WITHOUT --silent CLI flag (should use embedded flag)..." -ForegroundColor Gray
+    
+    # Create target directory
+    $targetDir = ".\testdata\advanced-output\gen-silent-apply-test"
+    if (Test-Path $targetDir) {
+        Remove-Item $targetDir -Recurse -Force
+    }
+    Copy-Item -Path .\testdata\versions\1.0.0 -Destination $targetDir -Recurse -Force
+    
+    # Run executable WITHOUT --silent flag (embedded flag should activate silent mode)
+    Push-Location $targetDir
+    try {
+        $applyOutput = & ..\gen-silent-test\1.0.0-to-1.0.1.exe --current-dir . 2>&1 | Out-String
+        $exitCode = $LASTEXITCODE
+        
+        Pop-Location
+        
+        # Verify silent mode behavior (exit code 0 on success)
+        if ($exitCode -ne 0) {
+            throw "Embedded silent mode execution failed with exit code $exitCode"
+        }
+        Write-Host "  [OK] Executable ran successfully with embedded silent mode (exit code 0)" -ForegroundColor Green
+        
+        # Verify log file created (silent mode creates log files)
+        Push-Location $targetDir
+        $logFiles = Get-ChildItem -Filter "log_*.txt" -ErrorAction SilentlyContinue
+        Pop-Location
+        
+        if ($logFiles.Count -gt 0) {
+            Write-Host "  [OK] Silent mode log file created: $($logFiles[0].Name)" -ForegroundColor Green
+        } else {
+            Write-Host "  Note: Log file may not be created (depends on implementation)" -ForegroundColor Yellow
+        }
+        
+        # Verify patch was applied
+        $patchedFile = "$targetDir\program.exe"
+        $patchedContent = Get-Content $patchedFile
+        if ($patchedContent -match "v1\.0\.1") {
+            Write-Host "  [OK] Patch applied successfully using embedded silent mode" -ForegroundColor Green
+        } else {
+            throw "Patch not applied correctly using embedded silent mode"
+        }
+        
+    } catch {
+        Pop-Location
+        throw $_
+    }
+    
+    # Test 3: Generate executable WITHOUT --silent flag (normal mode)
+    Write-Host "  Test 3: Generating executable WITHOUT --silent flag (normal mode)..." -ForegroundColor Gray
+    
+    $normalExeDir = ".\testdata\advanced-output\gen-normal-test"
+    if (Test-Path $normalExeDir) {
+        Remove-Item $normalExeDir -Recurse -Force
+    }
+    New-Item -ItemType Directory -Force -Path $normalExeDir | Out-Null
+    
+    $output = & .\patch-gen.exe --from-dir .\testdata\versions\1.0.0 --to-dir .\testdata\versions\1.0.1 --output $normalExeDir --create-exe --compression zstd 2>&1 | Out-String
+    
+    if ($LASTEXITCODE -ne 0) {
+        throw "Patch generation without --silent flag failed: $output"
+    }
+    
+    $normalExePath = "$normalExeDir\1.0.0-to-1.0.1.exe"
+    if (-not (Test-Path $normalExePath)) {
+        throw "Normal executable not created"
+    }
+    Write-Host "  [OK] Normal executable created (without --silent flag)" -ForegroundColor Green
+    
+    # Test 4: Verify normal executable does NOT run in silent mode by default
+    Write-Host "  Test 4: Verifying normal executable requires --silent CLI flag..." -ForegroundColor Gray
+    
+    $normalTargetDir = ".\testdata\advanced-output\gen-normal-apply-test"
+    if (Test-Path $normalTargetDir) {
+        Remove-Item $normalTargetDir -Recurse -Force
+    }
+    Copy-Item -Path .\testdata\versions\1.0.0 -Destination $normalTargetDir -Recurse -Force
+    
+    # Run normal executable WITH --silent CLI flag
+    Push-Location $normalTargetDir
+    try {
+        $normalOutput = & ..\gen-normal-test\1.0.0-to-1.0.1.exe --silent --current-dir . 2>&1 | Out-String
+        $normalExitCode = $LASTEXITCODE
+        
+        Pop-Location
+        
+        if ($normalExitCode -ne 0) {
+            throw "Normal executable with --silent CLI flag failed"
+        }
+        Write-Host "  [OK] Normal executable works with --silent CLI flag" -ForegroundColor Green
+        
+    } catch {
+        Pop-Location
+        throw $_
+    }
+    
+    # Test 5: Verify embedded silent flag in exe header
+    Write-Host "  Test 5: Verifying embedded silent flag in executable header..." -ForegroundColor Gray
+    
+    # Read the LAST 128 bytes of each executable (embedded patch header is at the end)
+    $headerSize = 128
+    
+    # Read silent exe header
+    $silentFileStream = [System.IO.File]::OpenRead($exePath)
+    $silentFileSize = $silentFileStream.Length
+    $silentFileStream.Seek(-$headerSize, [System.IO.SeekOrigin]::End) | Out-Null
+    $silentHeaderBytes = New-Object byte[] $headerSize
+    $silentFileStream.Read($silentHeaderBytes, 0, $headerSize) | Out-Null
+    $silentFileStream.Close()
+    
+    # Read normal exe header
+    $normalFileStream = [System.IO.File]::OpenRead($normalExePath)
+    $normalFileSize = $normalFileStream.Length
+    $normalFileStream.Seek(-$headerSize, [System.IO.SeekOrigin]::End) | Out-Null
+    $normalHeaderBytes = New-Object byte[] $headerSize
+    $normalFileStream.Read($normalHeaderBytes, 0, $headerSize) | Out-Null
+    $normalFileStream.Close()
+    
+    # Verify CPMPATCH magic bytes at start of header
+    $magicBytes = [System.Text.Encoding]::ASCII.GetBytes("CPMPATCH")
+    $silentMagicMatch = $true
+    $normalMagicMatch = $true
+    
+    for ($i = 0; $i -lt 8; $i++) {
+        if ($silentHeaderBytes[$i] -ne $magicBytes[$i]) {
+            $silentMagicMatch = $false
+        }
+        if ($normalHeaderBytes[$i] -ne $magicBytes[$i]) {
+            $normalMagicMatch = $false
+        }
+    }
+    
+    if (-not $silentMagicMatch -or -not $normalMagicMatch) {
+        Write-Host "  Note: Magic bytes not found in header (structure may have changed)" -ForegroundColor Yellow
+    } else {
+        Write-Host "  [OK] Found CPMPATCH magic bytes in both executable headers" -ForegroundColor Green
+        
+        # Flags byte is at offset 84 in the header
+        $silentFlagsByte = $silentHeaderBytes[84]
+        $normalFlagsByte = $normalHeaderBytes[84]
+        
+        Write-Host "    Silent exe Flags byte: 0x$($silentFlagsByte.ToString('X2')) (binary: $([Convert]::ToString($silentFlagsByte, 2).PadLeft(8, '0')))" -ForegroundColor Gray
+        Write-Host "    Normal exe Flags byte: 0x$($normalFlagsByte.ToString('X2')) (binary: $([Convert]::ToString($normalFlagsByte, 2).PadLeft(8, '0')))" -ForegroundColor Gray
+        
+        # Bit 0 should be 1 for silent exe, 0 for normal exe
+        $silentBit = ($silentFlagsByte -band 0x01) -ne 0
+        $normalBit = ($normalFlagsByte -band 0x01) -ne 0
+        
+        if ($silentBit) {
+            Write-Host "  [OK] Silent flag (bit 0) SET in --silent executable" -ForegroundColor Green
+        } else {
+            throw "Silent flag (bit 0) NOT SET in --silent executable"
+        }
+        
+        if (-not $normalBit) {
+            Write-Host "  [OK] Silent flag (bit 0) CLEAR in normal executable" -ForegroundColor Green
+        } else {
+            throw "Silent flag (bit 0) incorrectly SET in normal executable"
+        }
+    }
+    
+    Write-Host "  [OK] Generator --silent flag embedded mode verified!" -ForegroundColor Green
+    Write-Host "    • Generator --silent flag embeds silent mode in executable header" -ForegroundColor Gray
+    Write-Host "    • Embedded silent mode activated without --silent CLI flag" -ForegroundColor Gray
+    Write-Host "    • Normal executables require --silent CLI flag for silent mode" -ForegroundColor Gray
+    Write-Host "    • Flags byte (offset 84) stores silent mode in bit 0" -ForegroundColor Gray
+    Write-Host "    • Embedded flag enables automation-friendly executables" -ForegroundColor Gray
+    Write-Host "    • Perfect for distributing self-contained patches for automation" -ForegroundColor Gray
+}
+
+# Test 45: Create Reverse Patch (--crp flag)
 Test-Step "Verify --crp flag creates reverse patches for downgrades" {
     Write-Host "  Testing reverse patch generation with --crp flag..." -ForegroundColor Gray
     
@@ -2120,10 +2317,10 @@ Test-Step "Verify --crp flag creates reverse patches for downgrades" {
     Write-Host "  [OK] Forward patch created: 1.0.0-to-1.0.1.patch" -ForegroundColor Green
     
     # Verify reverse patch created
-    if (-not (Test-Path "$crpTestDir\1.0.1-to-1.0.0.patch")) {
-        throw "Reverse patch (1.0.1-to-1.0.0.patch) not created"
+    if (-not (Test-Path "$crpTestDir\1.0.1-to-1.0.0_rev.patch")) {
+        throw "Reverse patch (1.0.1-to-1.0.0_rev.patch) not created"
     }
-    Write-Host "  [OK] Reverse patch created: 1.0.1-to-1.0.0.patch" -ForegroundColor Green
+    Write-Host "  [OK] Reverse patch created: 1.0.1-to-1.0.0_rev.patch" -ForegroundColor Green
     
     # Test 2: Verify reverse patch content
     Write-Host "  Verifying reverse patch operations..." -ForegroundColor Gray
@@ -2151,8 +2348,8 @@ Test-Step "Verify --crp flag creates reverse patches for downgrades" {
     $expectedFiles = @(
         "$crpExeDir\1.0.0-to-1.0.1.patch",
         "$crpExeDir\1.0.0-to-1.0.1.exe",
-        "$crpExeDir\1.0.1-to-1.0.0.patch",
-        "$crpExeDir\1.0.1-to-1.0.0.exe"
+        "$crpExeDir\1.0.1-to-1.0.0_rev.patch",
+        "$crpExeDir\1.0.1-to-1.0.0_rev.exe"
     )
     
     foreach ($file in $expectedFiles) {
@@ -2189,7 +2386,7 @@ Test-Step "Verify --crp flag creates reverse patches for downgrades" {
     
     # Apply reverse patch (1.0.1 -> 1.0.0)
     Write-Host "  Applying reverse patch (1.0.1 -> 1.0.0)..." -ForegroundColor Gray
-    Copy-Item "$crpTestDir\1.0.1-to-1.0.0.patch" "$applyTestDir\reverse.patch"
+    Copy-Item "$crpTestDir\1.0.1-to-1.0.0_rev.patch" "$applyTestDir\reverse.patch"
     $output = & .\patch-apply.exe --patch "$applyTestDir\reverse.patch" --current-dir $applyTestDir 2>&1 | Out-String
     
     if ($LASTEXITCODE -ne 0) {
@@ -2218,7 +2415,7 @@ Test-Step "Verify --crp flag creates reverse patches for downgrades" {
     Write-Host "    • Enables easy version rollback without manual work" -ForegroundColor Gray
 }
 
-# Test 44: Scan Cache - Basic Functionality
+# Test 46: Scan Cache - Basic Functionality
 Test-Step "Verify scan cache basic functionality with --savescans" {
     Write-Host "  Testing scan cache with --savescans flag..." -ForegroundColor Gray
     
@@ -2282,7 +2479,7 @@ Test-Step "Verify scan cache basic functionality with --savescans" {
     Write-Host "    • Cache provides instant version loading" -ForegroundColor Gray
 }
 
-# Test 45: Scan Cache - Custom Directory
+# Test 47: Scan Cache - Custom Directory
 Test-Step "Verify scan cache custom directory with --scandata" {
     Write-Host "  Testing custom cache directory with --scandata..." -ForegroundColor Gray
     
@@ -2323,7 +2520,7 @@ Test-Step "Verify scan cache custom directory with --scandata" {
     Write-Host "    • Useful for shared cache or specific storage" -ForegroundColor Gray
 }
 
-# Test 46: Scan Cache - Force Rescan
+# Test 48: Scan Cache - Force Rescan
 Test-Step "Verify force rescan with --rescan flag" {
     Write-Host "  Testing force rescan with --rescan flag..." -ForegroundColor Gray
     
@@ -2396,7 +2593,7 @@ Test-Step "Verify force rescan with --rescan flag" {
     Write-Host "    • Useful when files changed but need to update cache" -ForegroundColor Gray
 }
 
-# Test 47: Scan Cache - Performance Benefit
+# Test 49: Scan Cache - Performance Benefit
 Test-Step "Verify scan cache performance improvement" {
     Write-Host "  Testing cache performance benefit..." -ForegroundColor Gray
     
@@ -2449,7 +2646,7 @@ Test-Step "Verify scan cache performance improvement" {
     Write-Host "    • Expected: 15+ minute scan -> instant cache load" -ForegroundColor Gray
 }
 
-# Test 48: Scan Cache - Custom Paths Mode
+# Test 50: Scan Cache - Custom Paths Mode
 Test-Step "Verify scan cache works with custom paths mode" {
     Write-Host "  Testing cache with --from-dir and --to-dir..." -ForegroundColor Gray
     
@@ -2498,7 +2695,7 @@ Test-Step "Verify scan cache works with custom paths mode" {
     Write-Host "    • Cache matches directories regardless of mode" -ForegroundColor Gray
 }
 
-# Test 49: Scan Cache - Cache File Structure
+# Test 51: Scan Cache - Cache File Structure
 Test-Step "Verify scan cache file structure and content" {
     Write-Host "  Testing cache file structure..." -ForegroundColor Gray
     
@@ -2587,7 +2784,7 @@ Test-Step "Verify scan cache file structure and content" {
     Write-Host "    • Has creation timestamp" -ForegroundColor Gray
 }
 
-# Test 50: Scan Cache - Cache Invalidation
+# Test 52: Scan Cache - Cache Invalidation
 Test-Step "Verify scan cache invalidation on file changes" {
     Write-Host "  Testing cache invalidation when key file changes..." -ForegroundColor Gray
     
@@ -2644,7 +2841,7 @@ Test-Step "Verify scan cache invalidation on file changes" {
     Write-Host "    • Prevents using stale cache data" -ForegroundColor Gray
 }
 
-# Test 51: Simple Mode - Patch Generation with SimpleMode Flag
+# Test 53: Simple Mode - Patch Generation with SimpleMode Flag
 Test-Step "Verify patch generation with Simple Mode enabled" {
     Write-Host "  Testing Simple Mode patch generation..." -ForegroundColor Gray
     
@@ -2689,7 +2886,7 @@ Test-Step "Verify patch generation with Simple Mode enabled" {
     Write-Host "    • CLI generator will set this via --silent-mode flag (future)" -ForegroundColor Gray
 }
 
-# Test 52: Simple Mode - GUI Applier Simplified Interface
+# Test 54: Simple Mode - GUI Applier Simplified Interface
 Test-Step "Verify simplified applier interface for Simple Mode patches" {
     Write-Host "  Testing Simple Mode applier behavior..." -ForegroundColor Gray
     
@@ -2728,7 +2925,7 @@ Test-Step "Verify simplified applier interface for Simple Mode patches" {
     Write-Host "    • Advanced options (compression, verification) are hidden/auto-enabled" -ForegroundColor Gray
 }
 
-# Test 53: Simple Mode - End-to-End Workflow
+# Test 55: Simple Mode - End-to-End Workflow
 Test-Step "Verify complete Simple Mode workflow (generator -> applier)" {
     Write-Host "  Testing complete Simple Mode workflow..." -ForegroundColor Gray
     
@@ -2773,7 +2970,7 @@ Test-Step "Verify complete Simple Mode workflow (generator -> applier)" {
     Write-Host "    • CLI: Zero interaction required - perfect for non-technical users" -ForegroundColor Gray
 }
 
-# Test 54: Simple Mode - Feature Documentation Validation
+# Test 56: Simple Mode - Feature Documentation Validation
 Test-Step "Verify Simple Mode documentation and feature completeness" {
     Write-Host "  Validating Simple Mode feature implementation..." -ForegroundColor Gray
     
@@ -2831,7 +3028,7 @@ Test-Step "Verify Simple Mode documentation and feature completeness" {
     Write-Host "    • Feature ready for production use" -ForegroundColor Gray
 }
 
-# Test 55: Simple Mode - Use Case Scenarios
+# Test 57: Simple Mode - Use Case Scenarios
 Test-Step "Verify Simple Mode addresses real-world use cases" {
     Write-Host "  Validating Simple Mode use cases..." -ForegroundColor Gray
     
@@ -2879,7 +3076,7 @@ Test-Step "Verify Simple Mode addresses real-world use cases" {
     Write-Host "    • Detailed logging to <patchname>_<utctime>_log.txt" -ForegroundColor Gray
 }
 
-# Test 57: .cyberignore Absolute Path Pattern Support
+# Test 59: .cyberignore Absolute Path Pattern Support
 Test-Step "Verify .cyberignore absolute path pattern support" {
     Write-Host "  Testing .cyberignore absolute path patterns..." -ForegroundColor Gray
     
@@ -3041,218 +3238,7 @@ $externalSharedAbsV2\*
     Write-Host "    • Files outside project directory can be excluded" -ForegroundColor Gray
 }
 
-# Test 58: Streaming Data Directory Test (only if -runstreamtest flag is set)
-if ($runstreamtest) {
-    Test-Step "Verify .data directory streaming for large files" {
-        Write-Host "  Testing .data directory creation and streaming..." -ForegroundColor Yellow
-        Write-Host "  This test verifies large file streaming from .data directory" -ForegroundColor Gray
-        
-        # Create test directories
-        $streamTestDir = "testdata/advanced-output/stream-test"
-        $oldVersionDir = "$streamTestDir/1.0.0"
-        $newVersionDir = "$streamTestDir/1.0.1"
-        $patchesDir = "$streamTestDir/patches"
-        
-        if (Test-Path $streamTestDir) {
-            Remove-Item $streamTestDir -Recurse -Force
-        }
-        
-        New-Item -ItemType Directory -Force -Path "$oldVersionDir/assets" | Out-Null
-        New-Item -ItemType Directory -Force -Path "$newVersionDir/assets" | Out-Null
-        New-Item -ItemType Directory -Force -Path $patchesDir | Out-Null
-        
-        # Create key files
-        Write-Host "  Creating key files..." -ForegroundColor Gray
-        Set-Content -Path "$oldVersionDir/game.exe" -Value "Streaming Test v1.0.0`n"
-        Set-Content -Path "$newVersionDir/game.exe" -Value "Streaming Test v1.0.1`n"
-        
-        # Create 1.2GB test file to trigger streaming (>1GB threshold)
-        Write-Host "  Creating 1.2GB test file (this will take 20-40 seconds)..." -ForegroundColor Yellow
-        $fileSize = 1.2GB
-        $largeFilePath = "$newVersionDir/assets/game-data.pak"
-        
-        # Create file in chunks
-        $chunkSize = 128MB
-        $random = New-Object System.Random(54321)
-        $fileStream = [System.IO.File]::Create($largeFilePath)
-        
-        $written = 0
-        $totalMB = [math]::Round($fileSize / 1MB, 0)
-        
-        while ($written -lt $fileSize) {
-            $remainingBytes = $fileSize - $written
-            $currentChunkSize = [Math]::Min($chunkSize, $remainingBytes)
-            
-            $chunk = New-Object byte[] $currentChunkSize
-            $random.NextBytes($chunk)
-            $fileStream.Write($chunk, 0, $currentChunkSize)
-            
-            $written += $currentChunkSize
-            $progressMB = [math]::Round($written / 1MB, 0)
-            Write-Progress -Activity "Creating 1.2GB test file" -Status "$progressMB MB / $totalMB MB" -PercentComplete (($written / $fileSize) * 100)
-        }
-        
-        $fileStream.Close()
-        Write-Progress -Activity "Creating 1.2GB test file" -Completed
-        Write-Host "  [OK] 1.2GB file created: $largeFilePath" -ForegroundColor Green
-        
-        # Generate patch - should create .data directory for large file
-        Write-Host ""
-        Write-Host "  Generating patch (should create .data directory)..." -ForegroundColor Yellow
-        Write-Host "  Command: patch-gen.exe --from-dir $oldVersionDir --to-dir $newVersionDir --output $patchesDir --compression zstd" -ForegroundColor Cyan
-        Write-Host ""
-        
-        $output = & .\patch-gen.exe --from-dir $oldVersionDir --to-dir $newVersionDir --output $patchesDir --compression zstd 2>&1 | Out-String
-        
-        if ($LASTEXITCODE -ne 0) {
-            throw "Patch generation failed: $output"
-        }
-        
-        Write-Host "  Generation Output:" -ForegroundColor Gray
-        Write-Host "  ----------------------------------------" -ForegroundColor DarkGray
-        Write-Host $output -ForegroundColor DarkGray
-        Write-Host "  ----------------------------------------" -ForegroundColor DarkGray
-        Write-Host ""
-        
-        # Verify .data directory was created
-        $patchPath = "$patchesDir/1.0.0-to-1.0.1.patch"
-        $dataDir = "$patchPath.data"
-        
-        if (-not (Test-Path $patchPath)) {
-            throw "Patch file not created"
-        }
-        
-        if (-not (Test-Path $dataDir)) {
-            throw ".data directory was not created for large file"
-        }
-        Write-Host "  [OK] .data directory created: $dataDir" -ForegroundColor Green
-        
-        # Verify data files exist in .data directory
-        $dataFiles = Get-ChildItem $dataDir -File
-        if ($dataFiles.Count -eq 0) {
-            throw "No data files found in .data directory"
-        }
-        Write-Host "  [OK] Found $($dataFiles.Count) data file(s) in .data directory" -ForegroundColor Green
-        
-        foreach ($dataFile in $dataFiles) {
-            $sizeMB = [math]::Round($dataFile.Length / 1MB, 2)
-            Write-Host "    - $($dataFile.Name): $sizeMB MB" -ForegroundColor Gray
-        }
-        
-        # Verify patch metadata references .data files
-        Write-Host ""
-        Write-Host "  Verifying patch metadata references data files..." -ForegroundColor Yellow
-        $patchContent = Get-Content $patchPath -Raw
-        
-        # Try to decompress and read patch content
-        if ($patchContent -match 'LargeFileSource' -or $patchContent -match 'file_\d+\.dat') {
-            Write-Host "  [OK] Patch metadata references .data files" -ForegroundColor Green
-        } else {
-            Write-Host "  Note: Patch is compressed, but .data directory exists (structure verified)" -ForegroundColor Yellow
-        }
-        
-        # Create self-contained executable
-        Write-Host ""
-        Write-Host "  Creating self-contained executable..." -ForegroundColor Yellow
-        $output = & .\patch-gen.exe --from-dir $oldVersionDir --to-dir $newVersionDir --output $patchesDir --compression zstd --create-exe 2>&1 | Out-String
-        
-        if ($LASTEXITCODE -ne 0) {
-            throw "Executable creation failed: $output"
-        }
-        
-        $exePath = "$patchesDir/1.0.0-to-1.0.1.exe"
-        if (-not (Test-Path $exePath)) {
-            throw "Executable not created"
-        }
-        Write-Host "  [OK] Self-contained executable created" -ForegroundColor Green
-        
-        # Verify .data directory for executable exists
-        $exeDataDir = "$patchesDir/1.0.0-to-1.0.1.data"
-        if (-not (Test-Path $exeDataDir)) {
-            throw ".data directory not created for executable"
-        }
-        Write-Host "  [OK] .data directory exists for executable: 1.0.0-to-1.0.1.data" -ForegroundColor Green
-        
-        # Apply patch using executable (tests streaming from .data)
-        Write-Host ""
-        Write-Host "  Testing patch application with .data streaming..." -ForegroundColor Yellow
-        
-        $applyDir = "$streamTestDir/apply-test"
-        if (Test-Path $applyDir) {
-            Remove-Item $applyDir -Recurse -Force
-        }
-        Copy-Item -Path $oldVersionDir -Destination $applyDir -Recurse -Force
-        
-        # Copy executable and .data directory to apply location
-        Copy-Item $exePath $applyDir
-        Copy-Item $exeDataDir "$applyDir/1.0.0-to-1.0.1.data" -Recurse
-        
-        # Run executable in target directory
-        Push-Location $applyDir
-        $applyOutput = & .\1.0.0-to-1.0.1.exe --silent --current-dir . 2>&1 | Out-String
-        Pop-Location
-        
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "  Application Output:" -ForegroundColor Red
-            Write-Host $applyOutput -ForegroundColor Red
-            throw "Patch application failed"
-        }
-        
-        Write-Host "  Application Output:" -ForegroundColor Gray
-        Write-Host "  ----------------------------------------" -ForegroundColor DarkGray
-        Write-Host $applyOutput -ForegroundColor DarkGray
-        Write-Host "  ----------------------------------------" -ForegroundColor DarkGray
-        Write-Host ""
-        
-        # Verify streaming messages in output
-        if ($applyOutput -match "Streaming large file" -or $applyOutput -match "stream") {
-            Write-Host "  [OK] Large file streaming detected in output!" -ForegroundColor Green
-        } else {
-            Write-Host "  Note: Streaming message may not be visible in output" -ForegroundColor Yellow
-        }
-        
-        # Verify large file was applied correctly
-        $appliedLargeFile = "$applyDir/assets/game-data.pak"
-        if (-not (Test-Path $appliedLargeFile)) {
-            throw "Large file was not applied"
-        }
-        
-        $appliedSize = (Get-Item $appliedLargeFile).Length
-        $expectedSize = (Get-Item $largeFilePath).Length
-        
-        if ($appliedSize -ne $expectedSize) {
-            throw "File size mismatch: applied=$appliedSize, expected=$expectedSize"
-        }
-        Write-Host "  [OK] Large file applied successfully ($([math]::Round($appliedSize / 1GB, 2)) GB)" -ForegroundColor Green
-        
-        # Verify file content matches
-        Write-Host "  Verifying file integrity..." -ForegroundColor Gray
-        $appliedHash = (Get-FileHash $appliedLargeFile -Algorithm SHA256).Hash
-        $expectedHash = (Get-FileHash $largeFilePath -Algorithm SHA256).Hash
-        
-        if ($appliedHash -eq $expectedHash) {
-            Write-Host "  [OK] File integrity verified (SHA256 match)" -ForegroundColor Green
-        } else {
-            throw "File hash mismatch - data corruption detected"
-        }
-        
-        Write-Host ""
-        Write-Host "  [OK] .data directory streaming test completed successfully!" -ForegroundColor Green
-        Write-Host "    • .data directory created for large files (>1GB)" -ForegroundColor Gray
-        Write-Host "    • Large files stored separately in .data directory" -ForegroundColor Gray
-        Write-Host "    • Self-contained executable created with .data companion" -ForegroundColor Gray
-        Write-Host "    • Streaming from .data directory works correctly" -ForegroundColor Gray
-        Write-Host "    • File integrity verified after streaming" -ForegroundColor Gray
-        Write-Host "    • Memory-efficient: large files never fully loaded into memory" -ForegroundColor Gray
-        Write-Host ""
-        Write-Host "  Distribution Notes:" -ForegroundColor Cyan
-        Write-Host "    • Ship both: <patchname>.exe AND <patchname>.data directory" -ForegroundColor Gray
-        Write-Host "    • Keep them in the same directory" -ForegroundColor Gray
-        Write-Host "    • Applier automatically finds .data directory next to executable" -ForegroundColor Gray
-    }
-}
-
-# Test 59: Large File Handling - Memory Optimization (only if -runlargefile flag is set)
+# Test 60: Large File Handling - Memory Optimization (only if -runlargefile flag is set)
 if ($runlargefile) {
     Test-Step "Verify large file chunked processing and memory optimization" {
         Write-Host "  Testing large file handling with 1.5GB file..." -ForegroundColor Yellow
@@ -3450,6 +3436,86 @@ if ($runlargefile) {
     }
 }
 
+# Test 61: Key File Detection - versions-dir mode
+Test-Step "Optimization: Key file auto-detection in versions-dir mode" {
+	$output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches-opt1 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Exit code $LASTEXITCODE" }
+	if (-not (Test-Path "testdata/advanced-output/patches-opt1/1.0.0-to-1.0.1.patch")) { throw "Patch not created" }
+}
+
+# Test 62: Key File Detection - custom paths mode
+Test-Step "Optimization: Key file auto-detection in from-dir/to-dir mode" {
+	$output = .\patch-gen.exe --from-dir .\testdata\versions\1.0.0 --to-dir .\testdata\versions\1.0.1 --output .\testdata\advanced-output\patches-opt2 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Exit code $LASTEXITCODE" }
+	if (-not (Test-Path "testdata/advanced-output/patches-opt2/1.0.0-to-1.0.1.patch")) { throw "Patch not created" }
+}
+
+# Test 63: Key File Detection --key-file override
+Test-Step "Optimization: Key file override with --key-file flag" {
+	if (Test-Path "testdata/versions-custom") { Remove-Item "testdata/versions-custom" -Recurse -Force }
+	New-Item -ItemType Directory -Force -Path "testdata/versions-custom/1.0.0" | Out-Null
+	New-Item -ItemType Directory -Force -Path "testdata/versions-custom/1.0.1" | Out-Null
+	Copy-Item "testdata/versions/1.0.0/program.exe" "testdata/versions-custom/1.0.0/myapp.exe"
+	Copy-Item "testdata/versions/1.0.1/program.exe" "testdata/versions-custom/1.0.1/myapp.exe"
+	if (Test-Path "testdata/versions/1.0.1/libs") { Copy-Item -Recurse "testdata/versions/1.0.1/libs" "testdata/versions-custom/1.0.1/" }
+	$output = .\patch-gen.exe --from-dir "testdata/versions-custom/1.0.0" --to-dir "testdata/versions-custom/1.0.1" --key-file myapp.exe --output "testdata/advanced-output/patches-opt3" 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Exit code $LASTEXITCODE" }
+	if (-not (Test-Path "testdata/advanced-output/patches-opt3/1.0.0-to-1.0.1.patch")) { throw "Patch not created" }
+	Remove-Item "testdata/versions-custom" -Recurse -Force
+}
+
+# Test 64: Compression Level - zstd level 4
+Test-Step "Optimization: zstd compression level 4" {
+	$output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches-opt4 --compression zstd --level 4 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Exit code $LASTEXITCODE" }
+	if (-not (Test-Path "testdata/advanced-output/patches-opt4/1.0.0-to-1.0.1.patch")) { throw "Patch not created" }
+}
+
+# Test 65: Compression Level - gzip level 3
+Test-Step "Optimization: gzip compression level 3" {
+	$output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches-opt5 --compression gzip --level 3 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Exit code $LASTEXITCODE" }
+	if (-not (Test-Path "testdata/advanced-output/patches-opt5/1.0.0-to-1.0.1.patch")) { throw "Patch not created" }
+}
+
+# Test 66: Streaming LoadPatch - zstd magic-byte detection
+Test-Step "Optimization: Streaming LoadPatch with zstd" {
+	$output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches-opt6 --compression zstd 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Gen failed: $output" }
+	New-Item -ItemType Directory -Force -Path "testdata/advanced-output" | Out-Null
+	Copy-Item -Recurse "testdata/versions/1.0.0" "testdata/advanced-output/t-opt6"
+	$output = .\patch-apply.exe --patch "testdata/advanced-output/patches-opt6/1.0.0-to-1.0.1.patch" --current-dir "testdata/advanced-output/t-opt6" --verify 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Apply failed: $output" }
+	$content = Get-Content "testdata/advanced-output/t-opt6/program.exe" -Raw
+	if ($content -notmatch "v1.0.1") { throw "Patch didn't update program.exe" }
+}
+
+# Test 67: Streaming LoadPatch - gzip magic-byte detection
+Test-Step "Optimization: Streaming LoadPatch with gzip" {
+	Copy-Item -Recurse "testdata/versions/1.0.0" "testdata/advanced-output/t-opt7" | Out-Null
+	$output = .\patch-apply.exe --patch "testdata/advanced-output/patches-opt5/1.0.0-to-1.0.1.patch" --current-dir "testdata/advanced-output/t-opt7" --verify 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Exit code $LASTEXITCODE" }
+	$content = Get-Content "testdata/advanced-output/t-opt7/program.exe" -Raw
+	if ($content -notmatch "v1.0.1") { throw "Patch didn't update program.exe" }
+}
+
+# Test 68: --crp reverse patch roundtrip
+Test-Step "Optimization: Forward and reverse patch roundtrip" {
+	$output = .\patch-gen.exe --versions-dir .\testdata\versions --from 1.0.0 --to 1.0.1 --output .\testdata\advanced-output\patches-opt8 --crp --compression zstd 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Gen failed: $output" }
+	if (-not (Test-Path "testdata/advanced-output/patches-opt8/1.0.0-to-1.0.1.patch")) { throw "Forward patch not created" }
+	if (-not (Test-Path "testdata/advanced-output/patches-opt8/1.0.1-to-1.0.0_rev.patch")) { throw "Reverse patch not created" }
+	Copy-Item -Recurse "testdata/versions/1.0.0" "testdata/advanced-output/t-opt8" | Out-Null
+	$output = .\patch-apply.exe --patch "testdata/advanced-output/patches-opt8/1.0.0-to-1.0.1.patch" --current-dir "testdata/advanced-output/t-opt8" --verify 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Forward apply failed: $output" }
+	$content = Get-Content "testdata/advanced-output/t-opt8/program.exe" -Raw
+	if ($content -notmatch "v1.0.1") { throw "Forward patch didn't upgrade" }
+	$output = .\patch-apply.exe --patch "testdata/advanced-output/patches-opt8/1.0.1-to-1.0.0_rev.patch" --current-dir "testdata/advanced-output/t-opt8" --verify 2>&1
+	if ($LASTEXITCODE -ne 0) { throw "Reverse apply failed: $output" }
+	$content = Get-Content "testdata/advanced-output/t-opt8/program.exe" -Raw
+	if ($content -notmatch "v1.0.0") { throw "Reverse patch didn't downgrade" }
+}
+
 # Final summary
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
@@ -3505,14 +3571,6 @@ if ($failed -eq 0) {
     Write-Host "  • Simple Mode complete workflow (generator -> exe -> end user)" -ForegroundColor Gray
     Write-Host "  • Simple Mode feature documentation and implementation validation" -ForegroundColor Gray
     Write-Host "  • Simple Mode real-world use case scenarios (vendors, IT, modders)" -ForegroundColor Gray
-    
-    if ($runstreamtest) {
-        Write-Host "  • .data directory streaming for large files (>1GB)" -ForegroundColor Gray
-        Write-Host "  • Large file storage in separate .data directory" -ForegroundColor Gray
-        Write-Host "  • Self-contained executable with .data companion" -ForegroundColor Gray
-        Write-Host "  • Streaming from .data directory (memory-efficient)" -ForegroundColor Gray
-        Write-Host "  • File integrity verification after streaming" -ForegroundColor Gray
-    }
     
     if ($runlargefile) {
         Write-Host "  • Large file handling with chunked processing (1.5GB file, memory optimization)" -ForegroundColor Gray

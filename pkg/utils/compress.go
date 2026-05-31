@@ -9,6 +9,33 @@ import (
 	"github.com/klauspost/compress/zstd"
 )
 
+// Compression magic bytes for format detection
+var (
+	// ZstdMagic is the 4-byte magic number for zstd frames
+	ZstdMagic = []byte{0x28, 0xB5, 0x2F, 0xFD}
+	// GzipMagic is the 2-byte magic number for gzip
+	GzipMagic = []byte{0x1F, 0x8B}
+)
+
+// DetectCompression reads the first bytes of data and returns the compression
+// algorithm name ("none", "zstd", "gzip") based on magic bytes.
+// Returns "none" if the format cannot be determined.
+func DetectCompression(data []byte) string {
+	if len(data) == 0 {
+		return "none"
+	}
+	if data[0] == '{' {
+		return "none"
+	}
+	if len(data) >= 4 && bytes.Equal(data[:4], ZstdMagic) {
+		return "zstd"
+	}
+	if len(data) >= 2 && bytes.Equal(data[:2], GzipMagic) {
+		return "gzip"
+	}
+	return "none"
+}
+
 // CompressData compresses data using the specified algorithm
 func CompressData(data []byte, algorithm string, level int) ([]byte, error) {
 	switch algorithm {

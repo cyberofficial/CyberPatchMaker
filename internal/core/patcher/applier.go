@@ -5,21 +5,17 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/cyberofficial/cyberpatchmaker/internal/core/differ"
 	"github.com/cyberofficial/cyberpatchmaker/pkg/utils"
 )
 
 // Applier handles patch application
 type Applier struct {
-	differ        *differ.Differ
 	patchFilePath string // Stores the patch file path during application for large file streaming
 }
 
 // NewApplier creates a new patch applier
 func NewApplier() *Applier {
-	return &Applier{
-		differ: differ.NewDiffer(),
-	}
+	return &Applier{}
 }
 
 // ApplyPatch applies a patch to a target directory
@@ -211,13 +207,6 @@ func (a *Applier) applyAdd(targetPath string, op utils.PatchOperation) error {
 
 // applyModify modifies an existing file
 func (a *Applier) applyModify(targetPath string, op utils.PatchOperation) error {
-	// Check file size to determine if we need chunked processing
-	fileInfo, err := os.Stat(targetPath)
-	if err != nil {
-		return fmt.Errorf("failed to stat target file: %w", err)
-	}
-	isLarge := fileInfo.Size() > utils.LargeFileThreshold
-
 	// Verify old checksum
 	match, err := utils.VerifyFileChecksum(targetPath, op.OldChecksum)
 	if err != nil {
@@ -226,42 +215,15 @@ func (a *Applier) applyModify(targetPath string, op utils.PatchOperation) error 
 		return fmt.Errorf("old file checksum mismatch")
 	}
 
-	var newData []byte
-
-	if len(op.BinaryDiff) > 0 {
-		// For large files (>1GB), the "diff" is actually the full new file
-		// (generator uses full replacement instead of binary diff for memory efficiency)
-		// We can detect this by checking if diff size is similar to the expected result size
-		diffSize := int64(len(op.BinaryDiff))
-
-		// If diff is >1GB, it's definitely a full file replacement
-		if diffSize > utils.LargeFileThreshold {
-			fmt.Printf("  Large file modify detected (%d MB), using full file replacement: %s\n",
-				diffSize/(1024*1024), op.FilePath)
-			newData = op.BinaryDiff
-		} else {
-			// Normal-sized diff, use bspatch
-			if isLarge {
-				fmt.Printf("  Large file modify detected (%d MB), applying binary patch: %s\n",
-					fileInfo.Size()/(1024*1024), op.FilePath)
-			}
-
-			// Apply binary diff
-			var patchErr error
-			newData, patchErr = a.differ.ApplyPatch(targetPath, op.BinaryDiff)
-			if patchErr != nil {
-				return fmt.Errorf("failed to apply binary diff: %w", patchErr)
-			}
-		}
-	} else if len(op.NewFile) > 0 {
-		// Use full file replacement
-		newData = op.NewFile
-	} else {
-		return fmt.Errorf("no diff or new file data provided")
+	if len(op.NewFile) == 0 {
+		return fmt.Errorf("no new file data provided")
 	}
 
-	// Write modified file - use chunked writing for large results
+	newData := op.NewFile
 	resultSize := int64(len(newData))
+	isLarge := resultSize > utils.LargeFileThreshold
+
+	// Write modified file - use chunked writing for large results
 	if resultSize > utils.LargeFileThreshold {
 		fmt.Printf("  Writing large result (%d MB) in chunks...\n", resultSize/(1024*1024))
 
