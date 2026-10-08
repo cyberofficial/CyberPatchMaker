@@ -2,7 +2,7 @@
 
 ## Overview
 
-CyberPatchMaker creates delta patches by comparing directory trees and storing full file replacements for changed files.
+CyberPatchMaker creates binary patches by comparing directory trees and storing full file replacements for changed files.
 
 ## Process
 
@@ -19,7 +19,7 @@ Source and target manifests are compared to identify added, modified, and delete
 For each modified or added file, the full file content is read and stored in the patch. All operations (add/modify/delete files, add/delete directories) are serialized into a compressed JSON file.
 
 ### 5. Compression
-The patch JSON is stream-encoded and compressed (zstd by default, configurable levels 1-4) for distribution.
+The patch JSON is stream-encoded and compressed (zstd by default with levels 1-4; gzip levels 1-3 and none are also supported) for distribution.
 
 ## Patch Application
 

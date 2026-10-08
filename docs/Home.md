@@ -30,7 +30,7 @@ Welcome to the CyberPatchMaker wiki! This documentation covers everything from g
 ## Advanced Features
 
 - [Scan Caching](scan-caching) - Instant patch generation with cached scans
-- [Large File Handling](large-file-handling) - Memory-efficient processing for files >1GB
+- [Large File Handling](large-file-handling) — Chunked writes for files >1GB
 - [Multi-Part Patches](multipart-patches) - Automatic splitting of patches >4GB
 
 ## Development

@@ -8,6 +8,8 @@
 
 Self-contained patch executables combine the patch applier and patch data into a single `.exe` file. End users simply download one file, drop it into their application folder, and double-click to apply the patch - no additional tools or setup required.
 
+> **Note:** Single-file distribution applies to single-part patches. Multi-part patches embed only part 01 in the executable (created when part 01 is under 3.75GB) — the remaining parts (`.02.patch`, etc.) and any chunk data files must be distributed alongside the executable.
+
 ## How It Works
 
 ### Traditional Workflow
@@ -95,7 +97,7 @@ A self-contained executable consists of up to four parts:
 
 ```
 ┌─────────────────────────────┐
-│ patch-apply.exe             │  ← Base applier (~50 MB)
+│ patch-apply.exe             │  ← Base applier (same size as patch-apply.exe)
 ├─────────────────────────────┤
 │ Compressed Patch Data       │  ← Your patch (varies)
 ├─────────────────────────────┤
@@ -142,30 +144,19 @@ When `patch-apply.exe` starts:
    - **If silent mode embedded**: Applies patch immediately without prompts
    - **If not silent mode**: Shows interactive console menu
 5. If any validation fails:
-   - Runs in normal mode (browse for .patch file)
+   - The embedded patch is ignored and the tool falls back to standard mode (it prints an error unless `--patch` and `--current-dir` are given)
 
 ## File Sizes
 
 ### Size Breakdown
 
-Base executable: **~50 MB** (includes console interface)
-
-Example patch sizes:
-- Small update (10 MB changed): **50.01 MB** total
-- Medium update (50 MB changed): **55 MB** total (with zstd)
-- Large update (200 MB changed): **80 MB** total (with zstd)
+The total size is the size of `patch-apply.exe` (the base stub) plus the embedded patch data (compressed), plus any embedded sidecar metadata. Use `--version` on a built `patch-apply.exe` or check the file size to determine the stub size on your system.
 
 ### Size Optimization Tips
 
-1. **Use compression**: Always enable zstd compression
-   ```
-   Without compression: 50 MB + 10 MB = 60 MB
-   With zstd: 50 MB + 2 MB = 52 MB
-   ```
+1. **Use compression**: Always enable zstd compression (the default)
 
-2. **Skip identical files**: Enable "Skip identical files" option
-   - Reduces patch data size
-   - Only includes actual changes
+2. **Skip identical files**: Always enabled by the CLI generator — files that did not change between versions are never included in the patch
 
 3. **Higher compression level**: Use level 3 or 4 for production
    - Level 3 (default): Good balance
@@ -323,6 +314,7 @@ patch-gen --from-dir "C:\releases\1.0.0" --to-dir "C:\releases\1.0.1" --output .
 - **Default settings**: Uses verify=true and backup=true
 - **Exit codes**: Returns 0 on success, 1 on failure
 - **Minimal output**: Only essential status messages
+- **Log file**: Writes `log_<epoch>.txt` to the current working directory with patch info, status, and any errors
 - **Perfect for**:
   - Automated deployments via scripts
   - CI/CD pipelines
@@ -371,7 +363,7 @@ See [Applier Guide - Automation Mode](applier-guide.md#automation-mode-silent-fl
 
 | Feature | Traditional | Self-Contained |
 |---------|-------------|----------------|
-| Files to download | 2 (applier + patch) | 1 (exe only) |
+| Files to download | 2 (applier + patch) | 1 (exe only; multi-part patches also need the remaining part/chunk files) |
 | Setup complexity | Medium | None |
 | Confusion possible | Yes (wrong patch file) | No (embedded) |
 | File management | Must keep organized | Single file |
@@ -384,7 +376,7 @@ See [Applier Guide - Automation Mode](applier-guide.md#automation-mode-silent-fl
 | Distribution | Multiple files | Clean, single file |
 | Support burden | Higher (setup issues) | Lower (simpler) |
 | User errors | More common | Rare |
-| Bandwidth | Lower (~2-10 MB) | Higher (~50+ MB) |
+| Bandwidth | Lower (small patch files) | Higher (applier size added to every patch) |
 | Hosting cost | Lower | Higher |
 
 ## When to Use
@@ -437,9 +429,9 @@ See [Applier Guide - Automation Mode](applier-guide.md#automation-mode-silent-fl
 - Note: Requires sufficient RAM to load large patch into memory
 - Consider: If patch is very large, traditional separate .patch file may be better
 
-### "Checksum mismatch (data corrupted)"
+### "Embedded patch not detected / falls back to standard mode"
 
-**Problem**: Embedded patch data fails validation
+**Problem**: Embedded patch data fails validation (for example, after the file was corrupted). The applier does not report the checksum failure — it silently ignores the embedded patch and behaves like a plain `patch-apply.exe`.
 
 **Solution**:
 - Re-download the executable (file may be corrupted)
@@ -503,9 +495,10 @@ See [Applier Guide - Automation Mode](applier-guide.md#automation-mode-silent-fl
 ### Current Limitations
 
 1. **Windows Only**: Currently only generates `.exe` files for Windows
-2. **Fixed Base Size**: Base applier is ~50 MB regardless of patch size
+2. **Fixed Base Size**: The applier stub size is added to every generated executable
 3. **No Streaming**: Entire file must be downloaded before use
 4. **Single Compression**: Can't mix compression methods in one exe
+5. **Multi-part cap**: For multi-part patches the executable embeds part 01 only, and is created only if part 01 is under 3.75GB; remaining parts must ship alongside the executable
 
 ### Future Enhancements
 

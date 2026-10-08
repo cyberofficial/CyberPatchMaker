@@ -42,13 +42,13 @@ Version constants are in `internal/core/version/version.go`.
 ## Running Tests
 
 ```powershell
-.\advanced-test.ps1                          # 59 standard tests
+.\advanced-test.ps1                          # 67 standard tests
 .\advanced-test.ps1 -run1gbtest             # + large patch test
 .\advanced-test.ps1 -runlargefile           # + chunked processing test
 .\advanced-test.ps1 -run1gbtest -runlargefile  # all tests
 ```
 
-Test data is auto-generated on first run. On subsequent runs, previous test data is cleaned up automatically.
+Test data is auto-generated on first run. If you keep the test data after a run, it is automatically cleaned up and regenerated on the next run.
 
 ## Code Organization
 
@@ -70,7 +70,7 @@ pkg/utils/               -- shared types and utilities (types, checksum, fileops
 
 1. Create a feature branch: `git checkout -b feature/description`
 2. Make changes, run `go fmt ./...`, run `.\advanced-test.ps1`
-3. Use conventional commits: `feat:`, `fix:`, `docs:`, `test:`, `refactor:`, `perf:`, `chore:`
+3. Use conventional commits: `feat:`, `fix:`, `docs:`, `style:`, `refactor:`, `test:`, `chore:`
 4. Submit PR against `main`
 
 All PRs must pass the test suite. Documentation should be updated for any user-facing changes.

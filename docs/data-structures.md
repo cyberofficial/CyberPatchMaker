@@ -159,8 +159,8 @@ type PatchHeader struct {
     FormatVersion int       // Patch format version (currently 1)
     CreatedAt     time.Time // Creation timestamp
     Compression   string    // Compression algorithm: "zstd", "gzip", "none"
-    PatchSize     int64     // Compressed patch size in bytes
-    Checksum      string    // SHA-256 of patch data
+    PatchSize     int64     // Estimated UNCOMPRESSED payload size (sum of operation data); not the compressed file size
+    Checksum      string    // SHA-256 of the patch data (computed in memory by SavePatch; persisted files contain "")
     Signature     []byte    // Digital signature (optional, future feature)
 }
 ```
@@ -217,9 +217,10 @@ type PartChunk struct {
 ```
 
 **Usage:**
-- When a single part exceeds ~3.75GB
-- Chunks are stored separately with `.chunks.json` sidecar
-- Reassembled during patch loading
+- Only when a custom `--splitsize` is given: saved parts larger than the split size are split into chunk files
+- Chunks are stored separately with a `.partN.chunks.json` sidecar
+- Reassembled and verified during patch loading
+- Without `--splitsize`, parts are never chunked
 
 ---
 
@@ -329,8 +330,8 @@ const (
 ```
 
 **Usage:**
-- `ChunkSize`: Size of chunks when processing large files
-- `LargeFileThreshold`: Files larger than this use chunked processing
+- `ChunkSize`: Size of chunks when writing large files during application
+- `LargeFileThreshold`: Files larger than this are written in chunks by the applier (generation/loading still hold full data in memory)
 - `DefaultMaxPartSize`: Patches larger than this are split
 
 ---

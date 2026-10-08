@@ -37,7 +37,7 @@ patcher.Generator -> streaming JSON + compression -> .patch file
 
 **Config (`config/`)**: Application configuration load/save with platform-specific paths.
 
-- _The differ package was removed in v1.0.17 — the generator uses full file replacement for all files._
+- _The differ package was removed in the 2.0.0 release — the generator uses full file replacement for all files._
 
 ### Utilities (`pkg/utils/`)
 

@@ -18,7 +18,7 @@ Scan caching eliminates this bottleneck by storing the complete scan results (in
 - **Speedup**: **900x faster**
 
 ### Benefits
-- Instant patch generation for previously scanned versions
+- Instant scan reload for previously scanned versions (patch generation itself still runs normally)
 - Key file hash validation ensures cache integrity
 - Location-based hashing prevents using wrong cached data
 - Transparent operation - works with all generation modes
@@ -31,9 +31,9 @@ Cached scans are stored in a dedicated cache directory (default: `.data/`):
 
 ```
 .data/
-├── scan_1.0.0_a1b2c3d4e5f6g7h8.json
-├── scan_1.0.1_i9j0k1l2m3n4o5p6.json
-└── scan_1.0.2_q7r8s9t0u1v2w3x4.json
+├── scan_1.0.0_a1b2c3d4e5f60718.json
+├── scan_1.0.1_9e8d7c6b5a4f3021.json
+└── scan_1.0.2_4c3b2a1908f7e6d5.json
 ```
 
 ### Cache Filename Format
@@ -67,7 +67,7 @@ The location hash ensures that cached scans from one directory cannot be mistake
     "Checksum": "def456..."
   },
   "cached_at": "2024-01-15T10:30:05Z",
-  "location_hash": "a1b2c3d4e5f6g7h8"
+  "location_hash": "a1b2c3d4e5f60718"
 }
 ```
 
@@ -116,7 +116,7 @@ patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --sav
 When loading from cache, CyberPatchMaker verifies:
 1. Cached scan exists for the version
 2. Location hash matches (prevents wrong directory usage)
-3. Key file checksum matches the cached manifest
+3. The cached key-file checksum is re-verified against the actual key file on disk
 
 If the key file has changed, the cache is invalidated and a fresh scan is performed automatically.
 
@@ -126,10 +126,10 @@ Each location gets its own cache entries:
 
 ```
 # Project A at /builds/project-a/versions/1.0.0
-.data/scan_1.0.0_a1b2c3d4e5f6g7h8.json
+.data/scan_1.0.0_a1b2c3d4e5f60718.json
 
 # Project B at /builds/project-b/versions/1.0.0
-.data/scan_1.0.0_x9y0z1a2b3c4d5e6.json
+.data/scan_1.0.0_5d6e7f809a1b2c3d.json
 ```
 
 Even with identical version numbers, projects maintain separate caches.
@@ -227,12 +227,12 @@ docker run -v ./cache:/app/.data patch-gen \
 
 ### Cache Location Mismatch
 - **Symptom**: Cache not found for known version
-- **Cause**: Location path changed (relative vs absolute)
-- **Solution**: Use consistent paths or `--rescan`
+- **Cause**: The cache directory changed (different `--scandata` or working directory), or the version directory was moved/renamed. Note: relative vs absolute paths of the same directory produce the same location hash (paths are normalized before hashing)
+- **Solution**: Use a consistent `--scandata` path, or let the version rescan
 
 ## Version History
 
-- **v1.0.10**: Initial scan caching implementation
+- **v1.0.6**: Initial scan caching implementation
   - `--savescans` flag for cache creation
   - `--scandata` flag for custom cache location
   - `--rescan` flag for cache invalidation

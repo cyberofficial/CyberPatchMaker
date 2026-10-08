@@ -5,14 +5,15 @@ Optimization techniques and performance characteristics of CyberPatchMaker.
 ## Overview
 
 CyberPatchMaker is designed for performance across multiple dimensions:
-- **Fast patch generation**: Minimize time to create patches
-- **Small patch sizes**: Minimize bandwidth for distribution
-- **Low memory usage**: Handle large applications without exhaustion
-- **Quick patch application**: Minimize user downtime
+- **Fast patch generation**: Scan caching and parallel hashing minimize time to create patches
+- **Small patch sizes**: Compression reduces bandwidth for distribution
+- **Quick patch application**: Only changed files are backed up, written, and verified
 
-## Performance Benchmarks
+Note: generation and application hold patch data in memory (see below), so very large changed files require commensurate RAM.
 
-### Real-World Example: War Thunder
+## Real-World Example
+
+The following figures are a real-world observation from scanning a large game installation (War Thunder), not a benchmark suite:
 
 | Metric | Value |
 |--------|-------|
@@ -20,36 +21,25 @@ CyberPatchMaker is designed for performance across multiple dimensions:
 | **File Count** | 34,650 files |
 | **Initial Scan Time** | ~15 minutes |
 | **Cached Scan Load** | <1 second |
-| **Typical Patch Size** | 5-50 MB |
-| **Patch Generation** | 3-5 minutes |
-| **Patch Application** | 2-3 minutes |
-
-### Large File Performance
-
-| File Size | Generation Time | Application Time | Memory Usage |
-|-----------|-----------------|------------------|--------------|
-| 1 GB | ~30 seconds | ~20 seconds | <500 MB |
-| 5 GB | ~2 minutes | ~90 seconds | <500 MB |
-| 20 GB | ~8 minutes | ~6 minutes | <500 MB |
 
 ## Optimization Techniques
 
 ### 1. Scan Caching
 
-**Problem**: Directory scanning with SHA-256 hashing is CPU-intensive
+**Problem**: Directory scanning with SHA-256 hashing is CPU- and I/O-intensive
 
 **Solution**: Cache complete scan results to disk
 
 ```go
-// First scan: 15+ minutes for large projects
-// Cached load: <1 second
+// First scan: full directory walk + hashing
+// Cached load: instant (validated against the key file on disk)
 cache := cache.NewScanCache(".data")
 cache.SaveScan(version)  // Save after scanning
 cache.LoadScan(versionNumber, location)  // Instant load
 ```
 
 **Benefits:**
-- 900x faster for cached versions
+- Cached versions skip the scan entirely on subsequent runs
 - Key file hash validation ensures integrity
 - Location-based hashing prevents wrong cache usage
 
@@ -61,11 +51,11 @@ cache.LoadScan(versionNumber, location)  // Instant load
 
 **Problem**: Sequential file hashing doesn't utilize multi-core CPUs
 
-**Solution**: Parallel checksum calculation with worker pool
+**Solution**: Parallel checksum calculation with a worker pool
 
 ```go
 // The CLI layer handles auto-detection:
-// --jobs 0  →  runtime.NumCPU() cores (default is set in config.go via runtime.NumCPU())
+// --jobs 0  →  worker_threads from config file (built-in default: runtime.NumCPU())
 // The version manager then calls:
 scan.ScanDirectoryParallelWithProgress(workerCount, progressCallback)
 
@@ -74,12 +64,10 @@ scan.ScanDirectoryParallelWithProgress(8, progressCallback)  // Use 8 workers
 ```
 
 **Benefits:**
-- Near-linear speedup on multi-core systems
-- 4-8x faster on typical 4-8 core CPUs
+- Spreads SHA-256 hashing across all cores; largest gains when disk throughput is not the bottleneck
 
 **Trade-offs:**
-- Higher memory usage during parallel scan
-- Diminishing returns beyond CPU count
+- Diminishing returns beyond CPU count or when I/O-bound
 
 ### 3. Selective Backup
 
@@ -93,7 +81,7 @@ scan.ScanDirectoryParallelWithProgress(8, progressCallback)  // Use 8 workers
 ```
 
 **Benefits:**
-- 90%+ reduction in backup size for typical updates
+- Backup size is a small fraction of the installation for typical updates
 - Faster backup creation
 - Less disk I/O
 
@@ -117,12 +105,11 @@ scan.ScanDirectoryParallelWithProgress(8, progressCallback)  // Use 8 workers
 // Compression levels: 1-4 (zstd)
 // Level 1: Fastest, larger size
 // Level 4: Smallest size, slower
-CompressData(data, "zstd", 3)  // Balanced
+CompressData(data, "zstd", 3)  // Balanced (CLI default)
 ```
 
 **Benefits:**
-- ~60% size reduction on average
-- Faster transfer outweighs compression time
+- Substantial size reduction on compressible content
 - Multiple algorithm options (zstd, gzip, none)
 
 ### Streaming Compression
@@ -174,7 +161,7 @@ operation.NewFile = readFile(newFilePath)
 | File Hashing | O(m) | m = total file size |
 | Manifest Comparison | O(n) | n = number of files |
 | Patch Generation | O(k) | k = size of changed files |
-| Patch Application | O(k) | k = number of operations |
+| Patch Application | O(k) | k = total bytes backed up, written, and re-verified |
 
 ## Space Complexity
 
@@ -183,76 +170,14 @@ operation.NewFile = readFile(newFilePath)
 | Manifest | O(n) | n = number of files |
 | Patch | O(k) | k = size of changes |
 | Backup | O(m) | m = size of modified/deleted files |
-| Memory | O(f) | f = size of largest changed file (generation reads all files into memory) |
-
-## Compression Performance
-
-### Algorithm Comparison
-
-| Algorithm | Ratio | Speed | Use Case |
-|-----------|-------|-------|----------|
-| **zstd** | 60-70% | Fast | Default, best balance |
-| **gzip** | 55-65% | Medium | Maximum compatibility |
-| **none** | 100% | N/A | Debugging, very small patches |
-
-### zstd Level Performance
-
-| Level | Ratio | Time | Recommendation |
-|-------|-------|------|----------------|
-| 1 | 50-55% | Fastest | Fast iteration |
-| 2 | 55-60% | Fast | Development |
-| 3 | 60-65% | Medium | **Default** |
-| 4 | 65-70% | Slow | Production builds |
-
-## Memory Management
-
-### Peak Memory Usage
-
-| Operation | Small Project | Medium Project | Large Project |
-|-----------|---------------|----------------|---------------|
-| Scan | 50 MB | 200 MB | 500 MB |
-| Generate | 100 MB | 500 MB | 1 GB |
-| Apply | 100 MB | 500 MB | 1 GB |
-
-**Note**: Memory usage is bounded by:
-- Chunk size (128MB) for large files
-- Worker count for parallel operations
-- Patch size for loading
-
-### Memory Optimization Strategies
-
-1. **Streaming**: Process data in chunks, never load full file
-2. **Reuse buffers**: Reuse compression buffers
-3. **Release early**: Free data immediately after use
-4. **Limit workers**: Cap parallel operations based on available memory
-
-## I/O Performance
-
-### Disk Access Patterns
-
-| Operation | Pattern | Optimization |
-|-----------|---------|---------------|
-| Scanning | Sequential read | OS read-ahead helps |
-| Hashing | Random read | Limited by disk seek time |
-| Compression | Sequential write | Large buffer writes |
-| Backup | Copy + Verify | Parallel when possible |
-
-### SSD vs HDD Impact
-
-| Operation | SSD | HDD | Ratio |
-|-----------|-----|-----|-------|
-| Scan | 2 min | 8 min | 4x |
-| Generate | 1 min | 3 min | 3x |
-| Apply | 1 min | 2 min | 2x |
-
-**Recommendation**: Use SSD for temp directory and version storage.
+| Memory | O(k) | k = total size of changed files (all held in memory simultaneously during generation; the whole decoded patch is held during application) |
 
 ## Performance Tuning
 
 ### For Patch Creators
 
 1. **Enable scan caching**: Use `--savescans` for repeated builds
-2. **Use parallel workers**: `--jobs 0` for auto-detect (uses `runtime.NumCPU()`)
+2. **Use parallel workers**: `--jobs 0` for auto-detect (uses `runtime.NumCPU()` unless overridden in the config file)
 3. **Choose compression level**: `--level 3` for balance
 4. **SSD for versions**: Store versions on fast storage
 5. **Exclude unnecessary files**: Use `.cyberignore`
@@ -264,41 +189,22 @@ operation.NewFile = readFile(newFilePath)
 3. **SSD for target**: Faster application on SSD
 4. **Close other apps**: Reduce disk contention
 
-## Performance Monitoring
-
-### Progress Indicators
+## Progress Indicators
 
 CyberPatchMaker provides real-time progress for:
 
-- **Scanning**: Files processed, percentage, ETA
-- **Hashing**: Current file, files remaining
-- **Diffing**: File being diffed, progress
-- **Compression**: Percentage complete
-- **Applying**: Operations completed, remaining
-
-### Performance Profiling
-
-To profile performance:
-
-```bash
-# Build with profiling
-go build -o patch-gen ./cmd/generator
-
-# Run with CPU profiling
-go tool pprof -http=:8080 ./patch-gen [options]
-
-# Check memory usage
-/runtime/metrics
-```
+- **Scanning**: Files processed, percentage, elapsed time, ETA (parallel scans also show worker count)
+- **Manifest comparison**: Percentage of files analyzed
+- **Generation**: Per-file add/modify lines as operations are built
+- **Large file writes** (>1GB): Write progress percentage during application
 
 ## Bottlenecks
 
 ### Common Bottlenecks
 
-1. **Disk I/O**: Primary bottleneck for large projects
+1. **Disk I/O**: Primary bottleneck for large projects (scanning, backup, writes)
 2. **Hash calculation**: CPU-intensive, parallelizable
-3. **Compression**: CPU-intensive, tunable
-4. **Network**: For distributed patching
+3. **Compression**: CPU-intensive, tunable via level
 
 ### Mitigation Strategies
 
@@ -307,26 +213,10 @@ go tool pprof -http=:8080 ./patch-gen [options]
 | Disk I/O | SSD, reduce file count, exclude files |
 | Hashing | Parallel workers, scan caching |
 | Compression | Lower level, better algorithm |
-| Network | Smaller patches, compression, CDN |
-
-## Future Optimizations
-
-### Planned
-
-1. **Deduplication**: Cross-patch deduplication
-2. **Delta compression**: Similar file detection
-3. **Async I/O**: Overlap computation and I/O
-4. **Memory mapping**: Zero-copy file access
-
-### Experimental
-
-1. **GPU acceleration**: CUDA/OpenCL hashing
-2. **Distributed generation**: Cloud-based patch generation
-3. **Machine learning**: Predict optimal chunk sizes
 
 ## Related Documentation
 
 - [Compression Guide](compression-guide.md) - Compression options
 - [Large File Handling](large-file-handling.md) - Memory optimization
 - [Scan Caching](scan-caching.md) - Instant reload
-- [Architecture](architecture.md#performance-characteristics) - System performance
+- [Architecture](architecture.md) - System design and code organization

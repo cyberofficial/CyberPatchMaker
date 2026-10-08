@@ -300,7 +300,7 @@ patch-gen --versions-dir ./versions \
 ### How Generator Detects Versions
 
 1. **Scan versions directory**: Find all subdirectories
-2. **Validate version names**: Must be valid version numbers
+2. **Use directory names as version numbers**: Any name is accepted — semantic versioning is recommended but not enforced
 3. **Find key file**: Use priority order (program.exe → game.exe → app.exe → main.exe)
 4. **Calculate hash**: SHA-256 of key file
 5. **Scan files**: Recursively scan all files and directories
@@ -325,10 +325,12 @@ patch-gen --versions-dir ./versions \
 └── data/
     └── config.json         # ✓ Has files
 
-# Invalid
-./versions/latest/          # ✗ Not a semantic version
-./versions/1.0.0/           # ✗ Directory empty
-./versions/v1.0.0/          # ✗ "v" prefix not recommended
+# Fails (directory must contain files and a key file)
+./versions/1.0.0/           # ✗ Directory empty — registration fails
+
+# Accepted but not recommended naming
+./versions/latest/           # ⚠ Non-semantic name — tool accepts it, ordering/naming becomes unclear
+./versions/v1.0.0/           # ⚠ "v" prefix — works, but not recommended
 ```
 
 ---
@@ -352,17 +354,19 @@ ln -s /mnt/storage/versions/1.0.0 versions/1.0.0
 
 **3. Generate patches incrementally:**
 ```bash
-# Generate patches for recent versions only
+# Generate a single patch for one source version
 patch-gen --versions-dir ./versions \
-            --new-version 2.1.0 \
             --from 2.0.0 \
+            --to 2.1.0 \
             --output ./patches
 
 patch-gen --versions-dir ./versions \
-            --new-version 2.1.0 \
             --from 2.0.5 \
+            --to 2.1.0 \
             --output ./patches
 ```
+
+> Note: `--from`/`--to` generate one patch and must be used **without** `--new-version`. Combining `--new-version` with `--from` silently ignores `--from` and patches from every version directory instead.
 
 **4. Clean up old patches:**
 ```bash
@@ -375,13 +379,8 @@ rm patches/1.0.*-to-*.patch
 
 ### Performance Considerations
 
-**Scanning time:**
-- 10 versions: < 1 second
-- 100 versions: < 10 seconds
-- 1000 versions: < 2 minutes
-
-**Factors affecting performance:**
-- Number of files per version
+**Scanning time** depends mainly on:
+- Number and total size of files per version (each file is SHA-256 hashed)
 - Storage speed (SSD vs HDD)
 - Network latency (for network paths)
 
@@ -390,6 +389,7 @@ rm patches/1.0.*-to-*.patch
 - Archive old versions to slower storage
 - Use SSD for version directories
 - Limit number of active versions
+- Enable scan caching (`--savescans`) and parallel scanning (`--jobs`)
 
 ---
 
@@ -546,11 +546,8 @@ fc /b versions\1.0.0\program.exe versions\1.0.1\program.exe
 
 **Output from generator shows:**
 ```
-Comparing versions 1.0.0 → 1.0.1:
-  Files added:    5
-  Files modified: 12
-  Files deleted:  3
-  Total changes:  20
+Generating patch from 1.0.0 to 1.0.1...
+Changes detected: 5 added, 12 modified, 3 deleted files, 2 added dirs, 1 deleted dirs
 ```
 
 ---
@@ -634,9 +631,9 @@ patch-gen --versions-dir /full/path/to/versions \
 
 ### Issue: "Invalid version number"
 
-**Cause:** Version name doesn't follow semantic versioning
+**Cause:** None — the tool does not validate version names; any directory name is accepted. However, non-semantic names (e.g., `latest`, `v1.0.0`, dates) make patch file naming and ordering confusing.
 
-**Solution:**
+**Solution (recommended, not required):**
 ```bash
 # Rename version directory
 mv versions/v1.0.0 versions/1.0.0

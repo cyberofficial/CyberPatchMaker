@@ -1,6 +1,9 @@
 :: CyberPatchMaker Ignore Patterns
 :: Place this file in your source version directory to exclude files from patches
 :: Lines starting with :: are comments
+:: Note: plain names (e.g. Thumbs.db, .env) match only the file at the version
+:: root and any directory of that name; use wildcard patterns (e.g. *.log) to
+:: match files of that name at any depth
 
 :: ============================================
 :: Sensitive Files (Security)
