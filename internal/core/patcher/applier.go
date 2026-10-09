@@ -215,11 +215,21 @@ func (a *Applier) applyModify(targetPath string, op utils.PatchOperation) error 
 		return fmt.Errorf("old file checksum mismatch")
 	}
 
-	if len(op.NewFile) == 0 {
+	// Obtain the new file content: either the embedded full replacement or
+	// by reconstructing it from the delta against the current base file.
+	var newData []byte
+	if len(op.NewFile) > 0 {
+		newData = op.NewFile
+	} else if len(op.BinaryDiff) > 0 {
+		reconstructed, err := a.reconstructDelta(targetPath, op)
+		if err != nil {
+			return err
+		}
+		newData = reconstructed
+	} else {
 		return fmt.Errorf("no new file data provided")
 	}
 
-	newData := op.NewFile
 	resultSize := int64(len(newData))
 	isLarge := resultSize > utils.LargeFileThreshold
 
@@ -287,11 +297,42 @@ func (a *Applier) applyModify(targetPath string, op utils.PatchOperation) error 
 	}
 
 	if isLarge {
-		fmt.Printf("  Modified (large): %s (%d MB)\n", op.FilePath, op.Size/(1024*1024))
+		fmt.Printf("  Modified (large): %s (%d MB)\n", op.FilePath, resultSize/(1024*1024))
 	} else {
 		fmt.Printf("  Modified: %s\n", op.FilePath)
 	}
 	return nil
+}
+
+// reconstructDelta rebuilds the new file content from a delta operation,
+// using the current on-disk file as the decode dictionary. The base content
+// hash is checked against the checksum stored in the patch (op.OldChecksum)
+// so a wrong base is rejected before any bytes are decoded, and the
+// reconstructed content is verified against op.NewChecksum before it is
+// written to disk.
+func (a *Applier) reconstructDelta(targetPath string, op utils.PatchOperation) ([]byte, error) {
+	baseData, err := os.ReadFile(targetPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read base file for delta: %w", err)
+	}
+
+	// Reject a wrong base: a delta can only be decoded against the exact
+	// content it was generated from.
+	if utils.CalculateDataChecksum(baseData) != op.OldChecksum {
+		return nil, fmt.Errorf("delta base checksum mismatch for %s (wrong base)", op.FilePath)
+	}
+
+	newData, err := utils.DecodeDelta(baseData, op.BinaryDiff)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode delta for %s: %w", op.FilePath, err)
+	}
+
+	// Guard against corrupted or incompatible deltas before writing.
+	if utils.CalculateDataChecksum(newData) != op.NewChecksum {
+		return nil, fmt.Errorf("delta reconstruction checksum mismatch for %s", op.FilePath)
+	}
+
+	return newData, nil
 }
 
 // applyDelete deletes a file

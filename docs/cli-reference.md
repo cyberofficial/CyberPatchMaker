@@ -23,7 +23,7 @@ patch-gen [options]
 | `--output <path>` | No (default: patches) | Output directory for patches (falls back to the config file's `default_patch_output`, then `patches`) |
 | `--key-file <name>` | No | Specific key file to use (e.g., app_name.exe) |
 | `--compression <type>` | No | Compression: `zstd` (default), `gzip`, `none` |
-| `--level <n>` | No | Compression level: zstd (1-4), gzip (1-3), default: 3 |
+| `--level <n>` | No | Compression level: zstd (1-4), gzip (1-3), default: 3. Also controls the delta encoding effort for modified files (higher = smaller deltas, slower generation) |
 | `--verify` | No | Accepted for compatibility; currently has no effect (patch validation always runs) |
 | `--create-exe` | No | Create self-contained CLI executable (requires patch-apply.exe next to patch-gen.exe) |
 | `--silent` | No | Embed silent mode into generated executables (requires --create-exe) |

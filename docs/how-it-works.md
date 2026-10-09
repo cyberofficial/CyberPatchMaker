@@ -2,7 +2,7 @@
 
 ## Overview
 
-CyberPatchMaker creates binary patches by comparing directory trees and storing full file replacements for changed files.
+CyberPatchMaker creates binary patches by comparing directory trees. Each changed file is stored either as a compact zstd dictionary delta (the old file content serves as the compression dictionary for the new content — the same mechanism as `zstd --patch-from`) or, when the delta is not smaller, as the full new file.
 
 ## Process
 
@@ -16,7 +16,7 @@ A JSON manifest records every file's relative path, size, checksum, and the key 
 Source and target manifests are compared to identify added, modified, and deleted files and directories.
 
 ### 4. Patch Packaging
-For each modified or added file, the full file content is read and stored in the patch. All operations (add/modify/delete files, add/delete directories) are serialized into a compressed JSON file.
+For each added file, the full content is stored in the patch. For each modified file, a zstd dictionary delta is computed against the old file content and stored only if it is smaller than the full new file (full replacement otherwise). All operations (add/modify/delete files, add/delete directories) are serialized into a compressed JSON file.
 
 ### 5. Compression
 The patch JSON is stream-encoded and compressed (zstd by default with levels 1-4; gzip levels 1-3 and none are also supported) for distribution.
@@ -26,7 +26,7 @@ The patch JSON is stream-encoded and compressed (zstd by default with levels 1-4
 1. **Load and decompress** patch file
 2. **Pre-verify**: check key file and all required file hashes match expected source version
 3. **Create selective backup** of files being modified/deleted to `backup.cyberpatcher/`
-4. **Apply operations**: add new files/directories, replace modified files, delete removed files/directories
+4. **Apply operations**: add new files/directories, replace modified files (delta operations are reconstructed by verifying and reusing the current on-disk file as the decode dictionary), delete removed files/directories
 5. **Post-verify**: check key file and modified files match expected target version
 6. **On failure**: automatic rollback from backup restores original state
 

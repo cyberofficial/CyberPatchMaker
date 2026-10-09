@@ -129,11 +129,11 @@ Represents a single change operation in a patch.
 type PatchOperation struct {
     Type        OperationType // Add, Modify, Delete, AddDir, DeleteDir
     FilePath    string        // Relative file path
-    BinaryDiff  []byte        // Binary diff data (for modify) - small files
-    NewFile     []byte        // Full file data (for add/modify) - all data
-    OldChecksum string        // Expected checksum before patch
+    BinaryDiff  []byte        // Zstd dictionary delta (for modify): new file compressed against the old file as dictionary
+    NewFile     []byte        // Full file data (for add, or modify without a beneficial delta)
+    OldChecksum string        // Expected checksum before patch (delta base hash for delta operations)
     NewChecksum string        // Expected checksum after patch
-    Size        int64         // Operation size in bytes
+    Size        int64         // Payload size carried by the operation (delta size or new file size)
 }
 ```
 
@@ -145,8 +145,9 @@ type PatchOperation struct {
 - `OpDeleteDir` (4): Delete directory
 
 **Data Storage Strategy:**
-- All modified files: Use `NewFile` with full replacement
-- `BinaryDiff` is never populated by the current generator flow and is reserved for future use
+- Added files: always use `NewFile` with the full content
+- Modified files: use `BinaryDiff` with a zstd dictionary delta (old file content as dictionary) when the delta is strictly smaller than the new file and can be verified to reconstruct it exactly; otherwise fall back to `NewFile` with the full new content
+- `OldChecksum` stores the base-file hash the delta was encoded against; the applier verifies it before decoding, so a wrong base is rejected
 
 ---
 
@@ -156,7 +157,7 @@ Contains patch-level metadata.
 
 ```go
 type PatchHeader struct {
-    FormatVersion int       // Patch format version (currently 1)
+    FormatVersion int       // Patch format version (currently 2; 2 = modified files may be stored as zstd dictionary deltas)
     CreatedAt     time.Time // Creation timestamp
     Compression   string    // Compression algorithm: "zstd", "gzip", "none"
     PatchSize     int64     // Estimated UNCOMPRESSED payload size (sum of operation data); not the compressed file size

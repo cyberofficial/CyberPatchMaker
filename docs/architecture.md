@@ -27,7 +27,7 @@ patcher.Generator -> streaming JSON + compression -> .patch file
 
 **Version (`version/`)**: Manages version registry. `RegisterVersion()` scans directories, creates manifests, integrates scan cache. Supports parallel scanning via `SetWorkerThreads()`. Key file auto-detection (program.exe > game.exe > app.exe > main.exe) is handled by the CLI layer in `cmd/generator/main.go` before calling `RegisterVersion()`.
 
-**Patcher (`patcher/`)**: `generator.go` — compares manifests, reads all added/modified files into memory as full replacements (no bsdiff), builds `Patch` struct. `applier.go` — pre-verification, selective backup, operation application, post-verification, automatic rollback on failure. `multipart.go` — splits large patches into parts, chunk sidecar system.
+**Patcher (`patcher/`)**: `generator.go` — compares manifests, reads all added/modified files into memory; modified files are stored as zstd dictionary deltas (old file content as dictionary) when smaller than the full file, otherwise as full replacements (`PatchOperation.BinaryDiff`/`NewFile`). `applier.go` — pre-verification, selective backup, operation application (delta reconstruction verifies the base-file hash before decoding), post-verification, automatic rollback on failure. `multipart.go` — splits large patches into parts, chunk sidecar system.
 
 **Scanner (`scanner/`)**: Recursive directory traversal, SHA-256 hashing, `.cyberignore` pattern matching, backup folder exclusion. Supports parallel checksum computation via worker pool.
 
@@ -37,7 +37,7 @@ patcher.Generator -> streaming JSON + compression -> .patch file
 
 **Config (`config/`)**: Application configuration load/save with platform-specific paths.
 
-- _The differ package was removed in the 2.0.0 release — the generator uses full file replacement for all files._
+- _The old differ package was removed in the 2.0.0 release — delta support now uses zstd dictionary compression (`pkg/utils/delta.go`), with full file replacement as the automatic fallback._
 
 ### Utilities (`pkg/utils/`)
 
@@ -45,6 +45,7 @@ patcher.Generator -> streaming JSON + compression -> .patch file
 - `checksum.go`: SHA-256 file/data/string hashing and verification
 - `fileops.go`: CopyFile, EnsureDir, RemoveDir, CopyDir, FileExists, IsExecutable
 - `compress.go`: zstd/gzip compression/decompression (in-memory and streaming)
+- `delta.go`: zstd dictionary delta encoding/decoding for modified files (EncodeDelta/DecodeDelta/ShouldUseDelta, 512MB base / 1GB target eligibility limits)
 - `patch_io.go`: SavePatch/LoadPatch with streaming JSON encoding and auto-compression detection
 
 ## Data Flow
@@ -54,7 +55,7 @@ patcher.Generator -> streaming JSON + compression -> .patch file
 1. Scan source directory -> build manifest with file hashes
 2. Scan target directory -> build manifest with file hashes
 3. Compare manifests -> identify added/modified/deleted files and directories
-4. For each modified/added file: read full content via os.ReadFile
+4. For each added file: read full content via os.ReadFile. For each modified file: read both old and new content, encode a zstd dictionary delta (old content as dictionary), and store the delta when it is smaller than the full new file and reconstructs the new file exactly (full replacement otherwise)
 5. Package everything into Patch struct with operations
 6. Stream JSON encode -> compress -> write .patch file
 ```

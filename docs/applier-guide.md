@@ -4,7 +4,7 @@ Complete guide to using the CyberPatchMaker applier tool for applying patches to
 
 ## Overview
 
-The applier tool safely applies binary patches to existing installations. It verifies the current version, creates selective backups of files being changed, applies modifications, and validates the result. (Modified files are written as full replacements — there is no binary-diff application step.)
+The applier tool safely applies binary patches to existing installations. It verifies the current version, creates selective backups of files being changed, applies modifications, and validates the result. (Modified files stored as deltas are reconstructed from the current on-disk file after verifying it matches the base checksum stored in the patch; full-replacement operations are written directly.)
 
 ## Basic Usage
 

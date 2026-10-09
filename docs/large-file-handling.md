@@ -2,7 +2,7 @@
 
 ## Overview
 
-The generator uses **full file replacement** for all files — every modified or added file is read into memory via `os.ReadFile()` and stored as `PatchOperation.NewFile`. There is no binary diff generation (bsdiff) in the current generator flow.
+The generator reads every added file into memory via `os.ReadFile()` and stores it as `PatchOperation.NewFile`. Modified files are stored as zstd dictionary deltas when beneficial, but delta generation is skipped for files above the eligibility limits (base file > 512MB or new file > 1GB) — those keep the full-replacement path, so the large-file memory behavior is unchanged.
 
 During patch **application**, files larger than 1GB are written in 128MB chunks to avoid memory pressure from the write buffer.
 

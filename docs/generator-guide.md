@@ -4,7 +4,7 @@ Complete guide to using the CyberPatchMaker generator tool for creating patches.
 
 ## Overview
 
-The generator tool creates efficient binary patches between software versions. It compares two complete directory trees and generates a patch file containing only the changes (modified files are stored as full replacements — there is no binary diffing).
+The generator tool creates efficient binary patches between software versions. It compares two complete directory trees and generates a patch file containing only the changes. Modified files are stored as compact zstd dictionary deltas (the old file content is used as the compression dictionary for the new content) whenever the delta is smaller than the full file, with automatic fallback to storing the full new file.
 
 ## Basic Usage
 
@@ -650,7 +650,7 @@ See [Self-Contained Executables Guide](self-contained-executables.md) for comple
    - gzip: medium size, medium speed
    - none: no reduction
 
-Because modified files are stored as full replacements, a patch contains roughly the full (compressed) size of every changed file.
+Because modified files are stored as deltas when beneficial, a patch contains roughly the full size of every added file but only the changed regions of modified files — a small edit to a large binary typically produces a delta of a few hundred bytes. When a delta is not smaller than the new file (for example, replaced content in already-compressed media), the full (compressed) file is stored instead.
 
 ---
 
