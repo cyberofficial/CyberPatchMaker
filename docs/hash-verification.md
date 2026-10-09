@@ -41,11 +41,10 @@ Parallel checksum computation is handled by `scanner.ScanDirectoryParallel()` us
 ## Failure Example
 
 ```
-Pre-verification failed: key file checksum mismatch
-Expected: abc123...
-Got:      xyz789...
-This patch requires version 1.0.0
-Your installation may be corrupted or modified
+Applying patch from 1.0.0 to 1.0.1...
+Verifying current version...
+Error: patch application failed: key file verification failed:
+key file checksum mismatch: expected abc123def4567890, got xyz789abc1234567
 ```
 
 ## Security Properties

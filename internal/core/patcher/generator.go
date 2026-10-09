@@ -1,6 +1,7 @@
 package patcher
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -125,8 +126,9 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 	// Process modified files
 	totalModified := len(modified)
 	if totalModified > 0 {
-		fmt.Printf("Processing %d modified files (generating diffs)...\n", totalModified)
+		fmt.Printf("Processing %d modified files...\n", totalModified)
 	}
+	deltaOps, fullOps, savedBytes := 0, 0, int64(0)
 	for _, file := range modified {
 		// Find corresponding source file
 		var sourceFile *utils.FileEntry
@@ -146,9 +148,6 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 			continue
 		}
 
-		// Use full file replacement for all modified files (no streaming)
-		fmt.Printf("  Processing modified file: %s\n", file.Path)
-
 		// Get file path
 		newPath := filepath.Join(toVersion.Location, file.Path)
 
@@ -158,22 +157,39 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 			return nil, fmt.Errorf("failed to read new file %s: %w", file.Path, err)
 		}
 
-		// The manifest checksums from the scanner are trusted; no need to re-verify
-		patch.Operations = append(patch.Operations, utils.PatchOperation{
+		op := utils.PatchOperation{
 			Type:        utils.OpModify,
 			FilePath:    file.Path,
-			NewFile:     newFileData,
 			OldChecksum: sourceFile.Checksum,
 			NewChecksum: file.Checksum,
 			Size:        file.Size,
-		})
+		}
 
-		fmt.Printf("  Modify (full replacement): %s (%d bytes)\n", file.Path, file.Size)
+		// Try to store the change as a compact delta against the old file;
+		// fall back to full file replacement whenever the delta is not
+		// strictly smaller or cannot be verified.
+		if g.tryDelta(&op, fromVersion.Location, sourceFile, newFileData, options.CompressionLevel) {
+			deltaOps++
+			savedBytes += int64(len(newFileData)) - int64(len(op.BinaryDiff))
+			fmt.Printf("  Modify (delta): %s (%d -> %d bytes, %.1f%% of original)\n",
+				file.Path, len(newFileData), len(op.BinaryDiff),
+				float64(len(op.BinaryDiff))/float64(len(newFileData))*100)
+		} else {
+			op.NewFile = newFileData
+			fullOps++
+			fmt.Printf("  Modify (full replacement): %s (%d bytes)\n", file.Path, file.Size)
+		}
+
+		patch.Operations = append(patch.Operations, op)
+	}
+	if deltaOps > 0 {
+		fmt.Printf("Delta compression: %d file(s) stored as deltas, %d as full replacements (delta savings: %d bytes)\n",
+			deltaOps, fullOps, savedBytes)
 	}
 
 	// Create patch header
 	patch.Header = utils.PatchHeader{
-		FormatVersion: 1,
+		FormatVersion: 2, // 2 = modified files may be stored as zstd dictionary deltas (BinaryDiff)
 		CreatedAt:     time.Now(),
 		Compression:   options.Compression,
 		PatchSize:     g.CalculatePatchSize(patch),
@@ -183,6 +199,60 @@ func (g *Generator) GeneratePatch(fromVersion, toVersion *utils.Version, options
 	fmt.Printf("Patch generation complete: %d operations\n", len(patch.Operations))
 
 	return patch, nil
+}
+
+// tryDelta attempts to store a modification as a compact zstd delta instead
+// of a full file replacement: the old file content is used as the encoding
+// dictionary for the new file content (the `zstd --patch-from` mechanism).
+// On success it fills op.BinaryDiff and sets op.Size to the delta size;
+// otherwise the caller keeps the full-replacement behavior. Every stored
+// delta is verified to reconstruct the new file exactly before it is
+// accepted, and the base content is checked against the manifest checksum so
+// the patch only carries deltas that will verify at apply time.
+func (g *Generator) tryDelta(op *utils.PatchOperation, fromDir string, sourceFile *utils.FileEntry, newFileData []byte, level int) bool {
+	// The base (dictionary) and the new content must be within the delta
+	// size limits; anything larger keeps the full-replacement behavior.
+	// Both ends are checked against manifest/actual sizes before any
+	// extra file reads or encoding work.
+	if sourceFile.Size <= 0 || sourceFile.Size > utils.MaxDeltaBaseSize ||
+		len(newFileData) == 0 || int64(len(newFileData)) > utils.MaxDeltaTargetSize {
+		return false
+	}
+
+	oldFileData, err := os.ReadFile(filepath.Join(fromDir, op.FilePath))
+	if err != nil {
+		fmt.Printf("  Warning: could not read base file for delta (%s), using full replacement: %v\n", op.FilePath, err)
+		return false
+	}
+
+	// The delta must be built against the exact content the patch will
+	// verify at apply time (op.OldChecksum); otherwise fall back.
+	if utils.CalculateDataChecksum(oldFileData) != sourceFile.Checksum {
+		fmt.Printf("  Warning: base file %s does not match its manifest checksum, using full replacement\n", op.FilePath)
+		return false
+	}
+
+	delta, err := utils.EncodeDelta(oldFileData, newFileData, level)
+	if err != nil {
+		fmt.Printf("  Warning: delta encoding failed for %s, using full replacement: %v\n", op.FilePath, err)
+		return false
+	}
+
+	// Only keep the delta when it is smaller than the full new file.
+	if !utils.ShouldUseDelta(int64(len(delta)), int64(len(newFileData))) {
+		return false
+	}
+
+	// Verify the delta reconstructs the new file exactly before storing it.
+	reconstructed, err := utils.DecodeDelta(oldFileData, delta)
+	if err != nil || !bytes.Equal(reconstructed, newFileData) {
+		fmt.Printf("  Warning: delta verification failed for %s, using full replacement\n", op.FilePath)
+		return false
+	}
+
+	op.BinaryDiff = delta
+	op.Size = int64(len(delta)) // size of the payload this operation carries
+	return true
 }
 
 // CalculatePatchSize calculates the total size of patch operations
@@ -266,6 +336,9 @@ func (g *Generator) ValidatePatch(patch *utils.Patch) error {
 		case utils.OpModify:
 			if len(op.BinaryDiff) == 0 && len(op.NewFile) == 0 {
 				return fmt.Errorf("operation %d (modify): both diff and new file are empty", i)
+			}
+			if len(op.BinaryDiff) > 0 && len(op.NewFile) > 0 {
+				return fmt.Errorf("operation %d (modify): both diff and new file are set", i)
 			}
 			if len(op.NewFile) > 0 && len(op.NewFile) != int(op.Size) {
 				return fmt.Errorf("operation %d (modify): file data size mismatch (expected %d bytes, got %d bytes)", i, op.Size, len(op.NewFile))

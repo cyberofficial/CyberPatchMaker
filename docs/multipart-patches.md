@@ -2,7 +2,7 @@
 
 ## Overview
 
-CyberPatchMaker automatically splits large patches into multiple parts when the patch size exceeds 4GB. This prevents memory exhaustion issues and makes large patches more manageable.
+CyberPatchMaker automatically splits large patches into multiple parts when the total size of the patch operations exceeds 4GB. This makes large patches more manageable to store and distribute (splitting does not reduce peak memory — see Performance Considerations below).
 
 ## How It Works
 
@@ -30,8 +30,8 @@ patch-name.03.patch  ← Part 3 (if needed)
 Part 1 (.01.patch) contains:
 - **Key file verification data** (always in part 1)
 - **Multi-part metadata** (total parts, part hashes)
-- **Small files** (fill up to 4GB limit)
-- **Part verification hashes** (SHA-256 of all parts)
+- **Small files** (fill up to the part size limit)
+- **Part verification hashes** (SHA-256 of each saved part; parts 2+ are verified against them during load — part 1 itself is not hash-verified on load)
 
 ## Size Distribution Example
 
@@ -88,13 +88,13 @@ File 6: 9.8GB
 patch-gen.exe --from-dir "C:\Version1" --to-dir "C:\Version2" --output patches
 
 # Output:
-# Patch size (27.5 GB) exceeds 4GB limit, splitting into multiple parts...
+# Uncompressed data size (29483859968 bytes / 27.47 GB) exceeds 4.00 GB limit, splitting into multiple parts...
 # Split patch into 5 parts
-#   Part 1: 6 operations, ~2.6GB
-#   Part 2: 1 operation, ~2.2GB
-#   Part 3: 1 operation, ~5.5GB
-#   Part 4: 1 operation, ~7.4GB
-#   Part 5: 1 operation, ~9.8GB
+#   Part 1: 6 operations, ~2747816960 bytes
+#   Part 2: 1 operations, ~2308125696 bytes
+#   Part 3: 1 operations, ~5767168000 bytes
+#   Part 4: 1 operations, ~7759462400 bytes
+#   Part 5: 1 operations, ~10289377280 bytes
 # ✓ Multi-part patch saved: 5 parts
 ```
 
@@ -187,10 +187,7 @@ patch-apply.exe --patch "patches\Version1-to-Version2.01.patch" --current-dir "C
 
 ### Memory Efficiency
 
-Multi-part patches solve the memory exhaustion problem:
-
-- **Single 18GB patch:** Tries to allocate 64GB+ for JSON parsing → OOM crash
-- **Multi-part (5x 3-4GB):** Loads parts sequentially, max ~4GB per part → Success
+Multi-part splitting sequences disk I/O and hash verification per part, but it does **not** reduce peak memory: on load, every part is read, verified, and decoded, and the operations from **all** parts are merged into a single in-memory patch before anything is applied. Peak memory is therefore on the order of the total patch content, not the largest part. (Patch files themselves are parsed with streaming decompression and 64KB buffers — it is the decoded operations that live in memory.)
 
 ## Chunk Sidecar System (Very Large Patches)
 
@@ -204,6 +201,7 @@ For patches where individual parts exceed the configured split size, CyberPatchM
   2. Creates a `.chunks.json` sidecar file with chunk metadata
   3. Reconstructs the part on-the-fly when loading
 - Without `--splitsize`, parts are never chunked even if they exceed 4GB
+- Note: chunk sidecars are consulted only for parts 2 and up during loading. If part 1 itself is chunked, it is re-saved as a small metadata-only stub (operations without file data), and the current loader does not reconstruct it — avoid a `--splitsize` small enough to chunk part 1.
 
 ### Chunk File Structure
 
@@ -245,7 +243,7 @@ patch-name.part3.3.patch               ← Chunk 3 of Part 3
 When applying a patch with chunked parts:
 
 1. **Detect sidecar:** If `<part>.chunks.json` exists, part is chunked
-2. **Load sidecar:** Read chunk metadata (file names, offsets, checksums)
+2. **Load sidecar:** Read chunk metadata (file names, sizes, checksums)
 3. **Read chunks:** Load each chunk file and verify SHA-256 checksum
 4. **Reassemble:** Combine chunks in order into temporary file
 5. **Verify reconstructed hash:** Ensure full part matches expected hash
@@ -253,10 +251,9 @@ When applying a patch with chunked parts:
 
 ### Benefits of Chunking
 
-- **Handles any patch size:** Even 50GB+ patches can be processed
-- **Memory-safe:** Never loads more than one chunk at a time
-- **Parallel download ready:** Chunks can be downloaded independently
+- **Meets file-size limits:** Individual files stay at or below the `--splitsize` value, working around upload/storage limits
 - **Checksum verification:** Each chunk verified individually
+- **Integrity isolation:** A corrupted chunk is detected and named precisely
 
 ### Self-Contained Executables with Chunks
 
@@ -268,11 +265,13 @@ When creating self-contained executables with very large patches:
 
 Example distribution:
 ```
-MyApp-Patch-1.0.3.exe                  ← ~50MB (contains applier + patch metadata)
-MyApp-Patch-1.0.3.exe.chunks.json     ← Chunk manifest
-MyApp-Patch-1.0.3.exe.part1.1.patch    ← First chunk file
-MyApp-Patch-1.0.3.exe.part1.2.patch    ← Second chunk file
+MyApp-Patch-1.0.3.exe                   ← applier + part 01 data + embedded sidecar manifests
+MyApp-Patch-1.0.3.02.patch              ← Part 2 (external part)
+MyApp-Patch-1.0.3.part3.1.patch         ← Chunk 1 of Part 3
+MyApp-Patch-1.0.3.part3.2.patch         ← Chunk 2 of Part 3
 ```
+
+Chunk and sidecar files are named after the patch base (the executable name without `.exe`).
 
 ### Binary Sidecar Embedding Format
 
@@ -323,7 +322,6 @@ At runtime, the applier reads the 128-byte header from the end of the executable
 
 - **Single-part patches** continue to work exactly as before
 - **No version detection needed** - format is self-describing
-- **Legacy appliers** will fail gracefully on multi-part patches (missing metadata error)
 
 ### Forward Compatibility
 
@@ -370,15 +368,15 @@ At runtime, the applier reads the 128-byte header from the end of the executable
 
 ### Out of Memory Despite Multi-Part
 
-**Cause:** Individual operations still very large despite multi-part splitting
+**Cause:** All patch data is still loaded into memory when applying — multi-part splitting and chunking only limit individual file sizes on disk; they do not reduce peak memory (which is on the order of the total patch content).
 
-**Solution:** Use `--splitsize` with a smaller value to enable chunk sidecar splitting, which further subdivides oversized parts. The chunk sidecar system handles files of any size.
+**Solution:** There is currently no in-tool remedy. Keep the total size of changed files within available RAM, or apply the patch on a machine with more memory.
 
 ## Performance Considerations
 
 ### Patch Generation
 
-- **Sorting overhead:** Minimal (< 1 second for 100k files)
+- **Sorting overhead:** Minimal
 - **Part calculation:** Linear time O(n) operations
 - **Hash generation:** Proportional to patch size
 - **Disk I/O:** Main bottleneck (same as single-part)
@@ -386,8 +384,8 @@ At runtime, the applier reads the 128-byte header from the end of the executable
 ### Patch Application
 
 - **Sequential loading:** Each part loaded/verified in order
-- **Memory usage:** Peak = largest single part (~4GB)
-- **Verification time:** Proportional to number of parts
+- **Memory usage:** Peak ≈ total patch content (all parts' operations are merged in memory)
+- **Verification time:** Proportional to total patch size (each part is fully read and hashed)
 - **Overall time:** Similar to single-part (I/O bound)
 
 ## Limitations
@@ -397,7 +395,7 @@ At runtime, the applier reads the 128-byte header from the end of the executable
 1. **Configurable part size** - default 4GB, adjustable via `--splitsize` flag
 2. **Sequential loading** - parts loaded one at a time (could be parallelized)
 3. **No compression across parts** - each part compressed independently
-4. **Metadata only in Part 1** - other parts don't have standalone info
+4. **Part hash list only in Part 1** - all other metadata (header, versions, key files, required files) is duplicated in every part
 
 ### Known Edge Cases
 
@@ -420,7 +418,7 @@ At runtime, the applier reads the 128-byte header from the end of the executable
 ## FAQ
 
 **Q: Why 4GB default limit?**
-A: Balances between manageable part sizes and avoiding too many parts. Prevents 32-bit integer overflow issues. The limit is configurable via `--splitsize` (e.g., `--splitsize 2G`).
+A: Balances between manageable part sizes and avoiding too many parts. The limit is configurable via `--splitsize` (e.g., `--splitsize 2G`).
 
 **Q: Can I combine parts manually?**
 A: No - the format requires proper metadata merging. Use the applier to load all parts.
@@ -429,13 +427,10 @@ A: No - the format requires proper metadata merging. Use the applier to load all
 A: Yes - Part 1 contains metadata but operations span all parts.
 
 **Q: Can I create executables from multi-part patches?**
-A: Yes - use `--create-exe` with multi-part patches. The generator embeds part 01 data inside the executable. External parts (.02.patch, etc.) and chunk sidecar files must be distributed alongside the .exe. The embedded executable auto-detects and loads external parts at runtime.
+A: Yes - use `--create-exe` with multi-part patches. The generator embeds part 01 data inside the executable (created only if part 01 is under 3.75GB). External parts (.02.patch, etc.) and chunk data files must be distributed alongside the .exe (sidecar manifests are embedded in the executable). The embedded executable auto-detects and loads external parts at runtime.
 
 **Q: What if I lose Part 2 but have others?**
 A: Application will fail - all parts required for complete patch.
-
-**Q: Can old appliers use multi-part patches?**
-A: No - they'll error on missing MultiPart metadata. Upgrade to latest version.
 
 **Q: Is compression per-part or across all parts?**
 A: Per-part - each .XX.patch file is independently compressed.

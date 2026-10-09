@@ -5,12 +5,15 @@
 ```bash
 go build -o patch-gen.exe ./cmd/generator
 go build -o patch-apply.exe ./cmd/applier
+```
+
+```powershell
 .\advanced-test.ps1
 ```
 
 ## Generator Issues
 
-**"versions directory not found"**: Check the path exists and contains version folders.
+**"failed to read versions directory"**: Check the path exists and contains version folders.
 
 **"key file not found"**: No `program.exe`, `game.exe`, `app.exe`, or `main.exe` found. Use `--key-file <name>` if your executable has a custom name, or rename it to one of the auto-detected names.
 
@@ -22,11 +25,11 @@ go build -o patch-apply.exe ./cmd/applier
 
 **"key file checksum mismatch"**: You're trying to apply the wrong patch or your installation is modified/corrupted. Check the patch's expected source version and verify you have that exact version installed.
 
-**"required file missing or checksum mismatch"**: A file in your installation was modified or deleted. Re-install the clean source version and try again.
+**"required files verification failed"**: A file in your installation was modified or deleted (reported as "file not found" or "checksum mismatch"). Re-install the clean source version and try again.
 
 **"permission denied"**: Close the application before patching. On Windows, run as administrator for Program Files. On Linux, check ownership and permissions.
 
-**"insufficient disk space"**: Free up space. The selective backup only needs space for changed files (typically much less than the full installation).
+**"no space left on device"** (Windows: "There is not enough space on the disk"): Free up space. The selective backup only needs space for changed files (typically much less than the full installation).
 
 **"post-verification failed"**: Patch produced wrong results. The system will attempt automatic rollback. Check disk for errors, re-download the patch file, and retry.
 

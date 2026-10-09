@@ -92,11 +92,11 @@ type FileRequirement struct {
 type PatchOperation struct {
 	Type        OperationType // Add, Modify, Delete, AddDir, DeleteDir
 	FilePath    string        // Relative file path
-	BinaryDiff  []byte        // Binary diff data (for modify) - used for small files
-	NewFile     []byte        // Full file data (for add/modify) - all file data stored directly
-	OldChecksum string        // Expected checksum before patch
+	BinaryDiff  []byte        // Zstd dictionary delta (for modify): new file compressed against the old file as dictionary; OldChecksum identifies the required base
+	NewFile     []byte        // Full file data (for add/modify) - used when no delta is stored or the delta is not smaller
+	OldChecksum string        // Expected checksum before patch (for modify deltas: hash of the base file the delta was encoded against)
 	NewChecksum string        // Expected checksum after patch
-	Size        int64         // Operation size
+	Size        int64         // Payload size carried by this operation (new file size for full replacement, delta size for deltas)
 }
 
 // OperationType defines the type of patch operation

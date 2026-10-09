@@ -28,7 +28,8 @@ Backups are created **after pre-verification passes but before any operations ar
 |----------|--------|
 | **Pre-verification fails** | No backup created, no changes made |
 | **Patch succeeds** | Backup preserved for manual rollback |
-| **Patch fails mid-operation** | Automatic rollback from backup restores original state; backup kept for investigation |
+| **Operation fails mid-patch** | Automatic rollback from backup restores original state; backup kept for investigation |
+| **Post-patch verification fails** | Automatic rollback from backup restores original state; backup kept |
 
 ## Automatic Exclusion
 
@@ -38,10 +39,10 @@ The `.cyberignore` file itself is also auto-excluded. Only the **root-level** `b
 
 ## Selective Strategy (Why Not Full Backup?)
 
-The original design had a full-directory backup, then evolved to post-verification selective backup:
+Backing up only the files touched by the patch keeps the backup a small fraction of the full installation size:
 
-- **Disk space**: Only changed files backed up (e.g., 2.8MB vs 5.2GB full copy = 99.5% reduction)
-- **Speed**: Selective copy is 95% faster than full copy
+- **Disk space**: Only changed files are copied, not the entire application
+- **Speed**: Copying a handful of files is much faster than duplicating everything
 - **Rollback simplicity**: Mirror structure preserves exact original paths
 
 ## Implementation

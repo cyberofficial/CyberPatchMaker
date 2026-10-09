@@ -129,11 +129,11 @@ Represents a single change operation in a patch.
 type PatchOperation struct {
     Type        OperationType // Add, Modify, Delete, AddDir, DeleteDir
     FilePath    string        // Relative file path
-    BinaryDiff  []byte        // Binary diff data (for modify) - small files
-    NewFile     []byte        // Full file data (for add/modify) - all data
-    OldChecksum string        // Expected checksum before patch
+    BinaryDiff  []byte        // Zstd dictionary delta (for modify): new file compressed against the old file as dictionary
+    NewFile     []byte        // Full file data (for add, or modify without a beneficial delta)
+    OldChecksum string        // Expected checksum before patch (delta base hash for delta operations)
     NewChecksum string        // Expected checksum after patch
-    Size        int64         // Operation size in bytes
+    Size        int64         // Payload size carried by the operation (delta size or new file size)
 }
 ```
 
@@ -145,8 +145,9 @@ type PatchOperation struct {
 - `OpDeleteDir` (4): Delete directory
 
 **Data Storage Strategy:**
-- All modified files: Use `NewFile` with full replacement
-- `BinaryDiff` is never populated by the current generator flow and is reserved for future use
+- Added files: always use `NewFile` with the full content
+- Modified files: use `BinaryDiff` with a zstd dictionary delta (old file content as dictionary) when the delta is strictly smaller than the new file and can be verified to reconstruct it exactly; otherwise fall back to `NewFile` with the full new content
+- `OldChecksum` stores the base-file hash the delta was encoded against; the applier verifies it before decoding, so a wrong base is rejected
 
 ---
 
@@ -156,11 +157,11 @@ Contains patch-level metadata.
 
 ```go
 type PatchHeader struct {
-    FormatVersion int       // Patch format version (currently 1)
+    FormatVersion int       // Patch format version (currently 2; 2 = modified files may be stored as zstd dictionary deltas)
     CreatedAt     time.Time // Creation timestamp
     Compression   string    // Compression algorithm: "zstd", "gzip", "none"
-    PatchSize     int64     // Compressed patch size in bytes
-    Checksum      string    // SHA-256 of patch data
+    PatchSize     int64     // Estimated UNCOMPRESSED payload size (sum of operation data); not the compressed file size
+    Checksum      string    // SHA-256 of the patch data (computed in memory by SavePatch; persisted files contain "")
     Signature     []byte    // Digital signature (optional, future feature)
 }
 ```
@@ -217,9 +218,10 @@ type PartChunk struct {
 ```
 
 **Usage:**
-- When a single part exceeds ~3.75GB
-- Chunks are stored separately with `.chunks.json` sidecar
-- Reassembled during patch loading
+- Only when a custom `--splitsize` is given: saved parts larger than the split size are split into chunk files
+- Chunks are stored separately with a `.partN.chunks.json` sidecar
+- Reassembled and verified during patch loading
+- Without `--splitsize`, parts are never chunked
 
 ---
 
@@ -329,8 +331,8 @@ const (
 ```
 
 **Usage:**
-- `ChunkSize`: Size of chunks when processing large files
-- `LargeFileThreshold`: Files larger than this use chunked processing
+- `ChunkSize`: Size of chunks when writing large files during application
+- `LargeFileThreshold`: Files larger than this are written in chunks by the applier (generation/loading still hold full data in memory)
 - `DefaultMaxPartSize`: Patches larger than this are split
 
 ---

@@ -21,10 +21,11 @@ patch-gen --from 1.0.1 --to 1.0.0 --versions-dir ./versions --output ./patches/d
 Use `--crp` to generate both forward and reverse patches in one invocation:
 
 ```bash
-# Creates both 1.0.0-to-1.0.1.patch AND 1.0.1-to-1.0.0.patch
+# Creates both 1.0.0-to-1.0.1.patch AND 1.0.1-to-1.0.0_rev.patch
 patch-gen --from-dir ./v1.0.0 --to-dir ./v1.0.1 --output ./patches --crp
 
 # With self-contained executables for both directions
+# (creates 1.0.0-to-1.0.1.exe and 1.0.1-to-1.0.0_rev.exe)
 patch-gen --from-dir ./v1.0.0 --to-dir ./v1.0.1 --output ./patches --crp --create-exe
 ```
 
@@ -47,6 +48,8 @@ patches/
     ├── 1.0.2-to-1.0.1.patch
     └── 1.0.1-to-1.0.0.patch
 ```
+
+> Note: patches generated manually (swapping `--from`/`--to`) get the plain names shown above. Patches generated with `--crp` are named `<to>-to-<from>_rev.patch` — rename them if you use this layout.
 
 ## Safety Notes
 

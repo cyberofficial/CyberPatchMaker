@@ -3516,6 +3516,163 @@ Test-Step "Optimization: Forward and reverse patch roundtrip" {
 	if ($content -notmatch "v1.0.0") { throw "Reverse patch didn't downgrade" }
 }
 
+# Test 69: Delta compression - modified binary file stored as compact delta
+Test-Step "Delta compression: modified file stored as compact delta" {
+    $deltaRoot = "testdata/advanced-output/delta-tests"
+    $srcDir = "$deltaRoot/3.0.0"
+    $dstDir = "$deltaRoot/3.0.1"
+    $patchesDir = "$deltaRoot/patches"
+    
+    if (Test-Path $deltaRoot) { Remove-Item $deltaRoot -Recurse -Force }
+    New-Item -ItemType Directory -Force -Path "$srcDir/data" | Out-Null
+    New-Item -ItemType Directory -Force -Path "$dstDir/data" | Out-Null
+    New-Item -ItemType Directory -Force -Path $patchesDir | Out-Null
+    
+    # Key file, identical in both versions
+    Set-Content -Path "$srcDir/program.exe" -Value "DeltaApp v1"
+    Set-Content -Path "$dstDir/program.exe" -Value "DeltaApp v1"
+    
+    # ~2MB binary payload. The size is deliberately NOT a power of two
+    # (2MB + 128KB): the delta encoder's zstd window rounds up to the next
+    # power of two >= the base size, and dictionary back-references need
+    # the window to strictly exceed the base file size.
+    $deltaSize = 2MB + 128KB
+    $repoRoot = (Get-Location).Path
+    $rng = [System.Random]::new(1000)
+    $bytes = New-Object byte[] ($deltaSize)
+    $rng.NextBytes($bytes)
+    [IO.File]::WriteAllBytes((Join-Path $repoRoot "$srcDir/data/pack.bin"), $bytes)
+    
+    # New version: same payload with two bytes changed
+    $bytes[1000] = 7
+    $bytes[200000] = 9
+    [IO.File]::WriteAllBytes((Join-Path $repoRoot "$dstDir/data/pack.bin"), $bytes)
+    
+    Write-Host "  Generating delta patch (3.0.0 -> 3.0.1)..." -ForegroundColor Gray
+    $output = .\patch-gen.exe --from-dir $srcDir --to-dir $dstDir --output $patchesDir 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "Generator failed with exit code $LASTEXITCODE" }
+    
+    $outputStr = $output -join "`n"
+    if ($outputStr -notmatch 'Modify \(delta\): data/pack\.bin') {
+        throw "Expected data/pack.bin to be stored as a compact delta. Output:`n$outputStr"
+    }
+    if ($outputStr -match 'Modify \(full replacement\): data/pack\.bin') {
+        throw "data/pack.bin must not be a full replacement when the delta is smaller"
+    }
+    if (-not (Test-Path "$patchesDir/3.0.0-to-3.0.1.patch")) { throw "Patch file not created" }
+    
+    Write-Host "  data/pack.bin stored as a compact delta" -ForegroundColor Gray
+}
+
+# Test 70: Delta compression - delta patch applies and content matches
+Test-Step "Delta compression: delta patch applies and content matches" {
+    $deltaRoot = "testdata/advanced-output/delta-tests"
+    $srcDir = "$deltaRoot/3.0.0"
+    $dstDir = "$deltaRoot/3.0.1"
+    $patchesDir = "$deltaRoot/patches"
+    $targetDir = "$deltaRoot/target"
+    
+    if (Test-Path $targetDir) { Remove-Item $targetDir -Recurse -Force }
+    Copy-Item -Recurse $srcDir $targetDir
+    
+    $output = .\patch-apply.exe --patch "$patchesDir/3.0.0-to-3.0.1.patch" --current-dir $targetDir --verify 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "Apply failed with exit code $LASTEXITCODE" }
+    
+    $targetHash = (Get-FileHash "$targetDir/data/pack.bin").Hash
+    $expectedHash = (Get-FileHash "$dstDir/data/pack.bin").Hash
+    if ($targetHash -ne $expectedHash) { throw "Reconstructed pack.bin does not match the new version" }
+    
+    $targetExeHash = (Get-FileHash "$targetDir/program.exe").Hash
+    $srcExeHash = (Get-FileHash "$srcDir/program.exe").Hash
+    if ($targetExeHash -ne $srcExeHash) { throw "Unchanged program.exe must not be touched by the patch" }
+    
+    Write-Host "  Delta patch applied; reconstructed content matches" -ForegroundColor Gray
+}
+
+# Test 71: Delta compression - wrong base file rejected without changes
+Test-Step "Delta compression: wrong base file rejected without changes" {
+    $deltaRoot = "testdata/advanced-output/delta-tests"
+    $srcDir = "$deltaRoot/3.0.0"
+    $patchesDir = "$deltaRoot/patches"
+    $targetDir = "$deltaRoot/target-wrong"
+    
+    if (Test-Path $targetDir) { Remove-Item $targetDir -Recurse -Force }
+    Copy-Item -Recurse $srcDir $targetDir
+    
+    # Tamper with the delta base so reconstruction must fail
+    $repoRoot = (Get-Location).Path
+    $packPath = Join-Path $repoRoot "$targetDir/data/pack.bin"
+    $bytes = [IO.File]::ReadAllBytes($packPath)
+    $bytes[50] = 123
+    [IO.File]::WriteAllBytes($packPath, $bytes)
+    
+    $before = (Get-FileHash "$targetDir/data/pack.bin").Hash
+    
+    $output = .\patch-apply.exe --patch "$patchesDir/3.0.0-to-3.0.1.patch" --current-dir $targetDir 2>&1
+    if ($LASTEXITCODE -eq 0) { throw "Apply unexpectedly succeeded with a tampered base file" }
+    
+    $outputStr = $output -join "`n"
+    if ($outputStr -notmatch 'checksum mismatch') { throw "Expected a checksum mismatch error. Output:`n$outputStr" }
+    
+    $after = (Get-FileHash "$targetDir/data/pack.bin").Hash
+    if ($after -ne $before) { throw "Failed patch must not modify the target file" }
+    
+    Write-Host "  Wrong base file rejected; target left untouched" -ForegroundColor Gray
+}
+
+# Test 72: Delta compression - fallback to full replacement
+Test-Step "Delta compression: fallback to full replacement when delta is not smaller" {
+    $deltaRoot = "testdata/advanced-output/delta-tests"
+    $srcDir = "$deltaRoot/4.0.0"
+    $dstDir = "$deltaRoot/4.0.1"
+    $patchesDir = "$deltaRoot/patches"
+    $targetDir = "$deltaRoot/target-fallback"
+    
+    foreach ($d in @($srcDir, $dstDir, $targetDir)) {
+        if (Test-Path $d) { Remove-Item $d -Recurse -Force }
+    }
+    New-Item -ItemType Directory -Force -Path "$srcDir/data" | Out-Null
+    New-Item -ItemType Directory -Force -Path "$dstDir/data" | Out-Null
+    
+    # Key file, identical in both versions
+    Set-Content -Path "$srcDir/program.exe" -Value "DeltaApp v2"
+    Set-Content -Path "$dstDir/program.exe" -Value "DeltaApp v2"
+    
+    # Completely unrelated random payloads: the delta can never be smaller
+    $repoRoot = (Get-Location).Path
+    $rngOld = [System.Random]::new(2000)
+    $oldBytes = New-Object byte[] (256KB)
+    $rngOld.NextBytes($oldBytes)
+    [IO.File]::WriteAllBytes((Join-Path $repoRoot "$srcDir/data/pack.bin"), $oldBytes)
+    
+    $rngNew = [System.Random]::new(2001)
+    $newBytes = New-Object byte[] (256KB)
+    $rngNew.NextBytes($newBytes)
+    [IO.File]::WriteAllBytes((Join-Path $repoRoot "$dstDir/data/pack.bin"), $newBytes)
+    
+    Write-Host "  Generating patch (4.0.0 -> 4.0.1)..." -ForegroundColor Gray
+    $output = .\patch-gen.exe --from-dir $srcDir --to-dir $dstDir --output $patchesDir 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "Generator failed with exit code $LASTEXITCODE" }
+    
+    $outputStr = $output -join "`n"
+    if ($outputStr -notmatch 'Modify \(full replacement\): data/pack\.bin') {
+        throw "Expected data/pack.bin to fall back to full replacement. Output:`n$outputStr"
+    }
+    if ($outputStr -match 'Modify \(delta\): data/pack\.bin') {
+        throw "data/pack.bin must not be delta-compressed when the delta is not smaller"
+    }
+    
+    Copy-Item -Recurse $srcDir $targetDir
+    $output = .\patch-apply.exe --patch "$patchesDir/4.0.0-to-4.0.1.patch" --current-dir $targetDir --verify 2>&1
+    if ($LASTEXITCODE -ne 0) { throw "Apply failed with exit code $LASTEXITCODE" }
+    
+    $targetHash = (Get-FileHash "$targetDir/data/pack.bin").Hash
+    $expectedHash = (Get-FileHash "$dstDir/data/pack.bin").Hash
+    if ($targetHash -ne $expectedHash) { throw "Applied pack.bin does not match the new version" }
+    
+    Write-Host "  Full replacement fallback applied correctly" -ForegroundColor Gray
+}
+
 # Final summary
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
@@ -3571,6 +3728,7 @@ if ($failed -eq 0) {
     Write-Host "  • Simple Mode complete workflow (generator -> exe -> end user)" -ForegroundColor Gray
     Write-Host "  • Simple Mode feature documentation and implementation validation" -ForegroundColor Gray
     Write-Host "  • Simple Mode real-world use case scenarios (vendors, IT, modders)" -ForegroundColor Gray
+    Write-Host "  • Delta compression with full-file fallback (modified files stored as compact deltas)" -ForegroundColor Gray
     
     if ($runlargefile) {
         Write-Host "  • Large file handling with chunked processing (1.5GB file, memory optimization)" -ForegroundColor Gray

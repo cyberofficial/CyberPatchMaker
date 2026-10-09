@@ -20,18 +20,18 @@ patch-gen [options]
 | `--to <version>` | Mode 2 | Target version number (with --versions-dir) |
 | `--from-dir <path>` | Mode 3 | Full path to source version directory |
 | `--to-dir <path>` | Mode 3 | Full path to target version directory |
-| `--output <path>` | No (default: patches) | Output directory for patches (default: patches) |
+| `--output <path>` | No (default: patches) | Output directory for patches (falls back to the config file's `default_patch_output`, then `patches`) |
 | `--key-file <name>` | No | Specific key file to use (e.g., app_name.exe) |
 | `--compression <type>` | No | Compression: `zstd` (default), `gzip`, `none` |
-| `--level <n>` | No | Compression level: zstd (1-4), gzip (1-3), default: 3 |
-| `--verify` | No | Verify patches after creation (default: true) |
-| `--create-exe` | No | Create self-contained CLI executable |
+| `--level <n>` | No | Compression level: zstd (1-4), gzip (1-3), default: 3. Also controls the delta encoding effort for modified files (higher = smaller deltas, slower generation) |
+| `--verify` | No | Accepted for compatibility; currently has no effect (patch validation always runs) |
+| `--create-exe` | No | Create self-contained CLI executable (requires patch-apply.exe next to patch-gen.exe) |
 | `--silent` | No | Embed silent mode into generated executables (requires --create-exe) |
-| `--crp` | No | Create reverse patch for downgrades |
+| `--crp` | No | Create reverse patch for downgrades (named `<to>-to-<from>_rev.patch`) |
 | `--savescans` | No | Enable scan caching to `.data/` directory |
 | `--scandata <dir>` | No | Custom cache directory (default: `.data`) |
-| `--rescan` | No | Force rescan, ignoring cached data |
-| `--jobs <n>` | No | Number of parallel workers (0 = auto-detect CPU cores, 1 = single-threaded) |
+| `--rescan` | No | Force rescan, ignoring cached data (requires --savescans) |
+| `--jobs <n>` | No | Number of parallel workers (0 = config `worker_threads` which defaults to CPU count, 1 = single-threaded) |
 | `--splitsize <size>` | No | Custom multi-part split size (e.g., '2G', '500M'). Default: 4GB |
 | `--bypasssplitlimit` | No | Bypass 100MB minimum split size confirmation |
 | `--version` | No | Show version information |
@@ -43,6 +43,8 @@ patch-gen [options]
 |------|------|
 | 0 | Success |
 | 1 | Error (all error conditions) |
+
+Notes: invalid flag syntax exits with code 2 (Go flag package behavior); answering "no" to the sub-100MB `--splitsize` confirmation also exits 0.
 
 ### Examples
 
@@ -112,8 +114,8 @@ patch-apply [options]
 - **Structure**: Mirror directory hierarchy preserving exact original paths
 - **Preservation**: Kept after successful patching for manual rollback capability
 - **Benefits**:
-  - Minimal disk space (e.g., 2.8MB vs 5.2GB = 99.5% reduction)
-  - Fast backup creation (e.g., 2s vs 45s = 95% faster)
+  - Minimal disk space (only changed files, not the whole installation)
+  - Fast backup creation
   - Intuitive rollback (mirror structure = drag-and-drop restore)
   - Transparent about changes (shows exactly what was backed up)
 
@@ -166,10 +168,10 @@ patch-apply --patch ./patches/1.0.0-to-1.0.3.patch \
             --current-dir ./myapp \
             --key-file app.exe
 
-# Or with absolute path
+# Key file in a subdirectory (resolved relative to current-dir)
 patch-apply --patch ./patches/1.0.0-to-1.0.3.patch \
             --current-dir ./myapp \
-            --key-file C:\MyApp\renamed_program.exe
+            --key-file bin/program.exe
 ```
 
 **Silent Mode** (for automation/CI-CD):
@@ -276,7 +278,8 @@ patch-gen --versions-dir ./versions \
 
 # Apply without verification (fastest)
 patch-apply --patch ./patches/1.0.0-to-1.0.3.patch \
-        --current-dir ./test-app
+        --current-dir ./test-app \
+        --verify=false
 ```
 
 ### Large Projects with Scan Cache
@@ -310,8 +313,7 @@ patch-gen --versions-dir ./versions \
 ```
 
 **Benefits:**
-- **Small projects**: Minimal improvement (5-10ms saved)
-- **Large projects**: Massive improvement (15+ minute scan → <1 second load)
+- **Large projects**: Massive improvement (full scan skipped entirely, e.g. a ~15 minute scan loads instantly from cache)
 - **Example**: War Thunder (34,650 files) - 15 min scan → instant cache load
 - Cache validates key file hash to prevent using stale data
 - Works with both `--versions-dir` and custom paths (`--from-dir`/`--to-dir`)
@@ -321,13 +323,13 @@ patch-gen --versions-dir ./versions \
 
 ## Environment Variables
 
-Currently, no environment variables are used. All configuration is via command-line flags.
+No tool-specific environment variables are defined. Standard OS variables (`HOME`/`USERPROFILE`, `APPDATA`, `XDG_CONFIG_HOME`, `TEMP`) are used only to locate the optional configuration file and default temp/output paths; all tool behavior is configured via command-line flags.
 
 ---
 
 ## Configuration Files
 
-Configuration can be set via command-line flags. A configuration file is also supported (see development-setup.md for details).
+A `config.json` file is supported (loaded by the generator from the OS-specific config directory: `%APPDATA%\CyberPatchMaker\config.json` on Windows, `~/.config/cyberpatchmaker/config.json` on Linux, `~/Library/Application Support/CyberPatchMaker/config.json` on macOS). It can set `default_patch_output` and `worker_threads`, among other defaults.
 
 ---
 
@@ -336,72 +338,67 @@ Configuration can be set via command-line flags. A configuration file is also su
 ### Generator Output
 
 ```
-Scanning versions directory: ./versions
-Found versions: 1.0.0, 1.0.1, 1.0.2
-New version: 1.0.3
+Generating patches for new version 1.0.3
+Scanning version 1.0.3 at ./versions/1.0.3...
+Using key file: program.exe
+Version 1.0.3 registered: 156 files, 12 directories
 
-Generating patch 1.0.0 -> 1.0.3...
-  Loading manifests...
-  Comparing versions...
-  Processing modified files (full replacement)...
-  Compressing (zstd level 3)...
-  Patch saved to: patches/1.0.0-to-1.0.3.patch (2.1 MB)
+Processing version 1.0.0...
+Generating patch from 1.0.0 to 1.0.3...
+Changes detected: 5 added, 12 modified, 3 deleted files, 2 added dirs, 1 deleted dirs
+Patch saved to: patches/1.0.0-to-1.0.3.patch
 
-Generating patch 1.0.1 -> 1.0.3...
-  ...
-  ✓ Success: patches/1.0.1-to-1.0.3.patch (1.8 MB)
+Processing version 1.0.1...
+Generating patch from 1.0.1 to 1.0.3...
+Changes detected: 2 added, 8 modified, 1 deleted files, 0 added dirs, 0 deleted dirs
+Patch saved to: patches/1.0.1-to-1.0.3.patch
 
-Generating patch 1.0.2 -> 1.0.3...
-  ...
-  ✓ Success: patches/1.0.2-to-1.0.3.patch (1.2 MB)
-
-All patches generated successfully!
-Total: 3 patches, 5.1 MB
+Successfully generated 2 patches
 ```
 
 ### Applier Output
 
 ```
-Loading patch: patches/1.0.0-to-1.0.3.patch
-
 === Patch Information ===
-From Version: 1.0.0
-To Version:   1.0.3
-Key File:     program.exe
-Created:      2025-10-04 10:30:00
-Patch Size:   2.1 MB
-Compression:  zstd
-
-Operations:
-  5 files to add
-  12 files to modify
-  3 files to delete
+From Version:     1.0.0
+To Version:       1.0.3
+Key File:         program.exe
+Required Hash:    63573ff071ea5fa2...
+Patch Size:       2202010 bytes
+Compression:      zstd
+Created:          2025-10-04 10:30:00
+Files Added:      5
+Files Modified:   12
+Files Deleted:    3
+Dirs Added:       2
+Dirs Deleted:     1
+Required Files:   41 (must match exact hashes)
 
 Applying patch from 1.0.0 to 1.0.3...
 Verifying current version...
-✓ Pre-patch verification successful
+Pre-patch verification successful
 
-Creating selective backup...
-  Backing up: program.exe
-  Backing up: data/config.json
-  Backing up: libs/oldfeature.dll
-  ... (9 more files - only changed/deleted files)
-✓ Selective backup created
+Creating backup...
+Backed up 15 files
+Backup created at: ./myapp/backup.cyberpatcher
+Note: Backup will be preserved after patching for manual rollback
 
 Applying 20 operations...
   Modified: program.exe
   Modified: data/config.json
-  Added: libs/newfeature.dll (NOT backed up - didn't exist before)
+  Added: libs/newfeature.dll
   Deleted: libs/oldfeature.dll
   ... (16 more operations)
 
-✓ Post-patch verification successful
+Verifying patched version...
+Post-patch verification successful
+Patch applied successfully
 
-Backup preserved in: ./myapp/backup.cyberpatcher
+Backup preserved at: ./myapp/backup.cyberpatcher
+To rollback: Copy files from backup folder to their original locations
 
 === Patch Applied Successfully ===
 Version updated from 1.0.0 to 1.0.3
-Time elapsed: 8.2 seconds (selective backup saved time!)
 ```
 
 ---
@@ -438,7 +435,7 @@ patch-apply.exe --patch .\patches\1.0.0-to-1.0.3.patch --current-dir .\myapp --v
 
 **Permissions:** May need to make executables:
 ```bash
-chmod +x generator applier
+chmod +x patch-gen patch-apply
 ```
 
 ---
@@ -495,12 +492,13 @@ echo "Generating patches for version $NEW_VERSION..."
     --new-version "$NEW_VERSION" \
     --output "$OUTPUT_DIR" \
     --verify
+status=$?
 
-if [ $? -eq 0 ]; then
+if [ $status -eq 0 ]; then
     echo "Success! Patches generated in $OUTPUT_DIR"
 else
-    echo "Patch generation failed with exit code $?"
-    exit $?
+    echo "Patch generation failed with exit code $status"
+    exit $status
 fi
 ```
 

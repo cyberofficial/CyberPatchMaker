@@ -48,7 +48,7 @@ Version 1.0.0:
   
 Version 1.0.1:
   Key File: program.exe
-  Checksum: x9y8z7w6v5u4...  ← Different hash = different version
+  Checksum: 9f8e7d6c5b4a...  ← Different hash = different version
 ```
 
 Even if the filename is identical (`program.exe`), the **hash uniquely identifies each version**.
@@ -64,12 +64,14 @@ When no `--key-file` flag is provided, the generator automatically looks for a k
 3. `app.exe`
 4. `main.exe`
 
-If one of these files is found, it is used as the key file. If none are found, patch generation fails with an error:
+If one of these files is found, it is used as the key file. If none are found in the new/target version (or in single-patch mode), patch generation fails with an error:
 
 ```
 Error: could not find key file (program.exe, game.exe, app.exe, or main.exe)
 Hint: Use --key-file to specify a custom key file
 ```
+
+In batch mode (`--new-version`), source versions without a detectable key file are skipped with a warning instead of failing the run.
 
 ### Manual Override with --key-file
 
@@ -118,17 +120,17 @@ Version registration happens automatically when you generate patches. The system
 ```
 1. Load source manifest (1.0.0) → key_file: "program.exe" (hash: abc123...)
 2. Load target manifest (1.0.3) → key_file: "program.exe" (hash: xyz789...)
-3. Embed in patch:
+3. Embed in patch (JSON keys match the Go field names — no JSON tags are defined):
    {
-     "from_key_file": {
-       "path": "program.exe",
-       "checksum": "abc123...",
-       "size": 14680064
+     "FromKeyFile": {
+       "Path": "program.exe",
+       "Checksum": "abc123...",
+       "Size": 14680064
      },
-     "to_key_file": {
-       "path": "program.exe",
-       "checksum": "xyz789...",
-       "size": 15728640
+     "ToKeyFile": {
+       "Path": "program.exe",
+       "Checksum": "xyz789...",
+       "Size": 15728640
      }
    }
 ```
@@ -303,8 +305,8 @@ User renamed:
 ### Hash Calculation
 
 - Hash calculated once during version registration
-- Cached in manifest (no recalculation needed)
-- Only recalculated during patch verification
+- Cached in manifest
+- Recalculated during patch verification, when loading a cached scan (the key file's checksum is re-verified against the file on disk), and during rescan
 
 ## Security Considerations
 
@@ -317,7 +319,6 @@ User renamed:
 
 **Practical Security**:
 - No known SHA-256 collisions for real-world executables
-- Quantum computers would need ~10^20 operations (not practical)
 - More secure than MD5/SHA-1 (both have known collisions)
 
 ### Tampering Detection

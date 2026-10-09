@@ -23,6 +23,7 @@ Perfect for:
 ## Key Features
 
 - **Safe & Reliable** - Automatic verification and rollback if anything goes wrong
+- **Delta Compression** - Modified files are stored as compact zstd dictionary deltas (old file as dictionary) with automatic fallback to full replacement when a delta isn't smaller
 - **Efficient** - Smart compression reduces patch sizes by ~60%
 - **Bidirectional** - Generate both upgrade and downgrade patches for version flexibility
 - **Cross-Platform** - Works on Windows, macOS, and Linux

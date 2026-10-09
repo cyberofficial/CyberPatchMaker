@@ -64,22 +64,27 @@ func DecompressData(data []byte, algorithm string) ([]byte, error) {
 	}
 }
 
+// mapZstdLevel maps the user-facing compression level (1-4) to a zstd
+// encoder speed preset. Shared by whole-patch compression and delta encoding.
+func mapZstdLevel(level int) zstd.EncoderLevel {
+	switch level {
+	case 1:
+		return zstd.SpeedFastest
+	case 2:
+		return zstd.SpeedDefault
+	case 3:
+		return zstd.SpeedBetterCompression
+	case 4:
+		return zstd.SpeedBestCompression
+	default:
+		return zstd.SpeedDefault
+	}
+}
+
 func compressZstd(data []byte, level int) ([]byte, error) {
 	var buf bytes.Buffer
 
-	encoderLevel := zstd.SpeedDefault
-	switch level {
-	case 1:
-		encoderLevel = zstd.SpeedFastest
-	case 2:
-		encoderLevel = zstd.SpeedDefault
-	case 3:
-		encoderLevel = zstd.SpeedBetterCompression
-	case 4:
-		encoderLevel = zstd.SpeedBestCompression
-	}
-
-	encoder, err := zstd.NewWriter(&buf, zstd.WithEncoderLevel(encoderLevel))
+	encoder, err := zstd.NewWriter(&buf, zstd.WithEncoderLevel(mapZstdLevel(level)))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create zstd encoder: %w", err)
 	}
@@ -187,19 +192,7 @@ func DecompressDataStreaming(src io.Reader, dst io.Writer, algorithm string) err
 }
 
 func compressZstdStreaming(src io.Reader, dst io.Writer, level int) error {
-	encoderLevel := zstd.SpeedDefault
-	switch level {
-	case 1:
-		encoderLevel = zstd.SpeedFastest
-	case 2:
-		encoderLevel = zstd.SpeedDefault
-	case 3:
-		encoderLevel = zstd.SpeedBetterCompression
-	case 4:
-		encoderLevel = zstd.SpeedBestCompression
-	}
-
-	encoder, err := zstd.NewWriter(dst, zstd.WithEncoderLevel(encoderLevel))
+	encoder, err := zstd.NewWriter(dst, zstd.WithEncoderLevel(mapZstdLevel(level)))
 	if err != nil {
 		return fmt.Errorf("failed to create zstd encoder: %w", err)
 	}

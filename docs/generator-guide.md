@@ -1,10 +1,10 @@
 # Generator Tool Guide
 
-Complete guide to using the CyberPatchMaker generator tool for creating delta patches.
+Complete guide to using the CyberPatchMaker generator tool for creating patches.
 
 ## Overview
 
-The generator tool creates efficient binary patches between software versions. It compares two complete directory trees and generates a small patch file containing only the changes.
+The generator tool creates efficient binary patches between software versions. It compares two complete directory trees and generates a patch file containing only the changes. Modified files are stored as compact zstd dictionary deltas (the old file content is used as the compression dictionary for the new content) whenever the delta is smaller than the full file, with automatic fallback to storing the full new file.
 
 ## Basic Usage
 
@@ -27,30 +27,24 @@ This will:
 **Example Output:**
 ```
 Generating patches for new version 1.0.3
-Scanning version 1.0.3...
+Scanning version 1.0.3 at ./versions/1.0.3...
 Using key file: program.exe
 Version 1.0.3 registered: 156 files, 12 directories
 
 Processing version 1.0.0...
 Generating patch from 1.0.0 to 1.0.3...
-  5 files added
-  12 files modified
-  3 files deleted
-  2 directories added
-Patch saved to: patches/1.0.0-to-1.0.3.patch (2.1 MB)
+Changes detected: 5 added, 12 modified, 3 deleted files, 2 added dirs, 1 deleted dirs
+Patch saved to: patches/1.0.0-to-1.0.3.patch
 
 Processing version 1.0.1...
 Generating patch from 1.0.1 to 1.0.3...
-  2 files added
-  8 files modified
-  1 file deleted
-Patch saved to: patches/1.0.1-to-1.0.3.patch (1.5 MB)
+Changes detected: 2 added, 8 modified, 1 deleted files, 0 added dirs, 1 deleted dirs
+Patch saved to: patches/1.0.1-to-1.0.3.patch
 
 Processing version 1.0.2...
 Generating patch from 1.0.2 to 1.0.3...
-  1 file added
-  4 files modified
-Patch saved to: patches/1.0.2-to-1.0.3.patch (0.8 MB)
+Changes detected: 1 added, 4 modified, 0 deleted files, 0 added dirs, 0 deleted dirs
+Patch saved to: patches/1.0.2-to-1.0.3.patch
 
 Successfully generated 3 patches
 ```
@@ -85,7 +79,8 @@ This registers both versions automatically during the generation process.
 - Required when using `--versions-dir`
 
 **`--output <path>`**
-- Directory where patch files will be saved
+- Directory where patch files will be saved (optional)
+- Defaults to the `default_patch_output` setting in the config file, then `patches`
 - Directory is created if it doesn't exist
 - Patches named automatically: `{from}-to-{to}.patch`
 
@@ -107,7 +102,8 @@ This registers both versions automatically during the generation process.
 - Example: `1.0.3`
 
 **`--output <path>`**
-- Full path to the output directory for patch files
+- Full path to the output directory for patch files (optional)
+- Defaults to the `default_patch_output` setting in the config file, then `patches`
 - Directory is created if it doesn't exist
 - Patches named automatically: `{from}-to-{to}.patch`
 
@@ -135,17 +131,17 @@ This registers both versions automatically during the generation process.
 - Higher levels take longer but save bandwidth
 
 **`--verify`**
-- Verify patches after creation
-- Re-loads and validates patch metadata
-- Recommended for production patches
-- Adds time to generation process
-- **Note:** Verification is always enabled during patch generation regardless of this flag
+- Accepted for compatibility, but currently has no effect
+- Patch validation always runs during generation regardless of this flag and cannot be disabled
+- **Note:** This flag does not add time or change behavior — validation of the in-memory patch (operation consistency, checksums, sizes) is always performed
 
 **`--create-exe`**
 - Create self-contained CLI executable
 - Embeds patch data into a standalone `.exe` file
 - Creates both `.patch` file and `.exe` file
 - Uses CLI applier (console interface)
+- Requires `patch-apply.exe` to be located in the same directory as `patch-gen.exe`
+- For multi-part patches, the exe embeds part 01 only and is created only if part 01 is under 3.75GB (remaining parts are distributed alongside the exe)
 - See [Self-Contained Executables Guide](self-contained-executables.md) for details
 - Works with all generation modes (single, batch, custom paths)
 
@@ -162,10 +158,10 @@ This registers both versions automatically during the generation process.
 
 **`--crp`** (Create Reverse Patch)
 - Automatically create reverse patch for downgrades
-- Generates both forward patch (A→B) and reverse patch (B→A)
+- Generates both forward patch (A→B) and reverse patch (B→A), reusing the same scan data (no rescan)
 - Enables easy version rollback without manual patch creation
 - Works with `--create-exe` to generate reverse executables too
-- Example: Generates `1.0.0-to-1.0.1.patch` AND `1.0.1-to-1.0.0.patch`
+- Example: Generates `1.0.0-to-1.0.1.patch` AND `1.0.1-to-1.0.0_rev.patch` (reverse files carry the `_rev` suffix)
 - Compatible with all generation modes (single, batch, custom paths)
 - See [Downgrade Guide](downgrade-guide.md) for usage details
 
@@ -174,7 +170,7 @@ This registers both versions automatically during the generation process.
 - Cache stored in `.data/` directory (or custom location with `--scandata`)
 - First generation: Scans and caches (normal speed)
 - Subsequent generations: Loads from cache (instant, no rescanning)
-- **Performance**: Small projects (5-10ms saved), Large projects (15+ minutes → <1 second)
+- **Performance**: Caching skips the scan on subsequent runs; see the War Thunder example below
 - **Example**: War Thunder (34,650 files) - 15 minute scan → instant cache load
 - Cache validates key file hash to prevent using stale data
 - Works with all generation modes (batch, single, custom paths)
@@ -195,12 +191,11 @@ This registers both versions automatically during the generation process.
 
 **`--jobs <n>`** (Parallel Processing)
 - Number of parallel workers to use for file hashing and processing
-- `0` = Auto-detect CPU cores (default, recommended)
+- `0` = Use `worker_threads` from the config file (default; built-in config default is the CPU count) — recommended
 - `1` = Single-threaded (useful for debugging)
 - `2+` = Specific number of workers
-- **Performance**: Significantly faster on multi-core systems (especially for large projects)
-- **Example**: 4-core system can process 4 files simultaneously
-- Scales based on available CPU cores and I/O bandwidth
+- **Performance**: Faster on multi-core systems (especially for large projects); gains are limited by disk throughput
+- **Example**: 4-worker run hashes 4 files simultaneously
 - Works with all generation modes and compression options
 
 **`--splitsize <size>`** (Multi-Part Split Size)
@@ -212,7 +207,8 @@ This registers both versions automatically during the generation process.
 - Use cases:
   - Hosting platforms with file size limits
   - Email attachments or transfer services with restrictions
-  - Memory-constrained systems during patch application
+  - Keeping individual patch part files small for distribution
+- Note: splitting limits part file sizes on disk; it does not reduce peak memory during generation or application
 - See [Multi-Part Patches Guide](multipart-patches.md) for details
 
 **`--bypasssplitlimit`**
@@ -236,17 +232,17 @@ This registers both versions automatically during the generation process.
 
 **`--from-dir <path>`**
 - Full path to source version directory
-- Overrides `--versions-dir` and `--from`
+- Used together with `--to-dir` (both are required for this mode)
 - Use when source version is not in versions directory
 - Example: `D:\builds\old-version`
-- Takes priority over `--versions-dir`/`--from`/`--to` (provides custom source path directly)
+- Takes priority over `--from`/`--to` (but not over `--new-version`); version numbers for file naming are taken from the directory base names
 
 **`--to-dir <path>`**
 - Full path to target version directory
-- Overrides `--versions-dir` and `--to`
+- Used together with `--from-dir` (both are required for this mode)
 - Use when target version is not in versions directory
 - Example: `C:\projects\new-release`
-- Takes priority over `--versions-dir`/`--from`/`--to` (provides custom target path directly)
+- Takes priority over `--from`/`--to` (but not over `--new-version`); version numbers for file naming are taken from the directory base names
 
 **Custom Path Example:**
 ```bash
@@ -309,7 +305,7 @@ The generator automatically detects your key file by looking for:
 - Prevents applying patches to wrong versions
 - Verified before patch application
 
-If none of these files exist, generation will fail with an error.
+If none of these files exist, generation fails with an error for the new/target version and in single-patch modes. In batch mode (`--new-version`), source versions without a detectable key file are skipped with a warning.
 
 ---
 
@@ -331,8 +327,6 @@ If none of these files exist, generation will fail with an error.
 - Bandwidth is a concern
 - Fast patching is important
 
-**Example:** 5MB of changes → 1.2MB patch file
-
 ---
 
 ### gzip
@@ -350,8 +344,6 @@ If none of these files exist, generation will fail with an error.
 **Use When:**
 - Compatibility is critical
 - Target systems may not have modern libraries
-
-**Example:** 5MB of changes → 1.8MB patch file
 
 ---
 
@@ -371,8 +363,6 @@ If none of these files exist, generation will fail with an error.
 - Local testing only
 - Network speed not a concern
 - Debugging patch generation
-
-**Example:** 5MB of changes → 5MB patch file
 
 ---
 
@@ -515,14 +505,18 @@ patch-gen --versions-dir ./versions --new-version 1.0.3 --output ./patches --crp
 **Result:**
 ```
 patches/
-├── 1.0.0-to-1.0.1.patch     ← Forward patch (upgrade)
-├── 1.0.0-to-1.0.1.exe       ← Forward executable
-├── 1.0.1-to-1.0.0.patch     ← Reverse patch (downgrade)
-├── 1.0.1-to-1.0.0.exe       ← Reverse executable
+├── 1.0.0-to-1.0.3.patch       ← Forward patch (upgrade)
+├── 1.0.0-to-1.0.3.exe         ← Forward executable
+├── 1.0.3-to-1.0.0_rev.patch   ← Reverse patch (downgrade)
+├── 1.0.3-to-1.0.0_rev.exe     ← Reverse executable
+├── 1.0.1-to-1.0.3.patch
+├── 1.0.1-to-1.0.3.exe
+├── 1.0.3-to-1.0.1_rev.patch
+├── 1.0.3-to-1.0.1_rev.exe
 ├── 1.0.2-to-1.0.3.patch
 ├── 1.0.2-to-1.0.3.exe
-├── 1.0.3-to-1.0.2.patch     ← Reverse patch
-└── 1.0.3-to-1.0.2.exe       ← Reverse executable
+├── 1.0.3-to-1.0.2_rev.patch
+└── 1.0.3-to-1.0.2_rev.exe
 ```
 
 **Benefits:**
@@ -547,7 +541,7 @@ See [Downgrade Guide](downgrade-guide.md) for complete documentation.
 
 ### Example 9: Embedded Silent Mode for Automated Patches
 
-**Available since v1.0.11**: Create self-contained executables that automatically apply patches without user interaction.
+**Available since v1.0.15**: Create self-contained executables that automatically apply patches without user interaction.
 
 The `--silent` flag embeds silent mode into generated executables, making them perfect for automated deployments where you want users to simply run the file and have it patch automatically.
 
@@ -576,7 +570,7 @@ patches/
 - User downloads `1.0.0-to-1.0.3.exe`
 - User double-clicks the executable
 - Patch applies automatically (no prompts, no menus)
-- Creates log file `log_<epochtime>.txt` with complete execution details
+- Creates log file `log_<epochtime>.txt` (in the working directory) with patch info, status, and any errors
 - Returns exit code 0 on success, 1 on failure
 
 **Difference from Applier --silent Flag:**
@@ -600,10 +594,10 @@ patch-gen --from-dir "C:\releases\1.0.0" --to-dir "C:\releases\1.0.1" --output .
 **Result:**
 ```
 patches/
-├── 1.0.0-to-1.0.1.patch     ← Forward patch
-├── 1.0.0-to-1.0.1.exe       ← Forward silent executable (auto-upgrade)
-├── 1.0.1-to-1.0.0.patch     ← Reverse patch
-└── 1.0.1-to-1.0.0.exe       ← Reverse silent executable (auto-downgrade)
+├── 1.0.0-to-1.0.1.patch       ← Forward patch
+├── 1.0.0-to-1.0.1.exe         ← Forward silent executable (auto-upgrade)
+├── 1.0.1-to-1.0.0_rev.patch   ← Reverse patch
+└── 1.0.1-to-1.0.0_rev.exe     ← Reverse silent executable (auto-downgrade)
 ```
 
 **When to Use Embedded Silent Mode:**
@@ -622,8 +616,8 @@ patches/
 **Log File Details:**
 When a silent mode executable runs, it creates a timestamped log file:
 - Filename: `log_<unix_timestamp>.txt`
-- Location: Same directory as executable
-- Contents: Patch info, target directory, success/failure status, error messages
+- Location: created in the current working directory (the executable's folder when launched by double-click)
+- Contents: Patch info, target directory, status, and error messages (per-operation applier progress goes to the console only)
 - Enables audit trails for automated deployments
 
 **Security Note:**
@@ -656,12 +650,7 @@ See [Self-Contained Executables Guide](self-contained-executables.md) for comple
    - gzip: medium size, medium speed
    - none: no reduction
 
-### Typical Patch Sizes
-
-For a 5GB application:
-- **Few bug fixes** (10MB changed): ~2-5MB patch
-- **Feature update** (50MB changed): ~10-20MB patch
-- **Major overhaul** (500MB changed): ~100-200MB patch
+Because modified files are stored as deltas when beneficial, a patch contains roughly the full size of every added file but only the changed regions of modified files — a small edit to a large binary typically produces a delta of a few hundred bytes. When a delta is not smaller than the new file (for example, replaced content in already-compressed media), the full (compressed) file is stored instead.
 
 ---
 
@@ -670,7 +659,7 @@ For a 5GB application:
 ### For Large Applications (5GB+)
 
 1. **Use Default Settings**: zstd level 3 is well-optimized
-2. **Sufficient RAM**: Generation uses ~500MB max
+2. **Sufficient RAM**: All added/modified files are held in memory during generation — ensure RAM on the order of the total changed-file size
 3. **Fast Storage**: SSD recommended for large version folders
 
 ### For Large Projects (1000+ Files) - Use Scan Cache
@@ -692,9 +681,8 @@ patch-gen --versions-dir ./versions \
 ```
 
 **Performance Benefits:**
-- **Small projects** (< 1,000 files): 5-10ms saved (minimal benefit)
-- **Medium projects** (1,000-10,000 files): 1-5 seconds saved
-- **Large projects** (10,000+ files): 15+ minutes → <1 second (massive improvement)
+- Skips the full directory scan on every subsequent generation
+- **Large projects** benefit most — e.g. the real-world War Thunder scan (~34,650 files, ~15 minutes) loads from cache instantly
 - **Example**: War Thunder (34,650 files) - 15 minute scan → instant cache load
 
 **How it Works:**
@@ -793,7 +781,7 @@ If you have 10+ versions:
 
 ### Patch Generation
 
-1. **Always Verify**: Use `--verify` flag for production patches
+1. **Validation is automatic**: Patches are always validated during generation (the `--verify` flag has no additional effect)
 2. **Default Compression**: Stick with zstd unless you have a reason not to
 3. **Test First**: Generate and test patches before distributing
 4. **Document Changes**: Keep changelog for each version

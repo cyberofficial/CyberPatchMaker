@@ -59,9 +59,8 @@ You want to create a small patch file to upgrade 1.0.0 to 1.0.1.
 Create a versions directory:
 
 ```bash
-mkdir versions
-mkdir versions\1.0.0
-mkdir versions\1.0.1
+mkdir -p versions/1.0.0
+mkdir -p versions/1.0.1
 ```
 
 Copy your version folders into the structure:
@@ -155,7 +154,7 @@ Check your test-app directory - it should now be version 1.0.1!
 
 **"Checksum mismatch"**: Your application files were changed after installation - patches only work on unmodified installations
 
-**"Too many arguments"**: Make sure you're using the latest version of the tools
+**"Error: insufficient arguments"**: You did not provide the required flags — check the command syntax with `--help` (the applier prints "--patch and --current-dir are required" if those flags are missing).
 
 See [Troubleshooting](troubleshooting.md) for more help.
 
@@ -168,4 +167,4 @@ Want to verify everything works? Run the comprehensive test suite:
 .\advanced-test.ps1
 ```
 
-This runs 59 automated tests (plus 2 optional with additional flags) to validate the entire system.
+This runs 67 standard tests (plus 2 optional with additional flags) to validate the entire system.

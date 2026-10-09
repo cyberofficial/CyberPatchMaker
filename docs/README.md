@@ -24,7 +24,7 @@
 
 ### Advanced Features
 - [Scan Caching](scan-caching.md) — Instant patch generation with cached scans
-- [Large File Handling](large-file-handling.md) — Memory-efficient processing for files >1GB
+- [Large File Handling](large-file-handling.md) — Chunked writes for files >1GB
 - [Multi-Part Patches](multipart-patches.md) — Automatic splitting of patches >4GB
 
 ### Technical Reference
@@ -52,4 +52,4 @@
 
 ## Documentation Version
 
-This documentation corresponds to CyberPatchMaker v1.0.16.
+This documentation corresponds to CyberPatchMaker v2.0.0.
